@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {{ data_type.upper() }} Equipment List
+{% endblock %}
+
+{% block content %}
+    <h2>{{ data_type.upper() }} Equipment List</h2>
+    <a href="{{ url_for('views.add_ppm_equipment') if data_type == 'ppm' else '#' }}" class="btn btn-primary mb-3 {% if data_type == 'ocm' %}disabled{% endif %}">Add New {{ data_type.upper() }}</a> {# Add button, disabled for OCM for now #}
+    <a href="{{ url_for('views.import_export_page') }}" class="btn btn-secondary mb-3">Import/Export</a>
+
+    {% if equipment %}
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Equipment</th>
+                    <th>Model</th>
+                    <th>MFG Serial</th>
+                    <th>Manufacturer</th>
+                    <th>Log No</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in equipment %}
+                    <tr>
+                        <td>{{ entry.get('EQUIPMENT', '') }}</td>
+                        <td>{{ entry.get('MODEL', '') }}</td>
+                        <td>{{ entry.get('MFG_SERIAL', '') }}</td>
+                        <td>{{ entry.get('MANUFACTURER', '') }}</td>
+                        <td>{{ entry.get('LOG_NO', '') }}</td>
+                        <td>
+                            {# Edit Button #}
+                            <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=entry.MFG_SERIAL) if data_type == 'ppm' else '#' }}" class="btn btn-sm btn-warning {% if data_type == 'ocm' %}disabled{% endif %}">Edit</a>
+
+                            {# Delete Button Form #}
+                            <form action="{{ url_for('views.delete_equipment', data_type=data_type, mfg_serial=entry.MFG_SERIAL) }}" method="post" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No {{ data_type.upper() }} equipment found.</p>
+    {% endif %}
+{% endblock %}
+

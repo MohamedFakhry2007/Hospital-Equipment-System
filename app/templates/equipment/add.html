@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Add {{ data_type.upper() }} Equipment</h2>
+    <form action="{{ url_for('views.add_ppm_equipment') }}" method="post">
+        <div class="mb-3">
+            <label for="EQUIPMENT" class="form-label">Equipment</label>
+            <input type="text" class="form-control" id="EQUIPMENT" name="EQUIPMENT" value="{{ form_data.EQUIPMENT or '' }}" required>
+            {% if errors.EQUIPMENT %}
+            <div class="text-danger">{{ errors.EQUIPMENT[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="MODEL" class="form-label">Model</label>
+            <input type="text" class="form-control" id="MODEL" name="MODEL" value="{{ form_data.MODEL or '' }}" required>
+            {% if errors.MODEL %}
+            <div class="text-danger">{{ errors.MODEL[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="MFG_SERIAL" class="form-label">MFG Serial</label>
+            <input type="text" class="form-control" id="MFG_SERIAL" name="MFG_SERIAL" value="{{ form_data.MFG_SERIAL or '' }}" required>
+            {% if errors.MFG_SERIAL %}
+            <div class="text-danger">{{ errors.MFG_SERIAL[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="MANUFACTURER" class="form-label">Manufacturer</label>
+            <input type="text" class="form-control" id="MANUFACTURER" name="MANUFACTURER" value="{{ form_data.MANUFACTURER or '' }}" required>
+            {% if errors.MANUFACTURER %}
+            <div class="text-danger">{{ errors.MANUFACTURER[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="LOG_NO" class="form-label">Log No</label>
+            <input type="text" class="form-control" id="LOG_NO" name="LOG_NO" value="{{ form_data.LOG_NO or '' }}" required>
+            {% if errors.LOG_NO %}
+            <div class="text-danger">{{ errors.LOG_NO[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="PPM" class="form-label">PPM</label>
+            <select class="form-select" id="PPM" name="PPM" required>
+                <option value="Yes" {% if form_data.PPM == 'Yes' %}selected{% endif %}>Yes</option>
+                <option value="No" {% if form_data.PPM == 'No' %}selected{% endif %}>No</option>
+            </select>
+            {% if errors.PPM %}
+            <div class="text-danger">{{ errors.PPM[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="mb-3">
+            <label for="OCM" class="form-label">OCM</label>
+            <input type="text" class="form-control" id="OCM" name="OCM" value="{{ form_data.OCM or '' }}">
+        </div>
+
+        {% for q in ['I', 'II', 'III', 'IV'] %}
+        <div class="mb-3">
+            <label for="PPM_Q_{{ q }}_date" class="form-label">PPM Quarter {{ q }} Date</label>
+            <input type="text" class="form-control" id="PPM_Q_{{ q }}_date" name="PPM_Q_{{ q }}_date" value="{{ form_data['PPM_Q_' + q + '_date'] or '' }}" required>
+            {% if errors['PPM_Q_' + q] and errors['PPM_Q_' + q][0] %}
+            <div class="text-danger">{{ errors['PPM_Q_' + q][0] }}</div>
+            {% endif %}
+            <label for="PPM_Q_{{ q }}_engineer" class="form-label">PPM Quarter {{ q }} Engineer</label>
+            <input type="text" class="form-control" id="PPM_Q_{{ q }}_engineer" name="PPM_Q_{{ q }}_engineer" value="{{ form_data['PPM_Q_' + q + '_engineer'] or '' }}" required>
+            {% if errors['PPM_Q_' + q] and errors['PPM_Q_' + q][1] %}
+            <div class="text-danger">{{ errors['PPM_Q_' + q][1] }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary">Add Equipment</button>
+    </form>
+</div>
+{% endblock %}

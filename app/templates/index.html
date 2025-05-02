@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h2>PPM Equipment Dashboard</h2>
+
+        <div class="d-flex justify-content-between mb-3">
+            <div>
+                <a href="{{ url_for('views.add_ppm_equipment') }}" class="btn btn-primary">Add Equipment</a>
+                <a href="{{ url_for('views.import_export_page') }}" class="btn btn-secondary">Import/Export</a>
+            </div>
+            <div>
+                <input type="text" id="searchInput" class="form-control" placeholder="Search Equipment...">
+            </div>
+        </div>
+
+        {% if equipment %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="equipmentTable">
+                    <thead>
+                        <tr>
+                            <th>Equipment</th>
+                            <th>Model</th>
+                            <th>Serial Number</th>
+                            <th>Manufacturer</th>
+                            <th>PPM</th>
+                            <th>OCM</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in equipment %}
+                            <tr>
+                                <td>{{ item.EQUIPMENT }}</td>
+                                <td>{{ item.MODEL }}</td>
+                                <td>{{ item.MFG_SERIAL }}</td>
+                                <td>{{ item.MANUFACTURER }}</td>
+                                <td>{{ item.PPM }}</td>
+                                <td>{{ item.OCM }}</td>
+                                <td><a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>No PPM equipment found.</p>
+        {% endif %}
+    </div>
+{% endblock %}

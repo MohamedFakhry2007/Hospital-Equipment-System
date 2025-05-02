@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Edit {{ data_type.upper() }} Equipment</h2>
+
+    <!-- Display General Errors -->
+    {% if errors and errors|length > 0 %}
+        <div class="alert alert-danger">
+            {% for field, field_errors in errors.items() %}
+                {% for error in field_errors %}{{ field }}: {{ error }}<br/>{% endfor %}
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="EQUIPMENT" class="form-label">Equipment</label>
+                    <input type="text" class="form-control {% if errors.EQUIPMENT %}is-invalid{% endif %}" id="EQUIPMENT" name="EQUIPMENT" value="{{ entry.EQUIPMENT }}" required>
+                    {% if errors.EQUIPMENT %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.EQUIPMENT %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="MODEL" class="form-label">Model</label>
+                    <input type="text" class="form-control {% if errors.MODEL %}is-invalid{% endif %}" id="MODEL" name="MODEL" value="{{ entry.MODEL }}" required>
+                    {% if errors.MODEL %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.MODEL %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="MFG_SERIAL" class="form-label">MFG Serial</label>
+                    <input type="text" class="form-control {% if errors.MFG_SERIAL %}is-invalid{% endif %}" id="MFG_SERIAL" name="MFG_SERIAL" value="{{ entry.MFG_SERIAL }}" required readonly>
+                    {% if errors.MFG_SERIAL %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.MFG_SERIAL %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="MANUFACTURER" class="form-label">Manufacturer</label>
+                    <input type="text" class="form-control {% if errors.MANUFACTURER %}is-invalid{% endif %}" id="MANUFACTURER" name="MANUFACTURER" value="{{ entry.MANUFACTURER }}" required>
+                    {% if errors.MANUFACTURER %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.MANUFACTURER %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="LOG_NO" class="form-label">Log No.</label>
+                    <input type="text" class="form-control {% if errors.LOG_NO %}is-invalid{% endif %}" id="LOG_NO" name="LOG_NO" value="{{ entry.LOG_NO }}" required>
+                    {% if errors.LOG_NO %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.LOG_NO %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="mb-3">
+                    <label for="PPM" class="form-label">PPM</label>
+                    <select class="form-select {% if errors.PPM %}is-invalid{% endif %}" id="PPM" name="PPM" required>
+                        <option value="Yes" {% if entry.PPM == 'Yes' %}selected{% endif %}>Yes</option>
+                        <option value="No" {% if entry.PPM == 'No' %}selected{% endif %}>No</option>
+                    </select>
+                    {% if errors.PPM %}
+                        <div class="invalid-feedback">
+                            {% for error in errors.PPM %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                {% include 'equipment/_ppm_quarters.html' %}
+                <button type="submit" class="btn btn-primary">Update Equipment</button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
