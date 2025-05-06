@@ -1,52 +1,137 @@
+
 {% extends 'base.html' %}
 
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h2>PPM Equipment Dashboard</h2>
+<div class="container mt-4">
+    <h1 class="mb-4">Dashboard</h1>
+    <p class="lead mb-5">Monitor and manage your machine maintenance schedule</p>
 
-        <div class="d-flex justify-content-between mb-3">
-            <div>
-                <a href="{{ url_for('views.add_ppm_equipment') }}" class="btn btn-primary">Add Equipment</a>
-                <a href="{{ url_for('views.import_export_page') }}" class="btn btn-secondary">Import/Export</a>
-            </div>
-            <div>
-                <input type="text" id="searchInput" class="form-control" placeholder="Search Equipment...">
+    <div class="date-display mb-4">
+        {{ current_date }}
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Machines</h5>
+                    <h2 class="card-text">{{ total_machines }}</h2>
+                    <p>Machines under maintenance</p>
+                </div>
             </div>
         </div>
-
-        {% if equipment %}
-            <div class="table-responsive">
-                <table class="table table-striped table-hover" id="equipmentTable">
-                    <thead>
-                        <tr>
-                            <th>Equipment</th>
-                            <th>Model</th>
-                            <th>Serial Number</th>
-                            <th>Manufacturer</th>
-                            <th>PPM</th>
-                            <th>OCM</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in equipment %}
-                            <tr>
-                                <td>{{ item.EQUIPMENT }}</td>
-                                <td>{{ item.MODEL }}</td>
-                                <td>{{ item.MFG_SERIAL }}</td>
-                                <td>{{ item.MANUFACTURER }}</td>
-                                <td>{{ item.PPM }}</td>
-                                <td>{{ item.OCM }}</td>
-                                <td><a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a></td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Overdue</h5>
+                    <h2 class="card-text">{{ overdue_count }}</h2>
+                    <p>Require immediate attention</p>
+                </div>
             </div>
-        {% else %}
-            <p>No PPM equipment found.</p>
-        {% endif %}
+        </div>
     </div>
+
+    <div class="row mb-4">
+        {% for days in [7, 14, 21, 30, 60, 90] %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Coming Up ({{ days }} days)</h5>
+                    <h2 class="card-text">{{ upcoming_counts[days] if upcoming_counts[days] else 0 }}</h2>
+                    <p>Due for maintenance soon</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Frequency</h5>
+                    <div class="d-flex justify-content-around">
+                        <div class="text-center">
+                            <h3>{{ quarterly_count }}</h3>
+                            <p>Quarterly</p>
+                        </div>
+                        <div class="text-center">
+                            <h3>{{ yearly_count }}</h3>
+                            <p>Yearly</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title">Machine List</h5>
+                        <div class="d-flex gap-2">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search machines...">
+                            <select id="frequencyFilter" class="form-select">
+                                <option value="">Frequency</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                            <select id="statusFilter" class="form-select">
+                                <option value="">Status</option>
+                                <option value="overdue">Overdue</option>
+                                <option value="upcoming">Upcoming</option>
+                                <option value="ok">OK</option>
+                            </select>
+                            <button id="resetFilters" class="btn btn-secondary">Reset</button>
+                        </div>
+                    </div>
+
+                    {% if equipment %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Equipment</th>
+                                    <th>Model</th>
+                                    <th>Serial Number</th>
+                                    <th>Next Maintenance</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in equipment %}
+                                <tr>
+                                    <td>{{ item.EQUIPMENT }}</td>
+                                    <td>{{ item.MODEL }}</td>
+                                    <td>{{ item.MFG_SERIAL }}</td>
+                                    <td>{{ item.next_maintenance }}</td>
+                                    <td><span class="badge bg-{{ item.status_class }}">{{ item.status }}</span></td>
+                                    <td>
+                                        <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <h4>No machines found</h4>
+                        <p class="text-muted">Try adjusting your search or filters</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

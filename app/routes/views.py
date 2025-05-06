@@ -25,9 +25,66 @@ def allowed_file(filename):
 
 @views_bp.route('/')
 def index():
-    """Redirects to the PPM equipment list page."""
-    # Redirect to the list view for PPM data as the default home page
-    return redirect(url_for('views.list_equipment', data_type='ppm'))
+    """Display the dashboard with maintenance statistics."""
+    from datetime import datetime, timedelta
+    
+    data = DataService.get_all_entries('ppm')
+    current_date = datetime.now().strftime("%A, %d %B %Y - %I:%M:%S %p")
+    
+    # Calculate statistics
+    total_machines = len(data)
+    overdue_count = 0
+    upcoming_counts = {7: 0, 14: 0, 21: 0, 30: 0, 60: 0, 90: 0}
+    quarterly_count = sum(1 for item in data if item.get('PPM') == 'Yes')
+    yearly_count = total_machines - quarterly_count
+    
+    # Process equipment data for display
+    for item in data:
+        next_maintenance = None
+        # Find next maintenance date from quarters
+        for q in ['I', 'II', 'III', 'IV']:
+            q_date = item.get(f'PPM_Q_{q}', {}).get('date')
+            if q_date:
+                date = datetime.strptime(q_date, '%d/%m/%Y')
+                if date > datetime.now():
+                    next_maintenance = date
+                    break
+        
+        if next_maintenance:
+            days_until = (next_maintenance - datetime.now()).days
+            if days_until < 0:
+                overdue_count += 1
+            else:
+                for day_limit in upcoming_counts.keys():
+                    if days_until <= day_limit:
+                        upcoming_counts[day_limit] += 1
+        
+        # Add status information to items
+        if next_maintenance:
+            days_until = (next_maintenance - datetime.now()).days
+            if days_until < 0:
+                item['status'] = 'Overdue'
+                item['status_class'] = 'danger'
+            elif days_until <= 7:
+                item['status'] = 'Due Soon'
+                item['status_class'] = 'warning'
+            else:
+                item['status'] = 'OK'
+                item['status_class'] = 'success'
+            item['next_maintenance'] = next_maintenance.strftime('%d/%m/%Y')
+        else:
+            item['status'] = 'No Schedule'
+            item['status_class'] = 'secondary'
+            item['next_maintenance'] = 'Not Scheduled'
+
+    return render_template('index.html',
+                         current_date=current_date,
+                         total_machines=total_machines,
+                         overdue_count=overdue_count,
+                         upcoming_counts=upcoming_counts,
+                         quarterly_count=quarterly_count,
+                         yearly_count=yearly_count,
+                         equipment=data)
 
 
 @views_bp.route('/equipment/<data_type>/list')
