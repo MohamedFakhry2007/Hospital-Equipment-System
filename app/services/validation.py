@@ -81,16 +81,20 @@ class ValidationService:
         if ppm_value not in ('yes', 'no'):
             errors['PPM'] = ["PPM must be 'Yes' or 'No'"]
         
-        # Validate quarter data
-        for q in ['I', 'II', 'III', 'IV']:
-            quarter_data = {
-                'date': form_data.get(f'PPM_Q_{q}_date', ''),
-                'engineer': form_data.get(f'PPM_Q_{q}_engineer', '')
-            }
-            
-            q_valid, q_errors = ValidationService.validate_quarter_data(quarter_data)
-            if not q_valid:
-                errors[f'PPM_Q_{q}'] = q_errors
+        # Only validate Q1 date and all engineers
+        q1_data = {
+            'date': form_data.get('PPM_Q_I_date', ''),
+            'engineer': form_data.get('PPM_Q_I_engineer', '')
+        }
+        q1_valid, q1_errors = ValidationService.validate_quarter_data(q1_data)
+        if not q1_valid:
+            errors['PPM_Q_I'] = q1_errors
+
+        # Validate only engineers for other quarters
+        for q in ['II', 'III', 'IV']:
+            engineer = form_data.get(f'PPM_Q_{q}_engineer', '').strip()
+            if not engineer:
+                errors[f'PPM_Q_{q}'] = ["Engineer name cannot be empty"]
         
         return len(errors) == 0, errors
 
@@ -120,6 +124,22 @@ class ValidationService:
         return len(errors) == 0, errors
 
     @staticmethod
+    def generate_quarter_dates(q1_date: str) -> List[str]:
+        """Generate dates for Q2-Q4 based on Q1 date.
+        
+        Args:
+            q1_date: Q1 date in DD/MM/YYYY format
+            
+        Returns:
+            List of dates for Q2, Q3, Q4
+        """
+        q1 = datetime.strptime(q1_date, '%d/%m/%Y')
+        return [
+            (q1 + relativedelta(months=3*i)).strftime('%d/%m/%Y')
+            for i in range(1, 4)
+        ]
+
+    @staticmethod
     def convert_ppm_form_to_model(form_data: Dict[str, Any]) -> Dict[str, Any]:
         """Convert form data to PPM model data.
         
@@ -138,10 +158,20 @@ class ValidationService:
             'PPM': form_data.get('PPM', '').strip().title()  # Normalize to 'Yes' or 'No'
         }
         
-        # Convert quarter data
-        for q in ['I', 'II', 'III', 'IV']:
+        # Get Q1 date and generate other quarters
+        q1_date = form_data.get('PPM_Q_I_date', '').strip()
+        other_dates = ValidationService.generate_quarter_dates(q1_date)
+        
+        # Set Q1
+        model_data['PPM_Q_I'] = {
+            'date': q1_date,
+            'engineer': form_data.get('PPM_Q_I_engineer', '').strip()
+        }
+        
+        # Set Q2-Q4
+        for i, q in enumerate(['II', 'III', 'IV']):
             model_data[f'PPM_Q_{q}'] = {
-                'date': form_data.get(f'PPM_Q_{q}_date', '').strip(),
+                'date': other_dates[i],
                 'engineer': form_data.get(f'PPM_Q_{q}_engineer', '').strip()
             }
         

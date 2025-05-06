@@ -7,6 +7,7 @@ import io
 import csv
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Literal, Union, TextIO
+from datetime import datetime, timedelta
 
 import pandas as pd
 from pydantic import ValidationError
@@ -308,31 +309,40 @@ class DataService:
                 row_dict = row.to_dict()
                 combined_entry = {}
 
-                # Map PPM quarter fields
-                ppm_mapping = {
-                    'I': ('PPM Q I', 'Q1_ENGINEER'),
-                    'II': ('PPM Q II', 'Q2_ENGINEER'),
-                    'III': ('PPM Q III', 'Q3_ENGINEER'),
-                    'IV': ('PPM Q IV', 'Q4_ENGINEER'),
-                }
-
-                has_all_quarters = True
-                for q_key, (date_col, eng_col) in ppm_mapping.items():
-                    date_val = row_dict.get(date_col, '').strip()
-                    eng_val = row_dict.get(eng_col, '').strip()
-
-                    if not date_val:
-                        msg = f"Skipping row {index+2}: Missing date in '{date_col}'"
-                        logger.warning(msg)
-                        errors.append(msg)
-                        has_all_quarters = False
-                        break
-
-                    combined_entry[f'PPM_Q_{q_key}'] = {'date': date_val, 'engineer': eng_val}
-
-                if not has_all_quarters:
+                # Only need Q1 date and all engineers
+                q1_date = row_dict.get('PPM Q I', '').strip()
+                if not q1_date:
+                    msg = f"Row {index+2}: Missing Q1 date"
+                    logger.warning(msg)
+                    errors.append(msg)
                     skipped_count += 1
                     continue
+
+                try:
+                    other_dates = ValidationService.generate_quarter_dates(q1_date)
+                except ValueError as e:
+                    msg = f"Row {index+2}: Invalid Q1 date: {e}"
+                    logger.warning(msg)
+                    errors.append(msg)
+                    skipped_count += 1
+                    continue
+
+
+                # Map engineers
+                engineer_mapping = {
+                    'I': ('Q1_ENGINEER', q1_date),
+                    'II': ('Q2_ENGINEER', other_dates[0]),
+                    'III': ('Q3_ENGINEER', other_dates[1]),
+                    'IV': ('Q4_ENGINEER', other_dates[2])
+                }
+
+                # Set up quarter data
+                for q_key, (eng_col, date_val) in engineer_mapping.items():
+                    eng_val = row_dict.get(eng_col, '').strip()
+                    combined_entry[f'PPM_Q_{q_key}'] = {
+                        'date': date_val,
+                        'engineer': eng_val or 'Not Assigned'  # Default engineer if empty
+                    }
 
                 # Map common fields
                 if data_type == 'ppm':
@@ -390,7 +400,7 @@ class DataService:
                 # Check for duplicates and handle replacement
                 mfg_serial = validated['MFG_SERIAL']
                 duplicate_found = False
-                
+
                 # Check in existing data and replace if found
                 for i, entry in enumerate(existing_data):
                     if entry['MFG_SERIAL'] == mfg_serial:
@@ -400,7 +410,7 @@ class DataService:
                         logger.info(msg)
                         errors.append(msg)
                         break
-                
+
                 # Check in new entries and replace if found
                 if not duplicate_found:
                     for i, entry in enumerate(new_entries_validated):
@@ -411,7 +421,7 @@ class DataService:
                             logger.info(msg)
                             errors.append(msg)
                             break
-                
+
                 # If no duplicate found, add as new entry
                 if not duplicate_found:
                     new_entries_validated.append(validated)
@@ -492,3 +502,28 @@ class DataService:
             writer.writeheader()
             writer.writerows(flat_data)
             return csvfile.getvalue()
+
+class ValidationService:
+    @staticmethod
+    def generate_quarter_dates(q1_date_str: str) -> List[str]:
+        """Generates Q2, Q3, Q4 dates based on Q1 date.
+
+        Args:
+            q1_date_str: Q1 date string (YYYY-MM-DD).
+
+        Returns:
+            A list of Q2, Q3, Q4 date strings.
+
+        Raises:
+            ValueError: if the input date is invalid.
+        """
+        try:
+            q1_date = datetime.strptime(q1_date_str, '%Y-%m-%d')
+        except ValueError:
+            raise ValueError("Invalid Q1 date format. Use YYYY-MM-DD.")
+
+        q2_date = q1_date + timedelta(days=90)
+        q3_date = q2_date + timedelta(days=90)
+        q4_date = q3_date + timedelta(days=90)
+
+        return [q2_date.strftime('%Y-%m-%d'), q3_date.strftime('%Y-%m-%d'), q4_date.strftime('%Y-%m-%d')]

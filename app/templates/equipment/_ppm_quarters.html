@@ -1,6 +1,6 @@
 <div class="row mb-3">
     <div class="col-md-6">
-        <label for="PPM_Q_I_date">Quarter I Date</label>
+        <label for="PPM_Q_I_date" class="form-label">Quarter I Date (Other quarters will be auto-generated)</label>
         <input type="text" class="form-control {% if errors.get('PPM_Q_I') %}is-invalid{% endif %}" id="PPM_Q_I_date" name="PPM_Q_I_date" value="{{ entry.get('PPM_Q_I_date', '') }}">
         {% if errors.get('PPM_Q_I') %}
         <div class="invalid-feedback">
@@ -16,52 +16,19 @@
     </div>
 </div>
 <div class="row mb-3">
-    <div class="col-md-6">
-        <label for="PPM_Q_II_date">Quarter II Date</label>
-        <input type="text" class="form-control {% if errors.get('PPM_Q_II') %}is-invalid{% endif %}" id="PPM_Q_II_date" name="PPM_Q_II_date" value="{{ entry.get('PPM_Q_II_date', '') }}">
-        {% if errors.get('PPM_Q_II') %}
-        <div class="invalid-feedback">
-            {% for error in errors.get('PPM_Q_II') %}
-                {{ error }}<br>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <label for="PPM_Q_II_engineer">Quarter II Engineer</label>
         <input type="text" class="form-control {% if errors.get('PPM_Q_II') %}is-invalid{% endif %}" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" value="{{ entry.get('PPM_Q_II_engineer', '') }}">
     </div>
 </div>
 <div class="row mb-3">
-    <div class="col-md-6">
-        <label for="PPM_Q_III_date">Quarter III Date</label>
-        <input type="text" class="form-control {% if errors.get('PPM_Q_III') %}is-invalid{% endif %}" id="PPM_Q_III_date" name="PPM_Q_III_date" value="{{ entry.get('PPM_Q_III_date', '') }}">
-        {% if errors.get('PPM_Q_III') %}
-        <div class="invalid-feedback">
-            {% for error in errors.get('PPM_Q_III') %}
-                {{ error }}<br>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <label for="PPM_Q_III_engineer">Quarter III Engineer</label>
         <input type="text" class="form-control {% if errors.get('PPM_Q_III') %}is-invalid{% endif %}" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" value="{{ entry.get('PPM_Q_III_engineer', '') }}">
     </div>
 </div>
 <div class="row mb-3">
-    <div class="col-md-6">
-        <label for="PPM_Q_IV_date">Quarter IV Date</label>
-        <input type="text" class="form-control {% if errors.get('PPM_Q_IV') %}is-invalid{% endif %}" id="PPM_Q_IV_date" name="PPM_Q_IV_date" value="{{ entry.get('PPM_Q_IV_date', '') }}">
-        {% if errors.get('PPM_Q_IV') %}
-        <div class="invalid-feedback">
-            {% for error in errors.get('PPM_Q_IV') %}
-                {{ error }}<br>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
-    <div class="col-md-6">
+    <div class="col-md-12">
         <label for="PPM_Q_IV_engineer">Quarter IV Engineer</label>
         <input type="text" class="form-control {% if errors.get('PPM_Q_IV') %}is-invalid{% endif %}" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" value="{{ entry.get('PPM_Q_IV_engineer', '') }}">
     </div>
