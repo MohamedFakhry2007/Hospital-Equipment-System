@@ -19,6 +19,15 @@
                     <th>MFG Serial</th>
                     <th>Manufacturer</th>
                     <th>Log No</th>
+                    <th>PPM</th>
+                    <th>Q1 Date</th>
+                    <th>Q1 Engineer</th>
+                    <th>Q2 Date</th>
+                    <th>Q2 Engineer</th>
+                    <th>Q3 Date</th>
+                    <th>Q3 Engineer</th>
+                    <th>Q4 Date</th>
+                    <th>Q4 Engineer</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -31,6 +40,15 @@
                         <td>{{ entry.get('MFG_SERIAL', '') }}</td>
                         <td>{{ entry.get('MANUFACTURER', '') }}</td>
                         <td>{{ entry.get('LOG_NO', '') }}</td>
+                        <td>{{ entry.get('PPM', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_I', {}).get('date', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_I', {}).get('engineer', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_II', {}).get('date', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_II', {}).get('engineer', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_III', {}).get('date', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_III', {}).get('engineer', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_IV', {}).get('date', '') }}</td>
+                        <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', '') }}</td>
                         <td>
                             {# Edit Button #}
                             <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=entry.MFG_SERIAL) if data_type == 'ppm' else '#' }}" class="btn btn-sm btn-warning {% if data_type == 'ocm' %}disabled{% endif %}">Edit</a>
