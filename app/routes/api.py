@@ -1,8 +1,4 @@
-# app/routes/api.py
-
-"""
-API routes for managing equipment maintenance data.
-"""
+"""API routes for managing equipment maintenance data."""
 import logging
 from pathlib import Path
 
@@ -187,3 +183,28 @@ def import_data(data_type):
             return jsonify({"error": f"Failed to import {data_type} data: {str(e)}"}), 500
     else:
         return jsonify({"error": "Invalid file type, only CSV allowed"}), 400
+
+@api_bp.route('/bulk_delete/<data_type>', methods=['POST'])
+def bulk_delete(data_type):
+    """Handle bulk deletion of equipment entries."""
+    if data_type not in ('ppm', 'ocm'):
+        return jsonify({'success': False, 'message': 'Invalid data type'}), 400
+
+    serials = request.json.get('serials', [])
+    if not serials:
+        return jsonify({'success': False, 'message': 'No serials provided'}), 400
+
+    deleted_count = 0
+    not_found = 0
+
+    for serial in serials:
+        if DataService.delete_entry(data_type, serial):
+            deleted_count += 1
+        else:
+            not_found += 1
+
+    return jsonify({
+        'success': True,
+        'deleted_count': deleted_count,
+        'not_found': not_found
+    })
