@@ -135,8 +135,7 @@ class ValidationService:
             'MFG_SERIAL': form_data.get('MFG_SERIAL', '').strip(),
             'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
             'LOG_NO': form_data.get('LOG_NO', '').strip(),
-            'PPM': form_data.get('PPM', '').strip().title(),  # Normalize to 'Yes' or 'No'
-            'OCM': form_data.get('OCM', '').strip()
+            'PPM': form_data.get('PPM', '').strip().title()  # Normalize to 'Yes' or 'No'
         }
         
         # Convert quarter data

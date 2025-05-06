@@ -40,7 +40,6 @@ class PPMEntry(BaseModel):
     MANUFACTURER: str
     LOG_NO: str
     PPM: Literal['Yes', 'No']
-    OCM: Optional[str] = ''
     PPM_Q_I: QuarterData
     PPM_Q_II: QuarterData
     PPM_Q_III: QuarterData
