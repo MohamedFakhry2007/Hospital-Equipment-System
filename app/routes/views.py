@@ -4,6 +4,7 @@
 Frontend routes for rendering HTML pages.
 """
 import logging
+from dateutil.relativedelta import relativedelta
 import io
 import csv
 from flask import Blueprint, render_template, request, redirect, url_for, flash

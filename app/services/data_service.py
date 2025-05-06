@@ -2,6 +2,7 @@
 Data service for managing equipment maintenance data.
 """
 import json
+from dateutil.relativedelta import relativedelta
 import logging
 import io
 import csv
@@ -184,12 +185,26 @@ class DataService:
             ValueError: If entry is invalid or MFG_SERIAL is changed
             KeyError: If entry with given MFG_SERIAL does not exist
         """
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+
         entry_copy = new_entry.copy()
-        entry_copy.pop('NO', None) # Remove 'NO' field if present
+        entry_copy.pop('NO', None)  # Remove 'NO' field if present
 
         # Ensure MFG_SERIAL is not being changed
         if entry_copy.get('MFG_SERIAL') != mfg_serial:
             raise ValueError(f"Cannot update MFG_SERIAL from '{mfg_serial}' to '{entry_copy.get('MFG_SERIAL')}'")
+
+        # Calculate q2, q3, q4 based on q1 if q1 is provided
+        if 'q1' in entry_copy and entry_copy['q1']:
+            try:
+                q1_date = datetime.strptime(entry_copy['q1'], '%Y-%m-%d')  # Adjust format as needed
+                entry_copy['q2'] = (q1_date + relativedelta(months=3)).strftime('%Y-%m-%d')
+                entry_copy['q3'] = (q1_date + relativedelta(months=6)).strftime('%Y-%m-%d')
+                entry_copy['q4'] = (q1_date + relativedelta(months=9)).strftime('%Y-%m-%d')
+            except ValueError as e:
+                logger.error(f"Date parsing error for q1: {str(e)}")
+                raise ValueError("Invalid date format for q1. Use YYYY-MM-DD.") from e
 
         try:
             if data_type == 'ppm':
@@ -205,7 +220,7 @@ class DataService:
         updated_data = []
         for existing_entry in data:
             if existing_entry.get('MFG_SERIAL') == mfg_serial:
-                 # Preserve the 'NO' from the original entry
+                # Preserve the 'NO' from the original entry
                 validated_entry['NO'] = existing_entry.get('NO')
                 updated_data.append(validated_entry)
                 entry_found = True
@@ -224,8 +239,7 @@ class DataService:
         for e in reindexed_data:
             if e['MFG_SERIAL'] == mfg_serial:
                 return e
-        return validated_entry # Fallback
-
+        return validated_entry  # Fallback
 
     @staticmethod
     def delete_entry(data_type: Literal['ppm', 'ocm'], mfg_serial: str) -> bool:
