@@ -3,6 +3,7 @@ Validation service for form and data validation.
 """
 import logging
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from typing import Dict, Any, Tuple, List, Optional
 
 from app.models.ppm import PPMEntry, QuarterData
@@ -17,7 +18,7 @@ class ValidationService:
     
     @staticmethod
     def validate_date_format(date_str: str) -> Tuple[bool, Optional[str]]:
-        """Validate date is in DD/MM/YYYY format.
+        """Validate date is in DD/MM/YYYY or YYYY-MM-DD format, returning DD/MM/YYYY.
         
         Args:
             date_str: Date string to validate
@@ -25,52 +26,25 @@ class ValidationService:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        logger.debug(f"Validating date: '{date_str}'")
         if not date_str:
             return False, "Date cannot be empty"
             
         try:
-            datetime.strptime(date_str, '%d/%m/%Y')
+            # Try parsing as DD/MM/YYYY
+            parsed_date = datetime.strptime(date_str, '%d/%m/%Y')
             return True, None
         except ValueError:
-            return False, "Invalid date format. Expected format: DD/MM/YYYY"
-
-    @staticmethod
-    def validate_quarter_data(quarter_data: Dict[str, str]) -> Tuple[bool, List[str]]:
-        """Validate quarter data.
-        
-        Args:
-            quarter_data: Dictionary containing date and engineer
-            
-        Returns:
-            Tuple of (is_valid, error_messages)
-        """
-        errors = []
-        
-        # Validate date
-        date_valid, date_error = ValidationService.validate_date_format(quarter_data.get('date', ''))
-        if not date_valid:
-            errors.append(date_error)
-        
-        # Validate engineer
-        engineer = quarter_data.get('engineer', '')
-        if not engineer.strip():
-            errors.append("Engineer name cannot be empty")
-        
-        return len(errors) == 0, errors
+            try:
+                # Try parsing as YYYY-MM-DD
+                parsed_date = datetime.strptime(date_str, '%Y-%m-%d')
+                return True, None
+            except ValueError:
+                return False, "Invalid date format. Expected format: DD/MM/YYYY or YYYY-MM-DD"
 
     @staticmethod
     def validate_ppm_form(form_data: Dict[str, Any]) -> Tuple[bool, Dict[str, List[str]]]:
-        """Validate PPM form data.
-        
-        Args:
-            form_data: Form data from request
-            
-        Returns:
-            Tuple of (is_valid, error_messages)
-        """
         errors = {}
-        
-        # Required fields
         required_fields = ['EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'PPM']
         for field in required_fields:
             if not form_data.get(field, '').strip():
@@ -81,33 +55,19 @@ class ValidationService:
         if ppm_value not in ('yes', 'no'):
             errors['PPM'] = ["PPM must be 'Yes' or 'No'"]
         
-        # Only validate Q1 date and all engineers
-        q1_data = {
-            'date': form_data.get('PPM_Q_I_date', ''),
-            'engineer': form_data.get('PPM_Q_I_engineer', '')
-        }
-        q1_valid, q1_errors = ValidationService.validate_quarter_data(q1_data)
-        if not q1_valid:
-            errors['PPM_Q_I'] = q1_errors
+        q1_date = form_data.get('PPM_Q_I_date', '').strip()
+        date_valid, date_error = ValidationService.validate_date_format(q1_date)
+        if not date_valid:
+            errors['PPM_Q_I_date'] = [date_error]
 
-        # Validate only engineers for other quarters
-        for q in ['II', 'III', 'IV']:
-            engineer = form_data.get(f'PPM_Q_{q}_engineer', '').strip()
-            if not engineer:
-                errors[f'PPM_Q_{q}'] = ["Engineer name cannot be empty"]
-        
+        for q in ['I', 'II', 'III', 'IV']:
+            if not form_data.get(f'PPM_Q_{q}_engineer', '').strip():
+                errors[f'PPM_Q_{q}_engineer'] = ["Engineer name cannot be empty"]
         return len(errors) == 0, errors
 
     @staticmethod
     def validate_ocm_form(form_data: Dict[str, Any]) -> Tuple[bool, Dict[str, List[str]]]:
-        """Validate OCM form data.
-        
-        Args:
-            form_data: Form data from request
-            
-        Returns:
-            Tuple of (is_valid, error_messages)
-        """
+        """Validate OCM form data."""
         errors = {}
         
         # Required fields
@@ -125,46 +85,62 @@ class ValidationService:
 
     @staticmethod
     def generate_quarter_dates(q1_date: str) -> List[str]:
-        """Generate dates for Q2-Q4 based on Q1 date.
+        """Generate quarter dates from Q1 date.
         
         Args:
-            q1_date: Q1 date in DD/MM/YYYY format
+            q1_date: Quarter I date in DD/MM/YYYY or YYYY-MM-DD format
             
         Returns:
-            List of dates for Q2, Q3, Q4
+            List of Q2, Q3, Q4 dates in DD/MM/YYYY format
+            
+        Raises:
+            ValueError: If the date format is invalid
         """
-        q1 = datetime.strptime(q1_date, '%d/%m/%Y')
-        return [
-            (q1 + relativedelta(months=3*i)).strftime('%d/%m/%Y')
-            for i in range(1, 4)
-        ]
+        logger.debug(f"Generating quarter dates from: '{q1_date}'")
+        try:
+            try:
+                # Try parsing as DD/MM/YYYY
+                q1 = datetime.strptime(q1_date, '%d/%m/%Y')
+            except ValueError:
+                # Try parsing as YYYY-MM-DD
+                q1 = datetime.strptime(q1_date, '%Y-%m-%d')
+            return [
+                (q1 + relativedelta(months=3*i)).strftime('%d/%m/%Y')
+                for i in range(1, 4)
+            ]
+        except ValueError:
+            logger.error(f"Invalid date format for Q1 date: '{q1_date}'")
+            raise ValueError("Invalid date format for Quarter I date. Expected DD/MM/YYYY or YYYY-MM-DD")
 
     @staticmethod
     def convert_ppm_form_to_model(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert form data to PPM model data.
-        
-        Args:
-            form_data: Form data from request
-            
-        Returns:
-            Converted model data
-        """
         model_data = {
             'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
             'MODEL': form_data.get('MODEL', '').strip(),
             'MFG_SERIAL': form_data.get('MFG_SERIAL', '').strip(),
             'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
             'LOG_NO': form_data.get('LOG_NO', '').strip(),
-            'PPM': form_data.get('PPM', '').strip().title()  # Normalize to 'Yes' or 'No'
+            'PPM': form_data.get('PPM', '').strip().title()
         }
         
         # Get Q1 date and generate other quarters
         q1_date = form_data.get('PPM_Q_I_date', '').strip()
-        other_dates = ValidationService.generate_quarter_dates(q1_date)
+        try:
+            try:
+                # Parse as DD/MM/YYYY
+                q1 = datetime.strptime(q1_date, '%d/%m/%Y')
+            except ValueError:
+                # Parse as YYYY-MM-DD
+                q1 = datetime.strptime(q1_date, '%Y-%m-%d')
+            q1_date_formatted = q1.strftime('%d/%m/%Y')  # Standardize to DD/MM/YYYY
+            other_dates = ValidationService.generate_quarter_dates(q1_date_formatted)
+        except ValueError as e:
+            logger.error(f"Failed to process quarter dates: {str(e)}")
+            raise ValueError("Invalid Quarter I date format. Please use DD/MM/YYYY or YYYY-MM-DD")
         
         # Set Q1
         model_data['PPM_Q_I'] = {
-            'date': q1_date,
+            'date': q1_date_formatted,
             'engineer': form_data.get('PPM_Q_I_engineer', '').strip()
         }
         
@@ -179,14 +155,6 @@ class ValidationService:
 
     @staticmethod
     def convert_ocm_form_to_model(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert form data to OCM model data.
-        
-        Args:
-            form_data: Form data from request
-            
-        Returns:
-            Converted model data
-        """
         model_data = {
             'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
             'MODEL': form_data.get('MODEL', '').strip(),

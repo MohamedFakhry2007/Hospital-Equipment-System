@@ -332,6 +332,18 @@ class DataService:
                     skipped_count += 1
                     continue
 
+                # Validate Q1 date format (DD/MM/YYYY)
+                try:
+                    datetime.strptime(q1_date, '%d/%m/%Y')  # Validate format
+                    q1_date_formatted = q1_date  # Already in DD/MM/YYYY, use as-is
+                except ValueError as e:
+                    msg = f"Row {index+2}: Invalid Q1 date: {e}"
+                    logger.warning(msg)
+                    errors.append(msg)
+                    skipped_count += 1
+                    continue
+
+                # Generate Q2, Q3, Q4 dates (in DD/MM/YYYY format)
                 try:
                     other_dates = ValidationService.generate_quarter_dates(q1_date)
                 except ValueError as e:
@@ -341,10 +353,9 @@ class DataService:
                     skipped_count += 1
                     continue
 
-
                 # Map engineers
                 engineer_mapping = {
-                    'I': ('Q1_ENGINEER', q1_date),
+                    'I': ('Q1_ENGINEER', q1_date_formatted),  # Use validated Q1 date
                     'II': ('Q2_ENGINEER', other_dates[0]),
                     'III': ('Q3_ENGINEER', other_dates[1]),
                     'IV': ('Q4_ENGINEER', other_dates[2])
@@ -523,21 +534,25 @@ class ValidationService:
         """Generates Q2, Q3, Q4 dates based on Q1 date.
 
         Args:
-            q1_date_str: Q1 date string (YYYY-MM-DD).
+            q1_date_str: Q1 date string (DD/MM/YYYY).
 
         Returns:
-            A list of Q2, Q3, Q4 date strings.
+            A list of Q2, Q3, Q4 date strings in DD/MM/YYYY format.
 
         Raises:
             ValueError: if the input date is invalid.
         """
         try:
-            q1_date = datetime.strptime(q1_date_str, '%Y-%m-%d')
+            q1_date = datetime.strptime(q1_date_str, '%d/%m/%Y')
         except ValueError:
-            raise ValueError("Invalid Q1 date format. Use YYYY-MM-DD.")
+            raise ValueError("Invalid Q1 date format. Use DD/MM/YYYY.")
 
         q2_date = q1_date + timedelta(days=90)
         q3_date = q2_date + timedelta(days=90)
         q4_date = q3_date + timedelta(days=90)
 
-        return [q2_date.strftime('%Y-%m-%d'), q3_date.strftime('%Y-%m-%d'), q4_date.strftime('%Y-%m-%d')]
+        return [
+            q2_date.strftime('%d/%m/%Y'),
+            q3_date.strftime('%d/%m/%Y'),
+            q4_date.strftime('%d/%m/%Y')
+        ]

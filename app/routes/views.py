@@ -41,16 +41,42 @@ def index():
     
     # Process equipment data for display
     for item in data:
+        # For PPM, only Q1 has a date. Other quarter dates are calculated.
+        # We need to find the next upcoming quarter date based on Q1 date.
         next_maintenance = None
-        # Find next maintenance date from quarters
-        for q in ['I', 'II', 'III', 'IV']:
-            q_date = item.get(f'PPM_Q_{q}', {}).get('date')
+        q1_date_str = item.get('PPM_Q_I', {}).get('date')
+
+        if q1_date_str:
+            try:
+                q1_date = datetime.strptime(q1_date_str, '%d/%m/%Y')
+                # Calculate dates for Q2, Q3, Q4 based on Q1 date
+                q2_date = q1_date + relativedelta(months=3)
+                q3_date = q1_date + relativedelta(months=6)
+                q4_date = q1_date + relativedelta(months=9)
+                quarter_dates = {'I': q1_date, 'II': q2_date, 'III': q3_date, 'IV': q4_date}
+
+                # Find the earliest upcoming quarter date
+                upcoming_dates = [date for date in quarter_dates.values() if date >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)]
+                if upcoming_dates:
+                    next_maintenance = min(upcoming_dates)
+
+            except ValueError:
+                logger.warning(f"Invalid date format for {item.get('MFG_SERIAL')}: {q1_date_str}")
+                next_maintenance = None # Treat as no schedule if date is invalid
+
+        # Original logic to find next maintenance from individual quarter dates (now only Q1 relevant)
+        # This block can largely be replaced by the logic above
+        """
+ for q in ['I', 'II', 'III', 'IV']:
+ q_date = item.get(f'PPM_Q_{q}', {}).get('date')
             if q_date:
                 date = datetime.strptime(q_date, '%d/%m/%Y')
                 if date > datetime.now():
                     next_maintenance = date
                     break
         
+        if next_maintenance:
+        """
         if next_maintenance:
             days_until = (next_maintenance - datetime.now()).days
             if days_until < 0:
@@ -127,7 +153,7 @@ def add_ppm_equipment():
             # Re-render add form with errors and submitted data
             return render_template('equipment/add.html', data_type='ppm', errors=errors, form_data=form_data)
 
-    # GET request: show empty form
+    # GET request: show empty form - form_data is needed to avoid errors in template rendering
     return render_template('equipment/add.html', data_type='ppm', errors={}, form_data={})
 
 
@@ -169,9 +195,8 @@ def edit_ppm_equipment(mfg_serial):
             current_data = entry.copy()
             current_data.update(form_data)
              # Reformat quarter data from potentially submitted values
-            for q in ['I', 'II', 'III', 'IV']:
-                 current_data[f'PPM_Q_{q}_date'] = form_data.get(f'PPM_Q_{q}_date', '')
-                 current_data[f'PPM_Q_{q}_engineer'] = form_data.get(f'PPM_Q_{q}_engineer', '')
+            current_data['PPM_Q_I_date'] = form_data.get('PPM_Q_I_date', '')
+            for q in ['I', 'II', 'III', 'IV']: current_data[f'PPM_Q_{q}_engineer'] = form_data.get(f'PPM_Q_{q}_engineer', '')
             return render_template('equipment/edit.html', data_type='ppm', entry=current_data, errors=errors, mfg_serial=mfg_serial)
 
     # GET request: Populate form with existing data
@@ -179,9 +204,8 @@ def edit_ppm_equipment(mfg_serial):
      # Reformat quarter data from stored structure for template display
     for q in ['I', 'II', 'III', 'IV']:
          q_data = entry.get(f'PPM_Q_{q}', {})
-         form_data_display[f'PPM_Q_{q}_date'] = q_data.get('date', '')
+         if q == 'I': form_data_display[f'PPM_Q_{q}_date'] = q_data.get('date', '') # Only Q1 has a date field
          form_data_display[f'PPM_Q_{q}_engineer'] = q_data.get('engineer', '')
-
     return render_template('equipment/edit.html', data_type='ppm', entry=form_data_display, errors={}, mfg_serial=mfg_serial)
 
 

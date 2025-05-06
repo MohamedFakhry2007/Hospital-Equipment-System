@@ -49,17 +49,19 @@
             <div class="text-danger">{{ errors.PPM[0] }}</div>
             {% endif %}
         </div>
+        <div class="mb-3">
+            <label for="PPM_Q_I_date" class="form-label">PPM Quarter I Date</label>
+            <input type="text" class="form-control" id="PPM_Q_I_date" name="PPM_Q_I_date" value="{{ form_data['PPM_Q_I_date'] or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            {% if errors['PPM_Q_I_date'] %}
+            <div class="text-danger">{{ errors['PPM_Q_I_date'][0] }}</div>
+            {% endif %}
+        </div>
         {% for q in ['I', 'II', 'III', 'IV'] %}
         <div class="mb-3">
-            <label for="PPM_Q_{{ q }}_date" class="form-label">PPM Quarter {{ q }} Date</label>
-            <input type="text" class="form-control" id="PPM_Q_{{ q }}_date" name="PPM_Q_{{ q }}_date" value="{{ form_data['PPM_Q_' + q + '_date'] or '' }}" required>
-            {% if errors['PPM_Q_' + q] and errors['PPM_Q_' + q][0] %}
-            <div class="text-danger">{{ errors['PPM_Q_' + q][0] }}</div>
-            {% endif %}
             <label for="PPM_Q_{{ q }}_engineer" class="form-label">PPM Quarter {{ q }} Engineer</label>
             <input type="text" class="form-control" id="PPM_Q_{{ q }}_engineer" name="PPM_Q_{{ q }}_engineer" value="{{ form_data['PPM_Q_' + q + '_engineer'] or '' }}" required>
-            {% if errors['PPM_Q_' + q] and errors['PPM_Q_' + q][1] %}
-            <div class="text-danger">{{ errors['PPM_Q_' + q][1] }}</div>
+            {% if errors['PPM_Q_' + q + '_engineer'] %}
+            <div class="text-danger">{{ errors['PPM_Q_' + q + '_engineer'][0] }}</div>
             {% endif %}
         </div>
         {% endfor %}
