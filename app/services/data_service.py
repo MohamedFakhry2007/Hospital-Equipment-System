@@ -387,16 +387,35 @@ class DataService:
                     skipped_count += 1
                     continue
 
-                # Check for uniqueness
-                try:
-                    DataService.ensure_unique_mfg_serial(existing_data + new_entries_validated, validated)
+                # Check for duplicates and handle replacement
+                mfg_serial = validated['MFG_SERIAL']
+                duplicate_found = False
+                
+                # Check in existing data and replace if found
+                for i, entry in enumerate(existing_data):
+                    if entry['MFG_SERIAL'] == mfg_serial:
+                        existing_data[i] = validated
+                        duplicate_found = True
+                        msg = f"Row {index+2}: Replaced existing entry with MFG_SERIAL '{mfg_serial}'"
+                        logger.info(msg)
+                        errors.append(msg)
+                        break
+                
+                # Check in new entries and replace if found
+                if not duplicate_found:
+                    for i, entry in enumerate(new_entries_validated):
+                        if entry['MFG_SERIAL'] == mfg_serial:
+                            new_entries_validated[i] = validated
+                            duplicate_found = True
+                            msg = f"Row {index+2}: Replaced previously imported entry with MFG_SERIAL '{mfg_serial}'"
+                            logger.info(msg)
+                            errors.append(msg)
+                            break
+                
+                # If no duplicate found, add as new entry
+                if not duplicate_found:
                     new_entries_validated.append(validated)
                     added_count += 1
-                except ValueError as ve:
-                    msg = f"Skipping duplicate entry in row {index+2}: {str(ve)}"
-                    logger.warning(msg)
-                    errors.append(msg)
-                    skipped_count += 1
 
             # Save valid entries after processing all rows
             if new_entries_validated:
