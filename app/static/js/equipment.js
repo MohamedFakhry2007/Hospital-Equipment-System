@@ -1,54 +1,57 @@
+
 document.addEventListener('DOMContentLoaded', function() {
-    // Search/Filter functionality
+    // Get all control elements
     const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', filterEquipment);
-    }
+    const filterSelect = document.getElementById('filterSelect');
+    const sortSelect = document.getElementById('sortSelect');
+    const tableBody = document.querySelector('tbody');
+    
+    // Add event listeners
+    if (searchInput) searchInput.addEventListener('input', updateTable);
+    if (filterSelect) filterSelect.addEventListener('change', updateTable);
+    if (sortSelect) sortSelect.addEventListener('change', updateTable);
 
-    // Delete confirmations
-    const deleteLinks = document.querySelectorAll('.delete-link');
-    deleteLinks.forEach(link => {
-        link.addEventListener('click', confirmDelete);
-    });
-});
+    function updateTable() {
+        const rows = Array.from(tableBody.getElementsByTagName('tr'));
+        const searchTerm = searchInput.value.toLowerCase();
+        const filterValue = filterSelect.value;
+        const sortColumn = sortSelect.value;
 
-function filterEquipment() {
-    const filterValue = document.getElementById('searchInput').value.toLowerCase();
-    const tableRows = document.querySelectorAll('tbody tr');
-
-    tableRows.forEach(row => {
-        const rowData = row.textContent.toLowerCase();
-        if (rowData.includes(filterValue)) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-function confirmDelete(event) {
-    event.preventDefault(); // Prevent default link action
-    const link = event.currentTarget;
-    const url = link.href;
-    const mfgSerial = link.dataset.mfgSerial; // Get MFG_SERIAL from data attribute
-    const data_type = link.dataset.dataType; // Get data_type from data attribute
-
-    if (confirm(`Are you sure you want to delete equipment with serial: ${mfgSerial}?`)) {
-        // Proceed with deletion
-        fetch(`/api/equipment/${data_type}/${mfgSerial}`, {
-            method: 'DELETE',
-        })
-        .then(response => {
-            if (response.ok) {
-                window.location.reload(); // Reload page after successful deletion
-            } else {
-                alert('Failed to delete equipment.');
-            }
+        // Filter and search
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            const ppmValue = row.querySelector('td:nth-child(7)').textContent; // PPM column
+            const matchesSearch = text.includes(searchTerm);
+            const matchesFilter = !filterValue || ppmValue === filterValue;
+            row.style.display = matchesSearch && matchesFilter ? '' : 'none';
         });
+
+        // Sort
+        if (sortColumn) {
+            const visibleRows = rows.filter(row => row.style.display !== 'none');
+            const sortedRows = visibleRows.sort((a, b) => {
+                const columnIndex = getColumnIndex(sortColumn);
+                const aValue = a.cells[columnIndex].textContent;
+                const bValue = b.cells[columnIndex].textContent;
+                return aValue.localeCompare(bValue);
+            });
+
+            // Re-append sorted rows
+            sortedRows.forEach(row => tableBody.appendChild(row));
+        }
     }
-}
-// Bulk delete functionality
-document.addEventListener('DOMContentLoaded', function() {
+
+    function getColumnIndex(columnName) {
+        const columnMap = {
+            'EQUIPMENT': 1,
+            'MODEL': 2,
+            'MFG_SERIAL': 3,
+            'MANUFACTURER': 4
+        };
+        return columnMap[columnName] || 0;
+    }
+
+    // Bulk delete functionality
     const selectAllCheckbox = document.getElementById('selectAll');
     const itemCheckboxes = document.querySelectorAll('.item-checkbox');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
@@ -56,7 +59,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle all checkboxes
     selectAllCheckbox?.addEventListener('change', function() {
         itemCheckboxes.forEach(checkbox => {
-            checkbox.checked = selectAllCheckbox.checked;
+            const row = checkbox.closest('tr');
+            if (row.style.display !== 'none') { // Only check visible rows
+                checkbox.checked = selectAllCheckbox.checked;
+            }
         });
         updateBulkDeleteButton();
     });
@@ -68,7 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateBulkDeleteButton() {
         const checkedCount = document.querySelectorAll('.item-checkbox:checked').length;
-        bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+        if (bulkDeleteBtn) {
+            bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+        }
     }
 
     // Handle bulk delete
