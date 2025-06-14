@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, request, Response, current_app # send_file
 from datetime import datetime
 
 from app.services.data_service import DataService
+from app.services.training_service import TrainingService
 # ImportExportService and ValidationService removed
 
 api_bp = Blueprint('api', __name__)
@@ -208,3 +209,87 @@ def bulk_delete(data_type):
         'deleted_count': deleted_count,
         'not_found': not_found
     })
+
+
+
+# Training Records API Routes
+# These routes use the TrainingService which now persists to JSON.
+
+@api_bp.route('/training', methods=['POST'])
+def create_training_record_route():
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    data = request.get_json()
+    # Ensure logger is available (it should be if defined globally in the file)
+    # If not, local logger = logging.getLogger(__name__)
+    service = TrainingService()
+    try:
+        new_record = service.create_training_record(data)
+        return jsonify(new_record), 201
+    except ValueError as e: # Catches validation errors from service
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        # Check if logger is defined in this scope, or use global/module logger
+        # For example: current_app.logger.error(...) if using Flask app context
+        # Or, if logger is defined at module level as 'logger':
+        logger.error(f"Error creating training record: {str(e)}")
+        return jsonify({"error": "Failed to create training record"}), 500
+
+@api_bp.route('/training', methods=['GET'])
+def get_all_training_records_route():
+    service = TrainingService()
+    try:
+        # Pagination example (consider making this more robust for production)
+        skip = request.args.get('skip', default=0, type=int)
+        limit = request.args.get('limit', default=0, type=int) # 0 or no val for all after skip
+
+        records = service.get_all_training_records(skip=skip, limit=limit)
+        return jsonify(records), 200
+    except Exception as e:
+        logger.error(f"Error getting all training records: {str(e)}")
+        return jsonify({"error": "Failed to retrieve training records"}), 500
+
+@api_bp.route('/training/<int:record_id>', methods=['GET'])
+def get_training_record_route(record_id):
+    service = TrainingService()
+    try:
+        record = service.get_training_record(record_id)
+        if record:
+            return jsonify(record), 200
+        else:
+            return jsonify({"error": "Training record not found"}), 404
+    except Exception as e:
+        logger.error(f"Error getting training record {record_id}: {str(e)}")
+        return jsonify({"error": "Failed to retrieve training record"}), 500
+
+@api_bp.route('/training/<int:record_id>', methods=['PUT'])
+def update_training_record_route(record_id):
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+    data = request.get_json()
+    service = TrainingService()
+    try:
+        updated_record = service.update_training_record(record_id, data)
+        if updated_record:
+            return jsonify(updated_record), 200
+        else:
+            # This specific condition might mean record_id not found by service.
+            return jsonify({"error": "Training record not found"}), 404
+    except ValueError as e: # Catches validation errors from service
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error updating training record {record_id}: {str(e)}")
+        return jsonify({"error": "Failed to update training record"}), 500
+
+@api_bp.route('/training/<int:record_id>', methods=['DELETE'])
+def delete_training_record_route(record_id):
+    service = TrainingService()
+    try:
+        success = service.delete_training_record(record_id)
+        if success:
+            return jsonify({"message": "Training record deleted successfully"}), 200 # Standard is 204 No Content for DELETE success
+        else:
+            return jsonify({"error": "Training record not found"}), 404
+    except Exception as e:
+        logger.error(f"Error deleting training record {record_id}: {str(e)}")
+        return jsonify({"error": "Failed to delete training record"}), 500
