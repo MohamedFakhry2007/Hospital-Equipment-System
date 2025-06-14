@@ -1,4 +1,3 @@
-
 {% extends 'base.html' %}
 
 {% block title %}Dashboard{% endblock %}
@@ -6,7 +5,7 @@
 {% block content %}
 <div class="container mt-4">
     <h1 class="mb-4">Dashboard</h1>
-    <p class="lead mb-5">Monitor and manage your machine maintenance schedule</p>
+    <p class="lead mb-5">Monitor and manage your equipment maintenance schedule.</p>
 
     <div class="date-display mb-4">
         {{ current_date }}
@@ -16,9 +15,9 @@
         <div class="col-md-3">
             <div class="card bg-primary text-white">
                 <div class="card-body">
-                    <h5 class="card-title">Total Machines</h5>
+                    <h5 class="card-title">Total Equipment</h5>
                     <h2 class="card-text">{{ total_machines }}</h2>
-                    <p>Machines under maintenance</p>
+                    <p>PPM: {{ ppm_machine_count }} | OCM: {{ ocm_machine_count }}</p>
                 </div>
             </div>
         </div>
@@ -31,60 +30,48 @@
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="row mb-4">
-        {% for days in [7, 14, 21, 30, 60, 90] %}
-        <div class="col-md-4 mb-3">
-            <div class="card">
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark"> {# Changed text to dark for better contrast on warning #}
                 <div class="card-body">
-                    <h5 class="card-title">Coming Up ({{ days }} days)</h5>
-                    <h2 class="card-text">{{ upcoming_counts[days] if upcoming_counts[days] else 0 }}</h2>
+                    <h5 class="card-title">Upcoming</h5>
+                    <h2 class="card-text">{{ upcoming_count }}</h2>
                     <p>Due for maintenance soon</p>
                 </div>
             </div>
         </div>
-        {% endfor %}
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
                 <div class="card-body">
-                    <h5 class="card-title">Frequency</h5>
-                    <div class="d-flex justify-content-around">
-                        <div class="text-center">
-                            <h3>{{ quarterly_count }}</h3>
-                            <p>Quarterly</p>
-                        </div>
-                        <div class="text-center">
-                            <h3>{{ yearly_count }}</h3>
-                            <p>Yearly</p>
-                        </div>
-                    </div>
+                    <h5 class="card-title">Maintained</h5>
+                    <h2 class="card-text">{{ maintained_count }}</h2>
+                    <p>Recently serviced or up-to-date</p>
                 </div>
             </div>
         </div>
     </div>
+
+    {# Removed old upcoming_counts by specific days block #}
+    {# Removed old quarterly/yearly frequency block as it was PPM specific and based on old 'PPM' field #}
 
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title">Machine List</h5>
+                        <h5 class="card-title">Equipment Overview</h5>
                         <div class="d-flex gap-2">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search machines...">
-                            <select id="frequencyFilter" class="form-select">
-                                <option value="">Frequency</option>
-                                <option value="quarterly">Quarterly</option>
-                                <option value="yearly">Yearly</option>
-                            </select>
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search equipment...">
                             <select id="statusFilter" class="form-select">
-                                <option value="">Status</option>
-                                <option value="overdue">Overdue</option>
-                                <option value="upcoming">Upcoming</option>
-                                <option value="ok">OK</option>
+                                <option value="">Filter by Status</option>
+                                <option value="Overdue">Overdue</option>
+                                <option value="Upcoming">Upcoming</option>
+                                <option value="Maintained">Maintained</option>
+                                <option value="N/A">N/A or Other</option>
+                            </select>
+                             <select id="typeFilter" class="form-select">
+                                <option value="">Filter by Type</option>
+                                <option value="PPM">PPM</option>
+                                <option value="OCM">OCM</option>
                             </select>
                             <button id="resetFilters" class="btn btn-secondary">Reset</button>
                         </div>
@@ -92,12 +79,13 @@
 
                     {% if equipment %}
                     <div class="table-responsive">
-                        <table class="table table-hover">
+                        <table class="table table-hover equipment-table"> {# Added class for JS targeting #}
                             <thead>
                                 <tr>
+                                    <th>Type</th>
                                     <th>Equipment</th>
                                     <th>Model</th>
-                                    <th>Serial Number</th>
+                                    <th>Serial No.</th>
                                     <th>Next Maintenance</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -105,14 +93,22 @@
                             </thead>
                             <tbody>
                                 {% for item in equipment %}
-                                <tr>
+                                <tr data-status="{{ item.Status.lower() if item.Status else 'n/a' }}" data-type="{{ item.data_type.upper() }}">
+                                    <td><span class="badge bg-info text-dark">{{ item.data_type.upper() }}</span></td>
                                     <td>{{ item.EQUIPMENT }}</td>
                                     <td>{{ item.MODEL }}</td>
                                     <td>{{ item.MFG_SERIAL }}</td>
-                                    <td>{{ item.next_maintenance }}</td>
-                                    <td><span class="badge bg-{{ item.status_class }}">{{ item.status }}</span></td>
+                                    <td>{{ item.display_next_maintenance }}</td>
+                                    <td><span class="badge bg-{{ item.status_class }}">{{ item.Status }}</span></td>
                                     <td>
-                                        <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                        {% if item.data_type == 'ppm' %}
+                                            <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                        {% elif item.data_type == 'ocm' %}
+                                            <a href="{{ url_for('views.edit_ocm_equipment', mfg_serial=item.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                        {% endif %}
+                                         <form action="{{ url_for('views.delete_equipment', data_type=item.data_type, mfg_serial=item.MFG_SERIAL) }}" method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Del</button>
+                                        </form>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -121,8 +117,8 @@
                     </div>
                     {% else %}
                     <div class="text-center py-4">
-                        <h4>No machines found</h4>
-                        <p class="text-muted">Try adjusting your search or filters</p>
+                        <h4>No equipment found</h4>
+                        <p class="text-muted">There is no equipment data available at the moment.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -133,5 +129,47 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('searchInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    const resetFiltersBtn = document.getElementById('resetFilters');
+    const tableRows = document.querySelectorAll('.equipment-table tbody tr');
+
+    function filterTable() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const statusValue = statusFilter.value.toLowerCase();
+        const typeValue = typeFilter.value.toUpperCase();
+
+        tableRows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            const rowStatus = row.dataset.status;
+            const rowType = row.dataset.type;
+
+            const matchesSearch = searchTerm === '' || rowText.includes(searchTerm);
+            const matchesStatus = statusValue === '' || rowStatus === statusValue;
+            const matchesType = typeValue === '' || rowType === typeValue;
+
+            if (matchesSearch && matchesStatus && matchesType) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    searchInput.addEventListener('keyup', filterTable);
+    statusFilter.addEventListener('change', filterTable);
+    typeFilter.addEventListener('change', filterTable);
+
+    resetFiltersBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        statusFilter.value = '';
+        typeFilter.value = '';
+        filterTable();
+    });
+});
+</script>
 {% endblock %}

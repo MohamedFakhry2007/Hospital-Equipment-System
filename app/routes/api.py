@@ -2,12 +2,15 @@
 import logging
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, send_file, Response, current_app
+import io # Added for TextIOWrapper
+import logging
+from pathlib import Path
+
+from flask import Blueprint, jsonify, request, Response, current_app # send_file might not be needed now
 from datetime import datetime
 
 from app.services.data_service import DataService
-from app.services.import_export import ImportExportService
-from app.services.validation import ValidationService
+# ImportExportService and ValidationService removed
 
 api_bp = Blueprint('api', __name__)
 logger = logging.getLogger(__name__)
@@ -53,19 +56,11 @@ def add_equipment(data_type):
     data = request.get_json()
 
     # Basic validation (more thorough validation in service layer)
-    if 'MFG_SERIAL' not in data:
-         return jsonify({"error": "MFG_SERIAL is required"}), 400
+    # if 'MFG_SERIAL' not in data: # This will be caught by DataService Pydantic validation
+    #      return jsonify({"error": "MFG_SERIAL is required"}), 400
 
     try:
-        # Use validation service for form-like structure if needed,
-        # but here we expect JSON matching the model structure
-        # Convert JSON data to the format expected by DataService if necessary
-        if data_type == 'ppm':
-            # Example: Convert nested dicts if needed
-             pass # Assuming JSON matches PPMEntryCreate structure
-        else: # ocm
-             pass # Assuming JSON matches OCMEntryCreate structure
-
+        # Data is passed directly; Pydantic validation happens in DataService.add_entry
         added_entry = DataService.add_entry(data_type, data)
         return jsonify(added_entry), 201
     except ValueError as e:
@@ -129,17 +124,20 @@ def export_data(data_type):
         return jsonify({"error": "Invalid data type"}), 400
 
     try:
-        success, message, csv_content = ImportExportService.export_to_csv(data_type)
-        if success:
-            # Create a temporary file or send content directly
-            filename = f"{data_type}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-            return Response(
-                csv_content,
-                mimetype="text/csv",
-                headers={"Content-disposition":
-                         f"attachment; filename={filename}"})
-        else:
-            return jsonify({"error": message}), 500
+        csv_content = DataService.export_data(data_type)
+        if csv_content is None or csv_content == "": # Handle empty data case from service
+            # Optionally return 204 No Content, or an empty CSV with headers
+            # Current DataService.export_data returns "" if no data.
+            # For consistency, we can make it return headers only.
+            # For now, if it's empty string, send it as such.
+            pass
+
+        filename = f"{data_type}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return Response(
+            csv_content,
+            mimetype="text/csv",
+            headers={"Content-disposition":
+                        f"attachment; filename={filename}"})
     except Exception as e:
         logger.error(f"Error exporting {data_type} data: {str(e)}")
         return jsonify({"error": f"Failed to export {data_type} data"}), 500
@@ -160,27 +158,29 @@ def import_data(data_type):
 
     if file and file.filename.endswith('.csv'):
         try:
-            # Save temporary file
-            upload_folder = Path(current_app.config['UPLOAD_FOLDER']) # Define UPLOAD_FOLDER in Config
-            upload_folder.mkdir(exist_ok=True)
-            temp_path = upload_folder / file.filename
-            file.save(temp_path)
+            # Wrap the file stream for text-mode processing
+            # file.stream is a SpooledTemporaryFile, which is binary.
+            # TextIOWrapper makes it behave like a text file.
+            file_stream = io.TextIOWrapper(file.stream, encoding='utf-8')
 
-            success, message, stats = ImportExportService.import_from_csv(data_type, str(temp_path))
+            # Call DataService.import_data directly with the stream
+            import_results = DataService.import_data(data_type, file_stream)
 
-            # Clean up temporary file
-            temp_path.unlink(missing_ok=True)
-
-            if success:
-                return jsonify({"message": message, "stats": stats}), 200
+            # Check for errors in import_results to determine status code
+            if import_results.get("errors") and (import_results.get("added_count", 0) == 0 and import_results.get("updated_count", 0) == 0) :
+                # If there are errors and nothing was added or updated, consider it a failure.
+                # Or if only skipped_count > 0 and errors exist.
+                status_code = 400 # Bad request if all rows failed or file was problematic
+            elif import_results.get("errors"):
+                status_code = 207 # Multi-Status if some rows succeeded and some failed
             else:
-                return jsonify({"error": message, "stats": stats}), 400
+                status_code = 200 # OK if all succeeded
+
+            return jsonify(import_results), status_code
+
         except Exception as e:
             logger.error(f"Error importing {data_type} data: {str(e)}")
-            # Clean up temp file on error too
-            if 'temp_path' in locals() and temp_path.exists():
-                 temp_path.unlink(missing_ok=True)
-            return jsonify({"error": f"Failed to import {data_type} data: {str(e)}"}), 500
+            return jsonify({"error": f"Failed to import {data_type} data: {str(e)}", "details": str(e)}), 500
     else:
         return jsonify({"error": "Invalid file type, only CSV allowed"}), 400
 
