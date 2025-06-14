@@ -1,3 +1,4 @@
+
 # app/routes/views.py
 
 """
@@ -7,11 +8,12 @@ import logging
 from dateutil.relativedelta import relativedelta # Keep for now, might be removed if index logic changes enough
 import io
 # import csv # Not directly used in views.py after changes, DataService handles CSV logic
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask import send_file # Keep for export
 import tempfile # Keep for export
 # import pandas as pd # Not directly used in views.py after changes
 from app.services.data_service import DataService
+from app.services.training_service import TrainingService # Added for Training views
 # ValidationService removed
 
 views_bp = Blueprint('views', __name__)
@@ -21,8 +23,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {'csv'}
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @views_bp.route('/')
 def index():
@@ -190,7 +191,7 @@ def add_ocm_equipment():
     return render_template('equipment/add_ocm.html', data_type='ocm', form_data={})
 
 
-@views_bp.route('/equipment/ppm/edit/<mfg_serial>', methods=['GET', 'POST'])
+@views_bp.route('/equipment/ppm/edit/<path:mfg_serial>', methods=['GET', 'POST'])
 def edit_ppm_equipment(mfg_serial):
     """Handle editing existing PPM equipment."""
     entry = DataService.get_entry('ppm', mfg_serial)
@@ -235,10 +236,8 @@ def edit_ppm_equipment(mfg_serial):
             logger.error(f"Error updating PPM equipment {mfg_serial}: {str(e)}")
             flash('An unexpected error occurred during update.', 'danger')
         # Re-render form with current data (entry combined with form_data) and errors
-        # For GET, entry is already prepared. For POST error, use combined data.
         current_render_data = entry.copy()
-        current_render_data.update(form_data) # Overlay submitted values
-        # PPM_Q_X are dicts in entry, but form_data has PPM_Q_X_engineer
+        current_render_data.update(form_data)
         for q_key_form, q_field_model in [
             ("PPM_Q_I_engineer", "PPM_Q_I"), ("PPM_Q_II_engineer", "PPM_Q_II"),
             ("PPM_Q_III_engineer", "PPM_Q_III"), ("PPM_Q_IV_engineer", "PPM_Q_IV")
@@ -247,8 +246,7 @@ def edit_ppm_equipment(mfg_serial):
 
         return render_template('equipment/edit_ppm.html', data_type='ppm', entry=current_render_data, mfg_serial=mfg_serial)
 
-    # GET request: Populate form with existing data (entry is already prepared by DataService)
-    # Ensure PPM_Q_X data is directly usable by the template expecting PPM_Q_X_engineer
+    # GET request: Populate form with existing data
     display_entry = entry.copy()
     for q_model, q_form_eng in [("PPM_Q_I", "PPM_Q_I_engineer"), ("PPM_Q_II", "PPM_Q_II_engineer"),
                                 ("PPM_Q_III", "PPM_Q_III_engineer"), ("PPM_Q_IV", "PPM_Q_IV_engineer")]:
@@ -257,7 +255,7 @@ def edit_ppm_equipment(mfg_serial):
     return render_template('equipment/edit_ppm.html', data_type='ppm', entry=display_entry, mfg_serial=mfg_serial)
 
 
-@views_bp.route('/equipment/ocm/edit/<mfg_serial>', methods=['GET', 'POST'])
+@views_bp.route('/equipment/ocm/edit/<path:mfg_serial>', methods=['GET', 'POST'])
 def edit_ocm_equipment(mfg_serial):
     """Handle editing existing OCM equipment."""
     entry = DataService.get_entry('ocm', mfg_serial)
@@ -291,7 +289,7 @@ def edit_ocm_equipment(mfg_serial):
             return redirect(url_for('views.list_equipment', data_type='ocm'))
         except ValueError as e:
             flash(f"Error updating equipment: {str(e)}", 'danger')
-        except KeyError: # Should not happen
+        except KeyError:
              flash(f"Equipment with serial '{mfg_serial}' not found for update.", 'warning')
              return redirect(url_for('views.list_equipment', data_type='ocm'))
         except Exception as e:
@@ -315,9 +313,9 @@ def delete_equipment(data_type, mfg_serial):
     try:
         deleted = DataService.delete_entry(data_type, mfg_serial)
         if deleted:
-            flash(f'{data_type.upper()} equipment \'{mfg_serial}\' deleted successfully!', 'success')
+            flash(f"{data_type.upper()} equipment '{mfg_serial}' deleted successfully!", 'success')
         else:
-            flash(f'{data_type.upper()} equipment \'{mfg_serial}\' not found.', 'warning')
+            flash(f"{data_type.upper()} equipment '{mfg_serial}' not found.", 'warning')
     except Exception as e:
         logger.error(f"Error deleting {data_type} equipment {mfg_serial}: {str(e)}")
         flash('An unexpected error occurred during deletion.', 'danger')
@@ -345,26 +343,13 @@ def import_equipment():
 
     if file and allowed_file(file.filename):
         try:
-            # Use TextIOWrapper for consistent text handling
             file_stream = io.TextIOWrapper(file.stream, encoding='utf-8')
-
-            # Determine data_type from header before passing to DataService
-            # Read header safely
-            # Read header safely to infer data_type
-            # This part of logic remains, but using file_stream directly
-            # We need to be careful with consuming the stream before pandas uses it.
-            # One way is to read a line, then reset.
             try:
-                # Peek at the header to infer data_type
                 first_line = file_stream.readline()
-                file_stream.seek(0) # Reset stream for DataService.import_data
-
-                # Basic inference (can be made more robust)
-                # This is a simplified version of header check.
-                # DataService.import_data will use pandas which handles CSV parsing robustly.
-                if 'PPM_Q_I' in first_line or 'Eng1' in first_line: # PPM specific fields
+                file_stream.seek(0)
+                if 'PPM_Q_I' in first_line or 'Eng1' in first_line:
                     data_type_inferred = 'ppm'
-                elif 'Next_Maintenance' in first_line or 'Service_Date' in first_line: # OCM specific fields
+                elif 'Next_Maintenance' in first_line or 'Service_Date' in first_line:
                     data_type_inferred = 'ocm'
                 else:
                     flash('Could not reliably determine data type (PPM/OCM) from CSV header.', 'warning')
@@ -374,9 +359,7 @@ def import_equipment():
                 flash(f'Error reading CSV header: {header_read_error}', 'danger')
                 return redirect(url_for('views.import_export_page'))
 
-
             result = DataService.import_data(data_type_inferred, file_stream)
-
             msg_parts = []
             if result.get('added_count', 0) > 0:
                 msg_parts.append(f"{result['added_count']} new records added.")
@@ -384,20 +367,16 @@ def import_equipment():
                 msg_parts.append(f"{result['updated_count']} records updated.")
             if result.get('skipped_count', 0) > 0:
                 msg_parts.append(f"{result['skipped_count']} records skipped.")
-
             final_message = " ".join(msg_parts) if msg_parts else "No changes made from the import."
-
             if result.get('errors'):
                 flash(f"Import completed with issues. {final_message}", 'warning')
-                for error in result['errors'][:5]: # Show up to 5 specific errors
+                for error in result['errors'][:5]:
                     flash(f"- {error}", 'danger')
-            elif not msg_parts and not result.get('errors'): # No adds, no updates, no skips, no errors
+            elif not msg_parts and not result.get('errors'):
                  flash("The imported file did not result in any changes.", "info")
             else:
                 flash(f"Import successful. {final_message}", 'success')
-
             return redirect(url_for('views.list_equipment', data_type=data_type_inferred))
-
         except Exception as e:
             logger.exception("Error during file import process.")
             flash(f'An unexpected error occurred during import: {str(e)}', 'danger')
@@ -406,13 +385,11 @@ def import_equipment():
         flash('Invalid file type. Only CSV files are allowed.', 'warning')
         return redirect(url_for('views.import_export_page'))
 
-
 @views_bp.route('/export/ppm')
 def export_equipment_ppm():
     """Export PPM equipment data to CSV."""
     try:
         csv_content = DataService.export_data(data_type='ppm')
-        # Use BytesIO for in-memory file handling with send_file
         mem_file = io.BytesIO()
         mem_file.write(csv_content.encode('utf-8'))
         mem_file.seek(0)
@@ -445,3 +422,123 @@ def export_equipment_ocm():
         logger.exception("Error exporting OCM data.")
         flash(f"An error occurred during OCM export: {str(e)}", 'danger')
         return redirect(url_for('views.import_export_page'))
+
+# Training Page Views
+
+@views_bp.route('/training', methods=['GET'])
+def training_list():
+    """Display a list of training records."""
+    service = TrainingService()
+    try:
+        records = service.get_all_training_records()
+        # The template 'training/list.html' will be created in a later step.
+        return render_template('training/list.html', records=records, title="Training Records")
+    except Exception as e:
+        current_app.logger.error(f"Error fetching training records for list view: {str(e)}")
+        flash("Failed to load training records. Please try again later.", "danger")
+        return render_template('training/list.html', records=[], title="Training Records")
+
+
+@views_bp.route('/training/add', methods=['GET', 'POST'])
+def add_training_record_view():
+    """Handle adding a new training record."""
+    service = TrainingService()
+    form_data_for_template = {}
+
+    if request.method == 'POST':
+        form_data_for_template = request.form.to_dict()
+        try:
+            record_data = {
+                "employee_id": request.form.get("employee_id", "").strip(),
+                "name": request.form.get("name", "").strip(),
+                "department": request.form.get("department", "").strip(),
+                "trainer": request.form.get("trainer", "").strip(),
+                "trained_machines": [m.strip() for m in request.form.get("trained_machines", "").split(',') if m.strip()]
+            }
+
+            if not record_data["employee_id"] or not record_data["name"]:
+                flash("Employee ID and Name are required.", "warning")
+                return render_template('training/add.html', title="Add Training Record", record=form_data_for_template), 400
+
+            service.create_training_record(record_data)
+            flash('Training record added successfully!', 'success')
+            return redirect(url_for('views.training_list'))
+        except ValueError as e:
+            flash(str(e), 'danger')
+            return render_template('training/add.html', title="Add Training Record", record=form_data_for_template), 400
+        except Exception as e:
+            current_app.logger.error(f"Error adding training record: {str(e)}")
+            flash('Failed to add training record.', 'danger')
+            return render_template('training/add.html', title="Add Training Record", record=form_data_for_template), 500
+
+    return render_template('training/add.html', title="Add Training Record", record=form_data_for_template)
+
+
+@views_bp.route('/training/edit/<int:record_id>', methods=['GET', 'POST'])
+def edit_training_record_view(record_id):
+    """Handle editing an existing training record."""
+    service = TrainingService()
+
+    if request.method == 'POST':
+        form_data_for_template = request.form.to_dict()
+        form_data_for_template['id'] = record_id
+        try:
+            record_data = {
+                "employee_id": request.form.get("employee_id", "").strip(),
+                "name": request.form.get("name", "").strip(),
+                "department": request.form.get("department", "").strip(),
+                "trainer": request.form.get("trainer", "").strip(),
+                "trained_machines": [m.strip() for m in request.form.get("trained_machines", "").split(',') if m.strip()]
+            }
+
+            if not record_data["employee_id"] or not record_data["name"]:
+                flash("Employee ID and Name are required.", "warning")
+                return render_template('training/edit.html', title="Edit Training Record", record=form_data_for_template), 400
+
+            updated_record = service.update_training_record(record_id, record_data)
+            if updated_record is None:
+                flash('Training record not found or update failed.', 'danger')
+                return redirect(url_for('views.training_list'))
+
+            flash('Training record updated successfully!', 'success')
+            return redirect(url_for('views.training_list'))
+        except ValueError as e:
+            flash(str(e), 'danger')
+            return render_template('training/edit.html', title="Edit Training Record", record=form_data_for_template), 400
+        except Exception as e:
+            current_app.logger.error(f"Error updating training record {record_id}: {str(e)}")
+            flash('Failed to update training record.', 'danger')
+            return render_template('training/edit.html', title="Edit Training Record", record=form_data_for_template), 500
+
+    # GET request
+    try:
+        record = service.get_training_record(record_id)
+        if record:
+            # Prepare trained_machines as a comma-separated string for easy display/editing in a text field
+            if isinstance(record.get("trained_machines"), list):
+                record["trained_machines_str"] = ", ".join(record["trained_machines"])
+            else:
+                record["trained_machines_str"] = "" # Default if not list or not present
+            return render_template('training/edit.html', title="Edit Training Record", record=record)
+        else:
+            flash('Training record not found.', 'warning')
+            return redirect(url_for('views.training_list'))
+    except Exception as e:
+        current_app.logger.error(f"Error fetching training record {record_id} for edit view: {str(e)}")
+        flash("Failed to load record for editing. Please try again later.", "danger")
+        return redirect(url_for('views.training_list'))
+
+@views_bp.route('/training/delete/<int:record_id>', methods=['POST'])
+def delete_training_record_view(record_id):
+    """Handle deleting a training record."""
+    service = TrainingService()
+    try:
+        success = service.delete_training_record(record_id)
+        if success:
+            flash('Training record deleted successfully!', 'success')
+        else:
+            flash('Training record not found or could not be deleted.', 'warning')
+    except Exception as e:
+        current_app.logger.error(f"Error deleting training record {record_id}: {str(e)}")
+        flash('Failed to delete training record.', 'danger')
+    return redirect(url_for('views.training_list'))

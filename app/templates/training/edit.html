@@ -1,0 +1,61 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ title if title else 'Edit Training Record' }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title if title else 'Edit Training Record' }}</h2>
+
+    {% include '_flash_messages.html' %}
+
+    {% if record and record.id is not none %} {# Check record.id specifically for existence #}
+    <form method="POST" action="{{ url_for('views.edit_training_record_view', record_id=record.id) }}">
+        <div class="mb-3">
+            <label for="employee_id" class="form-label">Employee ID <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="employee_id" name="employee_id" value="{{ record.employee_id | default('') }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ record.name | default('') }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="department" class="form-label">Department</label>
+            <input type="text" class="form-control" id="department" name="department" value="{{ record.department | default('') }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="trainer" class="form-label">Trainer</label>
+            <input type="text" class="form-control" id="trainer" name="trainer" value="{{ record.trainer | default('') }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="trained_machines" class="form-label">Trained Machines</label>
+            {#
+                On GET, the view provides 'trained_machines_str'.
+                On POST (if form fails validation and is re-rendered), request.form['trained_machines'] will be a string.
+                So, 'record.trained_machines_str' should be prioritized if available (from GET),
+                otherwise, use 'record.trained_machines' (from form re-population which is a string).
+            #}
+            <textarea class="form-control" id="trained_machines" name="trained_machines" rows="3" placeholder="Enter machine names, comma separated">{{ record.trained_machines_str if record.trained_machines_str is not none else record.trained_machines | default('') }}</textarea>
+            <small class="form-text text-muted">Comma-separated list of machine names or identifiers.</small>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Update Record
+            </button>
+            <a href="{{ url_for('views.training_list') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+    {% else %}
+    <div class="alert alert-warning" role="alert">
+        Training record data is not available for editing or the record ID is missing. Please return to the <a href="{{ url_for('views.training_list') }}">list</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

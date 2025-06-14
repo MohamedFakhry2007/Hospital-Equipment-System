@@ -3,6 +3,30 @@ import io
 
 # Helper function to create sample data (can be expanded or moved)
 # These are simplified for view tests where we mostly check for presence of data in HTML
+
+from unittest.mock import patch # Ensure patch is available
+from app.services.training_service import TrainingService # For patching
+
+def create_sample_view_training_record(id=1, employee_id="VTRN001", name="View Test User", department="View Dept", trainer="View Trainer", trained_machines=None, **kwargs):
+    if trained_machines is None:
+        trained_machines = ["V-Machine1", "V-Machine2"]
+    data = {
+        "id": id,
+        "employee_id": employee_id,
+        "name": name,
+        "department": department,
+        "trainer": trainer,
+        "trained_machines": trained_machines
+    }
+    # For edit form, view might add 'trained_machines_str'
+    if isinstance(trained_machines, list):
+        data["trained_machines_str"] = ", ".join(trained_machines)
+    else: # If trained_machines is already a string or None/other
+        data["trained_machines_str"] = trained_machines if isinstance(trained_machines, str) else ""
+
+    data.update(kwargs)
+    return data
+
 def create_sample_view_ppm_entry(mfg_serial="PPM_VIEW_S001", status="Upcoming", status_class="warning", **kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "PPM View Device", "MODEL": "PPM-VXYZ", "Name": "PPM Device XYZ View",
@@ -478,3 +502,215 @@ def test_export_equipment_service_error(client):
         assert "An error occurred during PPM export: Export Fail" in response_data_str
         assert "Import/Export Equipment Data" in response_data_str
         mock_export.assert_called_once_with(data_type='ppm')
+
+# --- Tests for Training Page Views (/training/...) ---
+
+# GET /training (List View)
+def test_training_list_route_success_with_data(client):
+    sample_records = [
+        create_sample_view_training_record(id=1, employee_id="TRN001", name="User One"),
+        create_sample_view_training_record(id=2, employee_id="TRN002", name="User Two", trained_machines=[])
+    ]
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.return_value = sample_records
+
+        response = client.get(url_for('views.training_list')) # Use url_for
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training Records" in html_content
+        assert "TRN001" in html_content
+        assert "User One" in html_content
+        assert "V-Machine1, V-Machine2" in html_content
+        assert "TRN002" in html_content
+        assert "User Two" in html_content
+        assert "N/A" in html_content
+        mock_service_instance.get_all_training_records.assert_called_once()
+
+def test_training_list_route_success_no_data(client):
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.return_value = []
+
+        response = client.get(url_for('views.training_list'))
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training Records" in html_content
+        assert "No training records found." in html_content
+        mock_service_instance.get_all_training_records.assert_called_once()
+
+def test_training_list_route_service_exception(client):
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.side_effect = Exception("DB Load Error")
+
+        response = client.get(url_for('views.training_list'))
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        # Check for flashed message content (depends on how _flash_messages.html renders it)
+        assert "Failed to load training records. Please try again later." in html_content
+        mock_service_instance.get_all_training_records.assert_called_once()
+
+# GET /training/add
+def test_add_training_record_view_get(client):
+    response = client.get(url_for('views.add_training_record_view'))
+    assert response.status_code == 200
+    html_content = response.data.decode('utf-8')
+    assert "Add Training Record" in html_content # Corrected H2 title and indentation
+    assert 'name="employee_id"' in html_content
+    assert 'name="trained_machines"' in html_content
+
+# POST /training/add
+def test_add_training_record_view_post_success(client):
+    form_data = {
+        "employee_id": "NEW_EMP01", "name": "New Trainee",
+        "department": "Quality", "trainer": "Lead Trainer",
+        "trained_machines": "Welder, Grinder"
+    }
+    expected_service_payload = {
+        "employee_id": "NEW_EMP01", "name": "New Trainee",
+        "department": "Quality", "trainer": "Lead Trainer",
+        "trained_machines": ["Welder", "Grinder"]
+    }
+    created_record_from_service = {**expected_service_payload, "id": 100}
+
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.create_training_record.return_value = created_record_from_service
+
+        response = client.post(url_for('views.add_training_record_view'), data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training record added successfully!" in html_content
+        assert "Training Records" in html_content
+        mock_service_instance.create_training_record.assert_called_once_with(expected_service_payload)
+
+def test_add_training_record_view_post_validation_error_form(client):
+    form_data = {"employee_id": "", "name": "Valid Name"}
+    # No service mock needed as view validation should catch this first
+    response = client.post(url_for('views.add_training_record_view'), data=form_data)
+    assert response.status_code == 400
+    html_content = response.data.decode('utf-8')
+    assert "Add Training Record" in html_content # Corrected H2 title and indentation
+    assert "Employee ID and Name are required." in html_content
+
+def test_add_training_record_view_post_service_value_error(client):
+    form_data = {"employee_id": "EMP02", "name": "Service Error User", "department": "", "trainer": "", "trained_machines": "MachineX"}
+    expected_service_payload = {
+        "employee_id": "EMP02", "name": "Service Error User", "department": "", "trainer": "",
+        "trained_machines": ["MachineX"]
+    }
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.create_training_record.side_effect = ValueError("Service validation failed")
+
+        response = client.post(url_for('views.add_training_record_view'), data=form_data)
+        assert response.status_code == 400
+        html_content = response.data.decode('utf-8')
+        assert "Add Training Record" in html_content # Corrected H2 title and indentation
+        assert "Service validation failed" in html_content
+        mock_service_instance.create_training_record.assert_called_once_with(expected_service_payload)
+
+# GET /training/edit/<record_id>
+def test_edit_training_record_view_get_success(client):
+    record_id = 7
+    sample_record = create_sample_view_training_record(id=record_id, employee_id="EDT007", name="Edit User")
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_training_record.return_value = sample_record
+
+        response = client.get(url_for('views.edit_training_record_view', record_id=record_id))
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Edit Training Record" in html_content
+        assert 'value="EDT007"' in html_content
+        assert 'value="Edit User"' in html_content
+        assert ">V-Machine1, V-Machine2</textarea>" in html_content
+        mock_service_instance.get_training_record.assert_called_once_with(record_id)
+
+def test_edit_training_record_view_get_not_found(client):
+    record_id = 99
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_training_record.return_value = None
+
+        response = client.get(url_for('views.edit_training_record_view', record_id=record_id), follow_redirects=True)
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training record not found." in html_content
+        assert "Training Records" in html_content
+        mock_service_instance.get_training_record.assert_called_once_with(record_id)
+
+# POST /training/edit/<record_id>
+def test_edit_training_record_view_post_success(client):
+    record_id = 8
+    form_data = {
+        "employee_id": "EDT008_UPD", "name": "Updated Trainee",
+        "department": "Maintenance", "trainer": "Senior Trainer",
+        "trained_machines": "Cutter, Press"
+    }
+    expected_service_payload = {
+        "employee_id": "EDT008_UPD", "name": "Updated Trainee",
+        "department": "Maintenance", "trainer": "Senior Trainer",
+        "trained_machines": ["Cutter", "Press"]
+    }
+    updated_record_from_service = {**expected_service_payload, "id": record_id}
+
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.return_value = updated_record_from_service
+
+        response = client.post(url_for('views.edit_training_record_view', record_id=record_id), data=form_data, follow_redirects=True)
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training record updated successfully!" in html_content
+        assert "Training Records" in html_content
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, expected_service_payload)
+
+def test_edit_training_record_view_post_service_value_error(client):
+    record_id = 9
+    form_data = {"employee_id": "EMP09_Fail", "name": "Fail Update", "department": "", "trainer": "", "trained_machines": "Drill"}
+    expected_service_payload = {
+        "employee_id": "EMP09_Fail", "name": "Fail Update", "department": "", "trainer": "",
+        "trained_machines": ["Drill"]
+    }
+    # For re-rendering the form, the GET part of the view logic might call get_training_record again.
+    # However, the current view code in case of POST error re-renders with .
+    # So, we only need to mock update_training_record.
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.side_effect = ValueError("Update service validation fail")
+
+        response = client.post(url_for('views.edit_training_record_view', record_id=record_id), data=form_data)
+        assert response.status_code == 400
+        html_content = response.data.decode('utf-8')
+        assert "Edit Training Record" in html_content
+        assert "Update service validation fail" in html_content
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, expected_service_payload)
+
+# POST /training/delete/<record_id>
+def test_delete_training_record_view_post_success(client):
+    record_id = 10
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.delete_training_record.return_value = True
+
+        response = client.post(url_for('views.delete_training_record_view', record_id=record_id), follow_redirects=True)
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training record deleted successfully!" in html_content
+        assert "Training Records" in html_content
+        mock_service_instance.delete_training_record.assert_called_once_with(record_id)
+
+def test_delete_training_record_view_post_not_found(client):
+    record_id = 11
+    with patch('app.routes.views.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.delete_training_record.return_value = False
+
+        response = client.post(url_for('views.delete_training_record_view', record_id=record_id), follow_redirects=True)
+        assert response.status_code == 200
+        html_content = response.data.decode('utf-8')
+        assert "Training record not found or could not be deleted." in html_content
+        assert "Training Records" in html_content
+        mock_service_instance.delete_training_record.assert_called_once_with(record_id)
