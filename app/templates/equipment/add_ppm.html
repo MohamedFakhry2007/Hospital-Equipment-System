@@ -44,58 +44,39 @@
             </div>
         </div>
         <hr>
-        <h5 class="mt-4 mb-3">Dates</h5>
+        <h5 class="mt-4 mb-3">Dates (Optional)</h5>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Installation_Date" class="form-label">Installation Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Installation_Date" name="Installation_Date" value="{{ form_data.Installation_Date or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+                <label for="Installation_Date" class="form-label">Installation Date (DD/MM/YYYY)</label>
+                <input type="text" class="form-control" id="Installation_Date" name="Installation_Date" value="{{ form_data.Installation_Date or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
             </div>
             <div class="col-md-6 mb-3">
-                <label for="Warranty_End" class="form-label">Warranty End Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Warranty_End" name="Warranty_End" value="{{ form_data.Warranty_End or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+                <label for="Warranty_End" class="form-label">Warranty End Date (DD/MM/YYYY)</label>
+                <input type="text" class="form-control" id="Warranty_End" name="Warranty_End" value="{{ form_data.Warranty_End or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
             </div>
         </div>
         <hr>
-        <h5 class="mt-4 mb-3">PPM Quarter Engineer (Scheduled)</h5>
+        <h5 class="mt-4 mb-3">Quarterly Engineer Assignments</h5>
         <div class="row">
             <div class="col-md-3 mb-3">
-                <label for="PPM_Q_I_engineer" class="form-label">Quarter I Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_I_engineer" name="PPM_Q_I_engineer" value="{{ form_data.PPM_Q_I_engineer or '' }}">
+                <label for="Q1_Engineer" class="form-label">Q1 Engineer</label>
+                <input type="text" class="form-control" id="Q1_Engineer" name="Q1_Engineer" value="{{ form_data.Q1_Engineer or '' }}">
             </div>
             <div class="col-md-3 mb-3">
-                <label for="PPM_Q_II_engineer" class="form-label">Quarter II Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" value="{{ form_data.PPM_Q_II_engineer or '' }}">
+                <label for="Q2_Engineer" class="form-label">Q2 Engineer</label>
+                <input type="text" class="form-control" id="Q2_Engineer" name="Q2_Engineer" value="{{ form_data.Q2_Engineer or '' }}">
             </div>
             <div class="col-md-3 mb-3">
-                <label for="PPM_Q_III_engineer" class="form-label">Quarter III Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" value="{{ form_data.PPM_Q_III_engineer or '' }}">
+                <label for="Q3_Engineer" class="form-label">Q3 Engineer</label>
+                <input type="text" class="form-control" id="Q3_Engineer" name="Q3_Engineer" value="{{ form_data.Q3_Engineer or '' }}">
             </div>
             <div class="col-md-3 mb-3">
-                <label for="PPM_Q_IV_engineer" class="form-label">Quarter IV Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" value="{{ form_data.PPM_Q_IV_engineer or '' }}">
+                <label for="Q4_Engineer" class="form-label">Q4 Engineer</label>
+                <input type="text" class="form-control" id="Q4_Engineer" name="Q4_Engineer" value="{{ form_data.Q4_Engineer or '' }}">
             </div>
         </div>
         <hr>
-        <h5 class="mt-4 mb-3">PPM Engineer Work Done (Actual)</h5>
-        <div class="row">
-            <div class="col-md-3 mb-3">
-                <label for="Eng1" class="form-label">Engineer Q1 (Actual)</label>
-                <input type="text" class="form-control" id="Eng1" name="Eng1" value="{{ form_data.Eng1 or '' }}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="Eng2" class="form-label">Engineer Q2 (Actual)</label>
-                <input type="text" class="form-control" id="Eng2" name="Eng2" value="{{ form_data.Eng2 or '' }}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="Eng3" class="form-label">Engineer Q3 (Actual)</label>
-                <input type="text" class="form-control" id="Eng3" name="Eng3" value="{{ form_data.Eng3 or '' }}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="Eng4" class="form-label">Engineer Q4 (Actual)</label>
-                <input type="text" class="form-control" id="Eng4" name="Eng4" value="{{ form_data.Eng4 or '' }}">
-            </div>
-        </div>
-        <hr>
+        {# PPM Engineer Work Done (Actual) section removed #}
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="Status" class="form-label">Status (Optional, auto-calculated if blank)</label>

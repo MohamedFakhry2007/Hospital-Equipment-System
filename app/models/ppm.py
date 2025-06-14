@@ -9,14 +9,15 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class QuarterData(BaseModel):
     """Model for quarterly maintenance data."""
-    engineer: str
+    engineer: Optional[str] = None
+    quarter_date: Optional[str] = None
 
     @field_validator('engineer')
     @classmethod
-    def validate_engineer(cls, v: str) -> str:
-        """Validate engineer is not empty."""
-        if not v.strip():
-            raise ValueError("Engineer name cannot be empty")
+    def validate_engineer(cls, v: Optional[str]) -> Optional[str]:
+        """Validate engineer is not empty if provided."""
+        if v is None or not v.strip():
+            return None  # Allow None or empty string
         return v.strip()
 
 
@@ -30,12 +31,8 @@ class PPMEntry(BaseModel):
     MANUFACTURER: str
     Department: str
     LOG_NO: str
-    Installation_Date: str
-    Warranty_End: str
-    Eng1: str
-    Eng2: str
-    Eng3: str
-    Eng4: str
+    Installation_Date: Optional[str] = None
+    Warranty_End: Optional[str] = None
     Status: Literal["Upcoming", "Overdue", "Maintained"]
     PPM_Q_I: QuarterData
     PPM_Q_II: QuarterData
@@ -44,15 +41,17 @@ class PPMEntry(BaseModel):
 
     @field_validator('Installation_Date', 'Warranty_End')
     @classmethod
-    def validate_date_format(cls, v: str) -> str:
-        """Validate date is in DD/MM/YYYY format."""
+    def validate_date_format(cls, v: Optional[str]) -> Optional[str]:
+        """Validate date is in DD/MM/YYYY format if provided."""
+        if v is None or not v.strip():
+            return v  # Allow None or empty string
         try:
             datetime.strptime(v, '%d/%m/%Y')
             return v
         except ValueError:
             raise ValueError(f"Invalid date format: {v}. Expected format: DD/MM/YYYY")
 
-    @field_validator('EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'Department', 'Eng1', 'Eng2', 'Eng3', 'Eng4')
+    @field_validator('EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'Department')
     @classmethod
     def validate_not_empty(cls, v: str) -> str:
         """Validate required fields are not empty."""
@@ -76,12 +75,8 @@ class PPMEntryCreate(BaseModel):
     MANUFACTURER: str
     Department: str
     LOG_NO: str
-    Installation_Date: str
-    Warranty_End: str
-    Eng1: str
-    Eng2: str
-    Eng3: str
-    Eng4: str
+    Installation_Date: Optional[str] = None
+    Warranty_End: Optional[str] = None
     Status: Literal["Upcoming", "Overdue", "Maintained"]
     OCM: Optional[str] = ''
     PPM_Q_I: Dict[str, str]

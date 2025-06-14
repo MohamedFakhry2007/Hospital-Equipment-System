@@ -2,14 +2,14 @@
 Data service for managing equipment maintenance data.
 """
 import json
-from dateutil.relativedelta import relativedelta
 import logging
 import io
 import csv
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Literal, Union, TextIO
-from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional, Literal, Union, TextIO, get_args
+from datetime import datetime, date, timedelta
 
+from dateutil.relativedelta import relativedelta
 import pandas as pd
 from pydantic import ValidationError
 
@@ -118,20 +118,64 @@ class DataService:
             # This is a simplified interpretation: if all Eng fields for past/current quarters are filled, it's Maintained.
             # A more precise calculation would need actual quarter dates.
             # Assuming EngX fields imply work done for that quarter.
-            # This logic might need refinement based on actual operational meaning of Eng1-4.
+            # For PPM, status is based on PPM_Q_I to PPM_Q_IV fields, specifically their 'quarter_date' and 'engineer'.
+            today_date = datetime.now().date()
+            is_overdue = False
+            maintained_quarters_count = 0
+            past_due_quarters_with_engineer = 0
+            total_past_due_quarters = 0
 
-            # Simplified: If all Eng fields have values, assume "Maintained".
-            # This doesn't account for "Overdue" or "Upcoming" well without explicit quarter dates.
-            # For now, if any Eng field is empty, it's "Upcoming". If filled, "Maintained".
-            # This is a placeholder and likely needs to be more sophisticated.
-            all_eng_filled = all(entry_data.get(f"Eng{i}") for i in range(1, 5))
-            if all_eng_filled:
+            for q_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+                quarter_info = entry_data.get(q_key, {})
+                if not isinstance(quarter_info, dict): # Should be a dict after model validation
+                    quarter_info = {}
+
+                quarter_date_str = quarter_info.get('quarter_date')
+                engineer_name = quarter_info.get('engineer')
+
+                if not quarter_date_str:
+                    # If no date, this quarter cannot make it overdue by itself,
+                    # but lack of engineer might contribute to "Upcoming" if no other action.
+                    continue
+
+                try:
+                    current_quarter_date = datetime.strptime(quarter_date_str, '%d/%m/%Y').date()
+                except ValueError:
+                    logger.warning(f"Invalid quarter_date format for {entry_data.get('MFG_SERIAL')}, quarter {q_key}: {quarter_date_str}")
+                    continue # Skip this quarter for status calculation if date is invalid
+
+                if current_quarter_date < today_date:
+                    total_past_due_quarters += 1
+                    if engineer_name and engineer_name.strip():
+                        past_due_quarters_with_engineer += 1
+                    else:
+                        is_overdue = True # Found a past due quarter without an engineer
+
+                # For "Maintained" status, we count quarters with an engineer, irrespective of date for now.
+                # Refinement: "Maintained" typically means past services are done.
+                if engineer_name and engineer_name.strip():
+                    maintained_quarters_count +=1
+
+
+            if is_overdue:
+                return "Overdue"
+
+            # If all past due quarters have an engineer, and there was at least one such quarter
+            if total_past_due_quarters > 0 and past_due_quarters_with_engineer == total_past_due_quarters:
                 return "Maintained"
 
-            # Placeholder: This doesn't distinguish Overdue from Upcoming well for PPM without dates.
-            # If Installation_Date is available and very old, and not all Eng are filled, it could be Overdue.
-            # For now, default to "Upcoming" if not all Eng fields are filled.
-            return "Upcoming" # Needs better logic for PPM "Overdue"
+            # If there are no past due quarters, and some future quarters might or might not have engineers
+            # or if all past due quarters are maintained, but there are future quarters.
+            if not total_past_due_quarters and maintained_quarters_count > 0 : # e.g. all future but one is assigned
+                 # This could still be upcoming if all assigned quarters are in the future
+                 # Let's refine "Maintained": if all *past* quarters are done, and there are future ones.
+                 # The existing logic: if not overdue, and past_due_quarters_with_engineer == total_past_due_quarters
+                 # this covers the case where past work is done. If total_past_due_quarters is 0, it's upcoming.
+                 pass # Fall through to Upcoming
+
+            # If no quarters were overdue, and no past quarters were "maintained" (e.g. all future, or past but no engineer which means overdue)
+            # Default to upcoming if not Overdue and not clearly Maintained (all past work done)
+            return "Upcoming"
 
         elif data_type == 'ocm':
             next_maintenance_str = entry_data.get("Next_Maintenance")
@@ -170,6 +214,31 @@ class DataService:
                 return "Upcoming"
 
         return "Upcoming" # Default fallback
+
+    @staticmethod
+    def _calculate_ppm_quarter_dates(installation_date_str: Optional[str]) -> List[Optional[str]]:
+        """
+        Calculates four quarterly PPM dates.
+        Q1 is 3 months after installation_date_str or today if not provided/invalid.
+        Q2, Q3, Q4 are 3 months after the previous quarter.
+        Returns dates as DD/MM/YYYY strings.
+        """
+        base_date = None
+        if installation_date_str:
+            try:
+                base_date = datetime.strptime(installation_date_str, '%d/%m/%Y').date()
+            except ValueError:
+                logger.warning(f"Invalid Installation_Date format '{installation_date_str}'. Using today for PPM quarter calculation.")
+                base_date = datetime.today().date()
+        else:
+            base_date = datetime.today().date()
+
+        q_dates = []
+        current_q_date = base_date
+        for _ in range(4):
+            current_q_date += relativedelta(months=3)
+            q_dates.append(current_q_date.strftime('%d/%m/%Y'))
+        return q_dates
 
     @staticmethod
     def ensure_unique_mfg_serial(data: List[Dict[str, Any]], new_entry: Dict[str, Any], exclude_serial: Optional[str] = None):
@@ -236,10 +305,20 @@ class DataService:
 
         try:
             if data_type == 'ppm':
-                # For PPM, PPMEntryCreate is not defined in the problem, assume PPMEntry is used for creation
+                # Populate quarter dates before validation
+                installation_date_str = entry_copy.get('Installation_Date')
+                q_dates = DataService._calculate_ppm_quarter_dates(installation_date_str)
+                for i, q_key in enumerate(['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']):
+                    # entry_copy from PPMEntryCreate has PPM_Q_X as Dict[str, str] e.g. {"engineer": "name"}
+                    # We need to add quarter_date to it.
+                    quarter_data_dict = entry_copy.get(q_key, {})
+                    if not isinstance(quarter_data_dict, dict): # Ensure it's a dictionary
+                        quarter_data_dict = {} # Initialize if not present or wrong type
+                    quarter_data_dict['quarter_date'] = q_dates[i]
+                    entry_copy[q_key] = quarter_data_dict
+
                 validated_entry_model = PPMEntry(**entry_copy)
             else:
-                # For OCM, OCMEntryCreate is not defined in the problem, assume OCMEntry is used for creation
                 validated_entry_model = OCMEntry(**entry_copy)
             validated_entry = validated_entry_model.model_dump()
         except ValidationError as e:
@@ -281,6 +360,17 @@ class DataService:
 
         try:
             if data_type == 'ppm':
+                # Populate/update quarter dates before validation for PPM type
+                installation_date_str = entry_copy.get('Installation_Date')
+                q_dates = DataService._calculate_ppm_quarter_dates(installation_date_str)
+                for i, q_key in enumerate(['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']):
+                    # new_entry_data (aliased as entry_copy) should have PPM_Q_X fields as dicts
+                    quarter_data_dict = entry_copy.get(q_key, {})
+                    if not isinstance(quarter_data_dict, dict):
+                        quarter_data_dict = {} # Initialize if somehow missing or wrong type
+                    quarter_data_dict['quarter_date'] = q_dates[i]
+                    entry_copy[q_key] = quarter_data_dict
+
                 validated_model = PPMEntry(**entry_copy)
             else:
                 validated_model = OCMEntry(**entry_copy)
@@ -424,82 +514,100 @@ class DataService:
             # with PPM_Q_I etc. being dicts like {"engineer": "name"} or just the name.
             # For simplicity of CSV, we'll expect PPM_Q_I_Engineer, etc.
 
-            # Simpler approach: CSV columns match the flat field names of the Pydantic models.
-            # For PPM_Q_I, it will be a dictionary in the model, so CSV needs to map to that.
-            # Let's assume CSV has PPM_Q_I_engineer, PPM_Q_II_engineer, etc.
-            csv_columns = list(PPMEntry.model_fields.keys())
-            # We need to adjust for QuarterData fields.
-            # The export will produce flat PPM_Q_I (engineer name), etc. So import should expect that.
-
+            # Define expected CSV columns for PPM import
+            PPM_CSV_BASE_FIELDS = ['EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER', 'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'Status', 'OCM']
+            PPM_CSV_QUARTER_ENGINEER_FIELDS = ['Q1_Engineer', 'Q2_Engineer', 'Q3_Engineer', 'Q4_Engineer']
+            PPM_EXPECTED_CSV_COLS = PPM_CSV_BASE_FIELDS + PPM_CSV_QUARTER_ENGINEER_FIELDS
+            Model = PPMEntry
         else: # ocm
             Model = OCMEntry
-            csv_columns = list(OCMEntry.model_fields.keys())
+            # For OCM, we can still derive from model fields, assuming direct mapping
+            OCM_EXPECTED_CSV_COLS = [f for f in OCMEntry.model_fields if f != 'NO']
+
 
         try:
             df = pd.read_csv(file_stream, dtype=str) # Read all as string initially
-            df.fillna('', inplace=True)
+            df.fillna('', inplace=True) # Replace NaN with empty strings
 
             if 'NO' in df.columns: # 'NO' is ignored from CSV
                 df = df.drop(columns=['NO'])
 
             current_data_map = {entry['MFG_SERIAL']: entry for entry in DataService.load_data(data_type)}
-            entries_to_save = [] # list of dicts
 
             for index, row in df.iterrows():
                 row_dict_raw = row.to_dict()
                 entry_data = {}
 
-                # Prepare entry_data from row_dict_raw, mapping to model fields
-                for field_name in csv_columns:
-                    if field_name == 'NO': continue # NO is handled by reindex
+                if data_type == 'ppm':
+                    # Map base PPM fields
+                    for field_name in PPM_CSV_BASE_FIELDS:
+                        raw_value = row_dict_raw.get(field_name, '').strip()
+                        # Handle optional fields that should be None if empty
+                        if field_name in ['Name', 'Installation_Date', 'Warranty_End', 'OCM'] and not raw_value:
+                            entry_data[field_name] = None
+                        else:
+                            entry_data[field_name] = raw_value
 
-                    # Handle PPM QuarterData: CSV has PPM_Q_I, PPM_Q_II, etc. for engineer names
-                    if data_type == 'ppm' and field_name in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
-                        # CSV header for these should be PPM_Q_I, PPM_Q_II, etc.
-                        # And the value is the engineer's name for that quarter.
-                        engineer_name = row_dict_raw.get(field_name, '').strip()
-                        entry_data[field_name] = {"engineer": engineer_name}
-                        continue
+                    # Calculate quarter dates
+                    installation_date_csv = entry_data.get('Installation_Date')
+                    calculated_q_dates = DataService._calculate_ppm_quarter_dates(installation_date_csv)
 
-                    entry_data[field_name] = row_dict_raw.get(field_name, '').strip()
+                    # Populate PPM_Q_I to PPM_Q_IV
+                    entry_data['PPM_Q_I'] = {
+                        'engineer': row_dict_raw.get('Q1_Engineer', '').strip() or None,
+                        'quarter_date': calculated_q_dates[0]
+                    }
+                    entry_data['PPM_Q_II'] = {
+                        'engineer': row_dict_raw.get('Q2_Engineer', '').strip() or None,
+                        'quarter_date': calculated_q_dates[1]
+                    }
+                    entry_data['PPM_Q_III'] = {
+                        'engineer': row_dict_raw.get('Q3_Engineer', '').strip() or None,
+                        'quarter_date': calculated_q_dates[2]
+                    }
+                    entry_data['PPM_Q_IV'] = {
+                        'engineer': row_dict_raw.get('Q4_Engineer', '').strip() or None,
+                        'quarter_date': calculated_q_dates[3]
+                    }
+                else: # OCM data type
+                    for field_name in OCM_EXPECTED_CSV_COLS:
+                        raw_value = row_dict_raw.get(field_name, '').strip()
+                        # Handle optional fields for OCM if any are treated as None when empty
+                        # For now, assuming OCM fields are fine with empty strings or have specific validators
+                        entry_data[field_name] = raw_value
 
-                # Optional: Name field logic (skip if same as MODEL)
-                if 'Name' in entry_data and 'MODEL' in entry_data:
+                # Optional: Name field logic (common to both, if applicable, already handled for PPM)
+                if data_type == 'ocm' and 'Name' in entry_data and 'MODEL' in entry_data:
                     if not entry_data['Name'] or entry_data['Name'] == entry_data['MODEL']:
-                        entry_data['Name'] = None # Will be skipped by Pydantic if None and Optional
+                        entry_data['Name'] = None
 
-                # Date validation and formatting (DD/MM/YYYY)
-                date_fields = ["Installation_Date", "Warranty_End"]
-                if data_type == 'ocm':
-                    date_fields.extend(["Service_Date", "Next_Maintenance"])
+                # Date validation for required model date fields (PPM: none required, OCM: some might be)
+                # Note: PPMEntry Installation_Date/Warranty_End are Optional[str], validator handles None/empty.
+                # OCMEntry date fields might be mandatory string, needing validation here if not ''
 
-                valid_dates = True
-                for date_field in date_fields:
-                    if date_field in entry_data and entry_data[date_field]:
-                        try:
-                            datetime.strptime(entry_data[date_field], '%d/%m/%Y')
-                        except ValueError:
-                            msg = f"Row {index+2}: Invalid date format for {date_field} ('{entry_data[date_field]}'). Expected DD/MM/YYYY."
-                            errors.append(msg)
-                            skipped_count += 1
-                            valid_dates = False
-                            break
-                if not valid_dates:
-                    continue
+                # For PPM, specific date fields like Installation_Date, Warranty_End are already set to None if empty.
+                # Their validation (DD/MM/YYYY if not empty) happens in the PPMEntry model.
+                # For OCM, let's assume similar handling or that model validators are sufficient.
+                # The original code had a loop here, which is good for explicit checks if needed.
+                # For now, relying on Pydantic model validation for date formats.
 
                 # Status: Use from CSV if valid, else calculate
-                csv_status = entry_data.get('Status', '').strip()
-                valid_statuses = get_args(Literal["Upcoming", "Overdue", "Maintained"]) # Helper to get Literal values
-                if csv_status and csv_status in valid_statuses:
-                    entry_data['Status'] = csv_status
+                # Status field is in PPM_CSV_BASE_FIELDS, so it's already in entry_data if provided.
+                # If not provided or invalid, it will be calculated.
+                csv_status_value = entry_data.get('Status') # Might be None if column was missing or empty and mapped to None
+                if isinstance(csv_status_value, str): # Ensure it's a string before stripping
+                    csv_status_value = csv_status_value.strip()
+
+                valid_statuses = get_args(Literal["Upcoming", "Overdue", "Maintained"])
+                if csv_status_value and csv_status_value in valid_statuses:
+                    entry_data['Status'] = csv_status_value # Use valid provided status
                 else:
-                    if csv_status and csv_status not in valid_statuses:
-                         errors.append(f"Row {index+2}: Invalid Status '{csv_status}'. Will be recalculated.")
+                    if csv_status_value and csv_status_value not in valid_statuses: # Log if invalid status was provided
+                         errors.append(f"Row {index+2}: Invalid Status '{csv_status_value}'. Will be recalculated.")
+                    # Calculate status if not provided, or if provided status was invalid, or if it was None
                     entry_data['Status'] = DataService.calculate_status(entry_data, data_type)
 
-
                 try:
-                    # Validate the prepared entry_data
                     validated_model = Model(**entry_data)
                     validated_dict = validated_model.model_dump()
 
@@ -578,35 +686,54 @@ class DataService:
         if not all_data:
             return ""
 
-        Model = PPMEntry if data_type == 'ppm' else OCMEntry
-        # Define column order based on model fields, ensuring 'NO' is first.
-        # And PPM QuarterData fields are output as flat engineer names.
-        columns = ['NO'] + [field for field in Model.model_fields if field != 'NO']
-
         output = io.StringIO()
-        # Use extrasaction='ignore' if model has fields not intended for CSV or vice-versa
-        # Use extrasaction='raise' during development to catch discrepancies
-        writer = csv.DictWriter(output, fieldnames=columns, extrasaction='ignore')
-        writer.writeheader()
+        writer = None
 
-        for entry_model_dict in all_data:
-            # Prepare row for CSV
-            row_to_write = entry_model_dict.copy()
+        if data_type == 'ppm':
+            Model = PPMEntry
+            # Define specific column order for PPM export
+            PPM_EXPORT_COLUMNS = [
+                'NO', 'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER',
+                'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'OCM', 'Status',
+                'Q1_Date', 'Q1_Engineer', 'Q2_Date', 'Q2_Engineer',
+                'Q3_Date', 'Q3_Engineer', 'Q4_Date', 'Q4_Engineer'
+            ]
+            writer = csv.DictWriter(output, fieldnames=PPM_EXPORT_COLUMNS, extrasaction='ignore')
+            writer.writeheader()
 
-            if data_type == 'ppm':
-                # Flatten PPM QuarterData fields for CSV export
-                for q_field in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
-                    quarter_data = row_to_write.get(q_field)
-                    if isinstance(quarter_data, dict):
-                        row_to_write[q_field] = quarter_data.get('engineer', '')
-                    elif quarter_data is not None: # Should be dict or None
-                         logger.warning(f"Unexpected data type for {q_field} in entry {row_to_write.get('MFG_SERIAL')}: {type(quarter_data)}")
-                         row_to_write[q_field] = '' # Default to empty if unexpected type
+            for entry_model_dict in all_data:
+                row_to_write = {}
+                # Populate base fields
+                for col in PPM_EXPORT_COLUMNS:
+                    if col.startswith('Q1_') or col.startswith('Q2_') or \
+                       col.startswith('Q3_') or col.startswith('Q4_'):
+                        continue # Skip quarter fields, will handle next
+                    row_to_write[col] = entry_model_dict.get(col, '')
 
-            # Dates are already strings in DD/MM/YYYY in the model due to validators
-            writer.writerow(row_to_write)
+                # Populate flattened quarter data
+                ppm_q_map = {
+                    'PPM_Q_I': ('Q1_Date', 'Q1_Engineer'),
+                    'PPM_Q_II': ('Q2_Date', 'Q2_Engineer'),
+                    'PPM_Q_III': ('Q3_Date', 'Q3_Engineer'),
+                    'PPM_Q_IV': ('Q4_Date', 'Q4_Engineer'),
+                }
+                for q_model_field, (q_date_col, q_eng_col) in ppm_q_map.items():
+                    quarter_data = entry_model_dict.get(q_model_field, {})
+                    if not isinstance(quarter_data, dict): quarter_data = {} # Ensure dict
+                    row_to_write[q_date_col] = quarter_data.get('quarter_date', '')
+                    row_to_write[q_eng_col] = quarter_data.get('engineer', '')
+
+                writer.writerow(row_to_write)
+
+        else: # ocm
+            Model = OCMEntry
+            # For OCM, can derive from model fields, assuming direct mapping and NO first.
+            ocm_columns = ['NO'] + [field for field in Model.model_fields if field != 'NO']
+            writer = csv.DictWriter(output, fieldnames=ocm_columns, extrasaction='ignore')
+            writer.writeheader()
+
+            for entry_model_dict in all_data:
+                # Dates are already strings in DD/MM/YYYY in the model due to validators for OCM too
+                writer.writerow(entry_model_dict)
 
         return output.getvalue()
-
-# Need to import get_args for Literal introspection if used in import_data
-from typing import get_args

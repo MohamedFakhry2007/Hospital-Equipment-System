@@ -8,13 +8,39 @@ def create_sample_view_ppm_entry(mfg_serial="PPM_VIEW_S001", status="Upcoming", 
         "NO": 1, "EQUIPMENT": "PPM View Device", "MODEL": "PPM-VXYZ", "Name": "PPM Device XYZ View",
         "MFG_SERIAL": mfg_serial, "MANUFACTURER": "PPM Corp View", "Department": "View Dept",
         "LOG_NO": "VLOG001", "Installation_Date": "01/01/2024", "Warranty_End": "01/01/2026",
-        "Eng1": "VE1", "Eng2": "", "Eng3": "", "Eng4": "",
-        "Status": status, "status_class": status_class, # For dashboard/list view
-        "PPM_Q_I": {"engineer": "VQ1 Eng"}, "PPM_Q_II": {"engineer": ""},
-        "PPM_Q_III": {"engineer": ""}, "PPM_Q_IV": {"engineer": ""},
-        "data_type": "ppm", "display_next_maintenance": "N/A (PPM)"
+        # Eng1-Eng4 removed
+        "Status": status, "status_class": status_class,
+        "PPM_Q_I": {"engineer": "VQ1 Eng", "quarter_date": "01/04/2024"}, # Added quarter_date
+        "PPM_Q_II": {"engineer": "", "quarter_date": "01/07/2024"},
+        "PPM_Q_III": {"engineer": "", "quarter_date": "01/10/2024"},
+        "PPM_Q_IV": {"engineer": "", "quarter_date": "01/01/2025"},
+        "data_type": "ppm", "display_next_maintenance": "N/A (PPM)",
+        # Fields for edit form display, derived from PPM_Q_X for convenience in tests
+        "Q1_Engineer": "VQ1 Eng", "Q1_Date": "01/04/2024",
+        "Q2_Engineer": "", "Q2_Date": "01/07/2024",
+        "Q3_Engineer": "", "Q3_Date": "01/10/2024",
+        "Q4_Engineer": "", "Q4_Date": "01/01/2025",
     }
-    data.update(kwargs)
+    # Allow kwargs to update base data, including nested dicts like PPM_Q_I
+    # and ensure Qx_Engineer/Date fields are consistent if PPM_Q_X is updated.
+    for key, value in kwargs.items():
+        if key in ["PPM_Q_I", "PPM_Q_II", "PPM_Q_III", "PPM_Q_IV"] and isinstance(value, dict):
+            data[key].update(value)
+            # Update corresponding Qx_Engineer/Date fields if PPM_Q_X is updated by kwargs
+            if key == "PPM_Q_I":
+                data["Q1_Engineer"] = value.get("engineer", data["Q1_Engineer"])
+                data["Q1_Date"] = value.get("quarter_date", data["Q1_Date"])
+            elif key == "PPM_Q_II":
+                data["Q2_Engineer"] = value.get("engineer", data["Q2_Engineer"])
+                data["Q2_Date"] = value.get("quarter_date", data["Q2_Date"])
+            elif key == "PPM_Q_III":
+                data["Q3_Engineer"] = value.get("engineer", data["Q3_Engineer"])
+                data["Q3_Date"] = value.get("quarter_date", data["Q3_Date"])
+            elif key == "PPM_Q_IV":
+                data["Q4_Engineer"] = value.get("engineer", data["Q4_Engineer"])
+                data["Q4_Date"] = value.get("quarter_date", data["Q4_Date"])
+        else:
+            data[key] = value
     return data
 
 def create_sample_view_ocm_entry(mfg_serial="OCM_VIEW_S001", status="Upcoming", status_class="warning", next_maint="01/09/2024", **kwargs):
@@ -65,7 +91,7 @@ def test_index_route_no_data(client):
 def test_list_equipment_ppm_success(client):
     sample_ppm_list = [
         create_sample_view_ppm_entry("PPM_L01", Department="DeptX"),
-        create_sample_view_ppm_entry("PPM_L02", Eng1="Eng1Done")
+        create_sample_view_ppm_entry("PPM_L02", PPM_Q_I={"engineer": "Eng1Done_PPM_L02", "quarter_date": "10/04/2024"})
     ]
     with patch('app.services.data_service.DataService.get_all_entries', return_value=sample_ppm_list) as mock_get_all:
         response = client.get('/equipment/ppm/list')
@@ -75,12 +101,15 @@ def test_list_equipment_ppm_success(client):
         assert "PPM Equipment List" in response_data_str
         assert "PPM_L01" in response_data_str
         assert "PPM_L02" in response_data_str
-        assert "DeptX" in response_data_str # Check new field
-        assert "Eng1Done" in response_data_str # Check new field
-        assert "Q1 Eng" in response_data_str # Check PPM_Q_I engineer
-        # Check for PPM specific headers (examples)
-        assert "<th>Eng1</th>" in response_data_str
-        assert "<th>Q1 Eng.</th>" in response_data_str
+        assert "DeptX" in response_data_str
+        assert "Eng1Done_PPM_L02" in response_data_str # Updated assertion for specific engineer
+        assert "VQ1 Eng" in response_data_str # Default Q1 eng for PPM_L01 from helper
+        # Check for new PPM specific headers
+        assert "<th>Q1 Date</th>" in response_data_str
+        assert "<th>Q1 Engineer</th>" in response_data_str
+        # Ensure old PPM specific headers are NOT present
+        assert "<th>Eng1</th>" not in response_data_str
+        assert "<th>Q1 Eng.</th>" not in response_data_str
         # Ensure OCM specific headers are NOT present
         assert "<th>Service Date</th>" not in response_data_str
         mock_get_all.assert_called_once_with('ppm')
@@ -134,11 +163,10 @@ def test_add_ppm_equipment_get(client):
     assert response.status_code == 200
     response_data_str = response.data.decode('utf-8')
     assert "Add PPM Equipment" in response_data_str
-    # Check for a few new fields
     assert "Department" in response_data_str
-    assert "Installation_Date" in response_data_str
-    assert "Eng1" in response_data_str # Actual work done
-    assert "PPM_Q_I_engineer" in response_data_str # Scheduled engineer
+    assert "Installation_Date" in response_data_str # Optional now
+    assert "Eng1" not in response_data_str # Removed
+    assert "Q1_Engineer" in response_data_str # New field name
 
 # POST /equipment/ppm/add - Success
 def test_add_ppm_equipment_post_success(client):
@@ -146,25 +174,27 @@ def test_add_ppm_equipment_post_success(client):
         "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "MFG_SERIAL": "PPM_ADD01",
         "MANUFACTURER": "PPM Makers", "Department": "Main PPM", "LOG_NO": "LOGP01",
         "Installation_Date": "10/10/2023", "Warranty_End": "10/10/2025",
-        "Eng1": "Engineer A", "Eng2": "Engineer B", "Eng3": "", "Eng4": "",
-        "PPM_Q_I_engineer": "QA Eng", "PPM_Q_II_engineer": "QB Eng",
-        "PPM_Q_III_engineer": "", "PPM_Q_IV_engineer": "",
-        "Status": "Upcoming"
+        # Eng1-4 removed
+        "Q1_Engineer": "QA Eng", "Q2_Engineer": "QB Eng",
+        "Q3_Engineer": "", "Q4_Engineer": "", # Empty engineers should become None
+        "Status": "Upcoming", "Name": "" # Optional Name explicitly empty
     }
-    # What DataService.add_entry is expected to receive
+    # What DataService.add_entry is expected to receive (engineer: None if empty string from form)
     expected_service_payload = {
-        "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "Name": None, # Assuming Name is optional and blank if not provided
+        "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "Name": None,
         "MFG_SERIAL": "PPM_ADD01", "MANUFACTURER": "PPM Makers", "Department": "Main PPM",
-        "LOG_NO": "LOGP01", "Installation_Date": "10/10/2023", "Warranty_End": "10/10/2025",
-        "Eng1": "Engineer A", "Eng2": "Engineer B", "Eng3": "", "Eng4": "",
-        "Status": "Upcoming",
+        "LOG_NO": "LOGP01",
+        "Installation_Date": "10/10/2023",
+        "Warranty_End": "10/10/2025",
+        # Eng1-4 removed
+        "Status": "Upcoming", # Or None if empty, then calculated by service
         "PPM_Q_I": {"engineer": "QA Eng"}, "PPM_Q_II": {"engineer": "QB Eng"},
-        "PPM_Q_III": {"engineer": ""}, "PPM_Q_IV": {"engineer": ""}
+        "PPM_Q_III": {"engineer": None}, "PPM_Q_IV": {"engineer": None}
     }
 
     with patch('app.services.data_service.DataService.add_entry', return_value=expected_service_payload) as mock_add:
         response = client.post('/equipment/ppm/add', data=form_data, follow_redirects=True)
-        assert response.status_code == 200 # After redirect to list page
+        assert response.status_code == 200
         response_data_str = response.data.decode('utf-8')
         assert "PPM equipment added successfully!" in response_data_str # Flashed message
         assert "PPM Equipment List" in response_data_str # Redirected to list
@@ -229,15 +259,23 @@ def test_add_ocm_equipment_post_validation_error(client):
 
 # GET /equipment/ppm/edit/<mfg_serial>
 def test_edit_ppm_equipment_get_exists(client):
-    sample_ppm = create_sample_view_ppm_entry("PPM_EDIT01", PPM_Q_I_engineer="TestEngQ1") # Add PPM_Q_I_engineer for template
-    with patch('app.services.data_service.DataService.get_entry', return_value=sample_ppm) as mock_get:
+    # Helper now includes QX_Date and QX_Engineer directly for template context
+    sample_ppm_from_db = create_sample_view_ppm_entry(
+        "PPM_EDIT01",
+        PPM_Q_I={"engineer": "TestEngQ1", "quarter_date": "05/05/2024"}
+    )
+    # create_sample_view_ppm_entry will also set sample_ppm_from_db["Q1_Engineer"] and sample_ppm_from_db["Q1_Date"]
+
+    with patch('app.services.data_service.DataService.get_entry', return_value=sample_ppm_from_db) as mock_get:
         response = client.get('/equipment/ppm/edit/PPM_EDIT01')
         assert response.status_code == 200
         response_data_str = response.data.decode('utf-8')
         assert "Edit PPM Equipment" in response_data_str
         assert "PPM_EDIT01" in response_data_str # MFG Serial in title/form
-        assert 'value="PPM View Device"' in response_data_str # Check field population
-        assert 'value="TestEngQ1"' in response_data_str # Check PPM_Q_I_engineer population
+        assert 'value="PPM View Device"' in response_data_str # Check equipment name
+        assert 'value="TestEngQ1"' in response_data_str # Check Q1_Engineer value in form input
+        assert "Q1 Target Date" in response_data_str # Check Q1_Date label
+        assert sample_ppm_from_db["Q1_Date"] in response_data_str # Check Q1_Date value displayed
         mock_get.assert_called_once_with('ppm', "PPM_EDIT01")
 
 def test_edit_ppm_equipment_get_not_found(client):
@@ -252,41 +290,60 @@ def test_edit_ppm_equipment_get_not_found(client):
 # POST /equipment/ppm/edit/<mfg_serial> - Success
 def test_edit_ppm_equipment_post_success(client):
     mfg_serial = "PPM_EDT_S01"
-    original_ppm_data = create_sample_view_ppm_entry(mfg_serial) # Used to mock get_entry
+    # Sample data DataService.get_entry would return (includes calculated dates)
+    original_ppm_data_from_db = create_sample_view_ppm_entry(
+        mfg_serial,
+        Name="Original Name",
+        PPM_Q_I={"engineer": "OrigQ1Eng", "quarter_date": "10/04/2024"},
+        PPM_Q_II={"engineer": "OrigQ2Eng", "quarter_date": "10/07/2024"}
+    )
 
-    form_data_update = { # Only fields being changed + MFG_SERIAL (readonly)
+    form_data_update = { # Data from submitted form
         "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro", "MFG_SERIAL": mfg_serial,
-        "Department": "Pro Dept", "LOG_NO": original_ppm_data["LOG_NO"],
-        "Installation_Date": original_ppm_data["Installation_Date"], "Warranty_End": original_ppm_data["Warranty_End"],
-        "MANUFACTURER": original_ppm_data["MANUFACTURER"],
-        "Eng1": "E1 Upd", "Eng2": "E2 Upd", "Eng3": "E3 Upd", "Eng4": "E4 Upd", # All Eng filled
-        "PPM_Q_I_engineer": "Q1 Upd", "PPM_Q_II_engineer": "Q2 Upd",
-        "PPM_Q_III_engineer": "Q3 Upd", "PPM_Q_IV_engineer": "Q4 Upd",
-        "Status": "" # Let it be recalculated to Maintained
+        "Department": "Pro Dept",
+        "Installation_Date": "01/02/2024", # Changed Installation Date
+        "Warranty_End": original_ppm_data_from_db["Warranty_End"],
+        "MANUFACTURER": original_ppm_data_from_db["MANUFACTURER"],
+        "LOG_NO": original_ppm_data_from_db["LOG_NO"], "Name": "", # Name cleared
+        # Eng1-4 removed
+        "Q1_Engineer": "Q1 Upd", "Q2_Engineer": "Q2 Upd", # Updated engineers
+        "Q3_Engineer": "", "Q4_Engineer": "",
+        "Status": "" # Let it be recalculated
     }
-    # This is what DataService.update_entry is expected to receive
+
+    # Expected payload to DataService.update_entry
     expected_service_payload = {
-        "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro", "Name": None, # Assuming Name is optional
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": original_ppm_data["MANUFACTURER"],
-        "Department": "Pro Dept", "LOG_NO": original_ppm_data["LOG_NO"],
-        "Installation_Date": original_ppm_data["Installation_Date"], "Warranty_End": original_ppm_data["Warranty_End"],
-        "Eng1": "E1 Upd", "Eng2": "E2 Upd", "Eng3": "E3 Upd", "Eng4": "E4 Upd",
+        "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro",
+        "Name": None, # Empty string from form becomes None
+        "MFG_SERIAL": mfg_serial,
+        "MANUFACTURER": original_ppm_data_from_db["MANUFACTURER"],
+        "Department": "Pro Dept", "LOG_NO": original_ppm_data_from_db["LOG_NO"],
+        "Installation_Date": "01/02/2024",
+        "Warranty_End": original_ppm_data_from_db["Warranty_End"],
+        # Eng1-4 removed
         "Status": None, # Will be calculated by service
-        "PPM_Q_I": {"engineer": "Q1 Upd"}, "PPM_Q_II": {"engineer": "Q2 Upd"},
-        "PPM_Q_III": {"engineer": "Q3 Upd"}, "PPM_Q_IV": {"engineer": "Q4 Upd"}
+        "PPM_Q_I": {"engineer": "Q1 Upd"},
+        "PPM_Q_II": {"engineer": "Q2 Upd"},
+        "PPM_Q_III": {"engineer": None},
+        "PPM_Q_IV": {"engineer": None}
     }
-    # DataService.update_entry will return the fully updated entry with NO and calculated Status
-    returned_service_data = expected_service_payload.copy()
-    returned_service_data["NO"] = 1
-    returned_service_data["Status"] = "Maintained"
+    # DataService.update_entry will return the fully updated entry including NO, Status, and calculated quarter_dates
+    returned_service_data = expected_service_payload.copy() # Start with what's sent
+    # Simulate service adding/modifying these (actual values would depend on mocked date logic in service)
+    returned_service_data.update({
+        "NO": original_ppm_data_from_db["NO"],
+        "Status": "Upcoming",
+        "PPM_Q_I": {"engineer": "Q1 Upd", "quarter_date": "01/05/2024"},
+        "PPM_Q_II": {"engineer": "Q2 Upd", "quarter_date": "01/08/2024"},
+        "PPM_Q_III": {"engineer": None, "quarter_date": "01/11/2024"},
+        "PPM_Q_IV": {"engineer": None, "quarter_date": "01/02/2025"}
+    })
 
-
-    with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm_data), \
+    with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm_data_from_db), \
          patch('app.services.data_service.DataService.update_entry', return_value=returned_service_data) as mock_update:
 
         response = client.post(f'/equipment/ppm/edit/{mfg_serial}', data=form_data_update, follow_redirects=True)
-        assert response.status_code == 200
-        response_data_str = response.data.decode('utf-8')
+        assert response.status_code == 200 # After redirect
         assert "PPM equipment updated successfully!" in response_data_str
         assert "PPM Equipment List" in response_data_str
         mock_update.assert_called_once_with('ppm', mfg_serial, expected_service_payload)
@@ -294,19 +351,25 @@ def test_edit_ppm_equipment_post_success(client):
 # POST /equipment/ppm/edit/<mfg_serial> - Validation Error
 def test_edit_ppm_equipment_post_validation_error(client):
     mfg_serial = "PPM_EDT_V_ERR"
-    original_ppm = create_sample_view_ppm_entry(mfg_serial)
-    form_data_invalid = original_ppm.copy() # Start with valid data
-    form_data_invalid["Installation_Date"] = "INVALID DATE" # Make it invalid
-    # Also need to provide PPM_Q_X_engineer fields as the template would submit them
-    form_data_invalid["PPM_Q_I_engineer"] = original_ppm["PPM_Q_I"]["engineer"]
-    form_data_invalid["PPM_Q_II_engineer"] = original_ppm["PPM_Q_II"]["engineer"]
-    form_data_invalid["PPM_Q_III_engineer"] = original_ppm["PPM_Q_III"]["engineer"]
-    form_data_invalid["PPM_Q_IV_engineer"] = original_ppm["PPM_Q_IV"]["engineer"]
+    original_ppm_from_db = create_sample_view_ppm_entry(mfg_serial) # Helper now sets Qx_Date/Qx_Engineer
+
+    # Simulate form data that would be re-passed to template on error
+    form_data_on_error = {
+        **original_ppm_from_db, # Base data from DB (including Qx_Date/Engineer for display)
+        "Installation_Date": "INVALID DATE", # User's invalid input
+        "Q1_Engineer": original_ppm_from_db["PPM_Q_I"]["engineer"], # User's input for engineer fields
+        "Q2_Engineer": original_ppm_from_db["PPM_Q_II"]["engineer"],
+        "Q3_Engineer": original_ppm_from_db["PPM_Q_III"]["engineer"],
+        "Q4_Engineer": original_ppm_from_db["PPM_Q_IV"]["engineer"],
+    }
+    # Remove Eng1-4 if they are in helper result, though they should be gone by now
+    for i in range(1,5): form_data_on_error.pop(f'Eng{i}', None)
 
 
-    with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm), \
+    with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm_from_db), \
          patch('app.services.data_service.DataService.update_entry', side_effect=ValueError("PPM Edit Validation Fail")) as mock_update:
-        response = client.post(f'/equipment/ppm/edit/{mfg_serial}', data=form_data_invalid)
+        # When POSTing, form data should use QX_Engineer names, not PPM_Q_X_engineer
+        response = client.post(f'/equipment/ppm/edit/{mfg_serial}', data=form_data_on_error)
         assert response.status_code == 200 # Re-renders form
         response_data_str = response.data.decode('utf-8')
         assert "Edit PPM Equipment" in response_data_str
@@ -398,7 +461,8 @@ def test_import_equipment_success(client):
     # The view itself tries to peek at header, then DataService processes the stream.
     # We need to mock DataService.import_data. The header peeking in view is basic.
 
-    csv_content = "EQUIPMENT,MODEL,MFG_SERIAL,Eng1\nDev1,Mod1,SN1,EngA" # PPM-like header
+    # Use new PPM header for inference test, e.g. Q1_Engineer
+    csv_content = "EQUIPMENT,MODEL,MFG_SERIAL,Q1_Engineer\nDev1,Mod1,SN1,EngA"
     file_stream_bytes = io.BytesIO(csv_content.encode('utf-8'))
 
     with patch('app.services.data_service.DataService.import_data', return_value=mock_import_results) as mock_ds_import:
@@ -408,7 +472,7 @@ def test_import_equipment_success(client):
         assert response.status_code == 200
         response_data_str = response.data.decode('utf-8')
         assert "Import successful. 5 new records added. 2 records updated." in response_data_str
-        # Assuming redirect to PPM list based on header inference
+        # Assuming redirect to PPM list based on header inference (Q1_Engineer makes it PPM)
         assert "PPM Equipment List" in response_data_str
         mock_ds_import.assert_called_once()
         # We could also assert the type of file_stream passed to mock_ds_import if needed
