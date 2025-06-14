@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Add PPM Equipment{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Add PPM Equipment</h2>
+    <form action="{{ url_for('views.add_ppm_equipment') }}" method="post">
+        {# Common Fields #}
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="EQUIPMENT" class="form-label">Equipment Name/ID <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="EQUIPMENT" name="EQUIPMENT" value="{{ form_data.EQUIPMENT or '' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="MODEL" class="form-label">Model <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MODEL" name="MODEL" value="{{ form_data.MODEL or '' }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Name" class="form-label">Display Name (Optional, if different from Model)</label>
+                <input type="text" class="form-control" id="Name" name="Name" value="{{ form_data.Name or '' }}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="MFG_SERIAL" class="form-label">MFG Serial <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MFG_SERIAL" name="MFG_SERIAL" value="{{ form_data.MFG_SERIAL or '' }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="MANUFACTURER" class="form-label">Manufacturer <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MANUFACTURER" name="MANUFACTURER" value="{{ form_data.MANUFACTURER or '' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Department" name="Department" value="{{ form_data.Department or '' }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="LOG_NO" class="form-label">Log No <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="LOG_NO" name="LOG_NO" value="{{ form_data.LOG_NO or '' }}" required>
+            </div>
+        </div>
+        <hr>
+        <h5 class="mt-4 mb-3">Dates</h5>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Installation_Date" class="form-label">Installation Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Installation_Date" name="Installation_Date" value="{{ form_data.Installation_Date or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Warranty_End" class="form-label">Warranty End Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Warranty_End" name="Warranty_End" value="{{ form_data.Warranty_End or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+        </div>
+        <hr>
+        <h5 class="mt-4 mb-3">PPM Quarter Engineer (Scheduled)</h5>
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_I_engineer" class="form-label">Quarter I Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_I_engineer" name="PPM_Q_I_engineer" value="{{ form_data.PPM_Q_I_engineer or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_II_engineer" class="form-label">Quarter II Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" value="{{ form_data.PPM_Q_II_engineer or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_III_engineer" class="form-label">Quarter III Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" value="{{ form_data.PPM_Q_III_engineer or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_IV_engineer" class="form-label">Quarter IV Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" value="{{ form_data.PPM_Q_IV_engineer or '' }}">
+            </div>
+        </div>
+        <hr>
+        <h5 class="mt-4 mb-3">PPM Engineer Work Done (Actual)</h5>
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label for="Eng1" class="form-label">Engineer Q1 (Actual)</label>
+                <input type="text" class="form-control" id="Eng1" name="Eng1" value="{{ form_data.Eng1 or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="Eng2" class="form-label">Engineer Q2 (Actual)</label>
+                <input type="text" class="form-control" id="Eng2" name="Eng2" value="{{ form_data.Eng2 or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="Eng3" class="form-label">Engineer Q3 (Actual)</label>
+                <input type="text" class="form-control" id="Eng3" name="Eng3" value="{{ form_data.Eng3 or '' }}">
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="Eng4" class="form-label">Engineer Q4 (Actual)</label>
+                <input type="text" class="form-control" id="Eng4" name="Eng4" value="{{ form_data.Eng4 or '' }}">
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Status" class="form-label">Status (Optional, auto-calculated if blank)</label>
+                <select class="form-select" id="Status" name="Status">
+                    <option value="" {% if not form_data.Status %}selected{% endif %}>Auto-calculate</option>
+                    <option value="Upcoming" {% if form_data.Status == 'Upcoming' %}selected{% endif %}>Upcoming</option>
+                    <option value="Overdue" {% if form_data.Status == 'Overdue' %}selected{% endif %}>Overdue</option>
+                    <option value="Maintained" {% if form_data.Status == 'Maintained' %}selected{% endif %}>Maintained</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-3">Add PPM Equipment</button>
+        <a href="{{ url_for('views.list_equipment', data_type='ppm') }}" class="btn btn-secondary mt-3">Cancel</a>
+    </form>
+</div>
+{% endblock %}

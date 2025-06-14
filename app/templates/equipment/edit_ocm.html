@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit OCM Equipment{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Edit OCM Equipment ({{ entry.MFG_SERIAL }})</h2>
+    <form action="{{ url_for('views.edit_ocm_equipment', mfg_serial=entry.MFG_SERIAL) }}" method="post">
+        {# Common Fields - Values from entry or form_data if validation failed #}
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="EQUIPMENT" class="form-label">Equipment Name/ID <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="EQUIPMENT" name="EQUIPMENT" value="{{ request.form.EQUIPMENT if request.form else entry.EQUIPMENT }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="MODEL" class="form-label">Model <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MODEL" name="MODEL" value="{{ request.form.MODEL if request.form else entry.MODEL }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Name" class="form-label">Display Name (Optional)</label>
+                <input type="text" class="form-control" id="Name" name="Name" value="{{ request.form.Name if request.form else entry.Name or '' }}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="MFG_SERIAL" class="form-label">MFG Serial <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MFG_SERIAL" name="MFG_SERIAL" value="{{ entry.MFG_SERIAL }}" readonly required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="MANUFACTURER" class="form-label">Manufacturer <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="MANUFACTURER" name="MANUFACTURER" value="{{ request.form.MANUFACTURER if request.form else entry.MANUFACTURER }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Department" name="Department" value="{{ request.form.Department if request.form else entry.Department }}" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="LOG_NO" class="form-label">Log No <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="LOG_NO" name="LOG_NO" value="{{ request.form.LOG_NO if request.form else entry.LOG_NO }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="ENGINEER" class="form-label">Servicing Engineer <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="ENGINEER" name="ENGINEER" value="{{ request.form.ENGINEER if request.form else entry.ENGINEER }}" required>
+            </div>
+        </div>
+        <hr>
+        <h5 class="mt-4 mb-3">Dates</h5>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Installation_Date" class="form-label">Installation Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Installation_Date" name="Installation_Date" value="{{ request.form.Installation_Date if request.form else entry.Installation_Date }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Warranty_End" class="form-label">Warranty End Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Warranty_End" name="Warranty_End" value="{{ request.form.Warranty_End if request.form else entry.Warranty_End }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="Service_Date" class="form-label">Last Service Date (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Service_Date" name="Service_Date" value="{{ request.form.Service_Date if request.form else entry.Service_Date }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Next_Maintenance" class="form-label">Next Maintenance Due (DD/MM/YYYY) <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="Next_Maintenance" name="Next_Maintenance" value="{{ request.form.Next_Maintenance if request.form else entry.Next_Maintenance }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY" required>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="PPM" class="form-label">Associated PPM (Optional)</label>
+                <input type="text" class="form-control" id="PPM" name="PPM" value="{{ request.form.PPM if request.form else entry.PPM or '' }}">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="Status" class="form-label">Status (Optional, auto-calculated if blank)</label>
+                <select class="form-select" id="Status" name="Status">
+                    <option value="" {% if not (request.form.Status if request.form else entry.Status) %}selected{% endif %}>Auto-calculate</option>
+                    <option value="Upcoming" {% if (request.form.Status if request.form else entry.Status) == 'Upcoming' %}selected{% endif %}>Upcoming</option>
+                    <option value="Overdue" {% if (request.form.Status if request.form else entry.Status) == 'Overdue' %}selected{% endif %}>Overdue</option>
+                    <option value="Maintained" {% if (request.form.Status if request.form else entry.Status) == 'Maintained' %}selected{% endif %}>Maintained</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-3">Update OCM Equipment</button>
+        <a href="{{ url_for('views.list_equipment', data_type='ocm') }}" class="btn btn-secondary mt-3">Cancel</a>
+    </form>
+</div>
+{% endblock %}

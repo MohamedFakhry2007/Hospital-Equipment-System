@@ -1,32 +1,54 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    Import/Export
+    Import/Export Equipment Data
 {% endblock %}
 
 {% block content %}
     <div class="container mt-4">
-        <h2>Import/Export</h2>
+        <h2>Import/Export Equipment Data</h2>
+        <p class="lead">Use the options below to import or export equipment data in CSV format.</p>
 
-        <div class="row">
+        <div class="row mt-4">
             <div class="col-md-6">
-                <h3>Import</h3>
-                <p>Import equipment data from a file.</p>
-                <form method="post" action="/import" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <input type="file" class="form-control" name="file" required>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Import Data</h3>
                     </div>
-                    <button type="submit" class="btn btn-primary">Upload</button>
-                </form>
+                    <div class="card-body">
+                        <p>Select a CSV file to import equipment data. The system will attempt to determine if it's PPM or OCM data based on the headers.</p>
+                        <form method="post" action="{{ url_for('views.import_equipment') }}" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">CSV File</label>
+                                <input type="file" class="form-control" name="file" id="file" accept=".csv" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Upload and Import</button>
+                        </form>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">Ensure your CSV file has the correct headers and data format. Refer to documentation for templates.</small>
+                    </div>
+                </div>
             </div>
 
             <div class="col-md-6">
-                <h3>Export</h3>
-                <p>Export equipment data to a file.</p>
-                 <a href="/export/ppm" class="btn btn-secondary">Export</a>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Export Data</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Export existing equipment data to a CSV file.</p>
+                        <div class="d-grid gap-2">
+                             <a href="{{ url_for('views.export_equipment_ppm') }}" class="btn btn-secondary">Export All PPM Data</a>
+                             <a href="{{ url_for('views.export_equipment_ocm') }}" class="btn btn-secondary">Export All OCM Data</a>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">Exports will include all current data for the selected type.</small>
+                    </div>
+                </div>
             </div>
         </div>
 
     </div>
 {% endblock %}
-

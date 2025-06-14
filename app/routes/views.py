@@ -4,15 +4,15 @@
 Frontend routes for rendering HTML pages.
 """
 import logging
-from dateutil.relativedelta import relativedelta
+from dateutil.relativedelta import relativedelta # Keep for now, might be removed if index logic changes enough
 import io
-import csv
+# import csv # Not directly used in views.py after changes, DataService handles CSV logic
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from flask import send_file
-import tempfile
-import pandas as pd
+from flask import send_file # Keep for export
+import tempfile # Keep for export
+# import pandas as pd # Not directly used in views.py after changes
 from app.services.data_service import DataService
-from app.services.validation import ValidationService
+# ValidationService removed
 
 views_bp = Blueprint('views', __name__)
 logger = logging.getLogger(__name__)
@@ -27,91 +27,57 @@ def allowed_file(filename):
 @views_bp.route('/')
 def index():
     """Display the dashboard with maintenance statistics."""
-    from datetime import datetime, timedelta
+    from datetime import datetime # Keep datetime
     
-    data = DataService.get_all_entries('ppm')
-    current_date = datetime.now().strftime("%A, %d %B %Y - %I:%M:%S %p")
+    # Fetch both PPM and OCM data to show a combined overview or select one
+    ppm_data = DataService.get_all_entries('ppm')
+    for item in ppm_data: item['data_type'] = 'ppm'
+    ocm_data = DataService.get_all_entries('ocm')
+    for item in ocm_data: item['data_type'] = 'ocm'
+    all_equipment = ppm_data + ocm_data # Combine for simplicity or process separately
+
+    current_date_str = datetime.now().strftime("%A, %d %B %Y - %I:%M:%S %p")
     
-    # Calculate statistics
-    total_machines = len(data)
+    total_machines = len(all_equipment)
     overdue_count = 0
-    upcoming_counts = {7: 0, 14: 0, 21: 0, 30: 0, 60: 0, 90: 0}
-    quarterly_count = sum(1 for item in data if item.get('PPM') == 'Yes')
-    yearly_count = total_machines - quarterly_count
-    
-    # Process equipment data for display
-    for item in data:
-        # For PPM, only Q1 has a date. Other quarter dates are calculated.
-        # We need to find the next upcoming quarter date based on Q1 date.
-        next_maintenance = None
-        q1_date_str = item.get('PPM_Q_I', {}).get('date')
+    upcoming_count = 0 # Simplified from upcoming_counts dictionary
+    maintained_count = 0
+    # The old quarterly_count/yearly_count based on PPM='Yes'/'No' is obsolete.
+    # We can count PPM vs OCM types if needed.
+    ppm_machine_count = len(ppm_data)
+    ocm_machine_count = len(ocm_data)
 
-        if q1_date_str:
-            try:
-                q1_date = datetime.strptime(q1_date_str, '%d/%m/%Y')
-                # Calculate dates for Q2, Q3, Q4 based on Q1 date
-                q2_date = q1_date + relativedelta(months=3)
-                q3_date = q1_date + relativedelta(months=6)
-                q4_date = q1_date + relativedelta(months=9)
-                quarter_dates = {'I': q1_date, 'II': q2_date, 'III': q3_date, 'IV': q4_date}
-
-                # Find the earliest upcoming quarter date
-                upcoming_dates = [date for date in quarter_dates.values() if date >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)]
-                if upcoming_dates:
-                    next_maintenance = min(upcoming_dates)
-
-            except ValueError:
-                logger.warning(f"Invalid date format for {item.get('MFG_SERIAL')}: {q1_date_str}")
-                next_maintenance = None # Treat as no schedule if date is invalid
-
-        # Original logic to find next maintenance from individual quarter dates (now only Q1 relevant)
-        # This block can largely be replaced by the logic above
-        """
- for q in ['I', 'II', 'III', 'IV']:
- q_date = item.get(f'PPM_Q_{q}', {}).get('date')
-            if q_date:
-                date = datetime.strptime(q_date, '%d/%m/%Y')
-                if date > datetime.now():
-                    next_maintenance = date
-                    break
-        
-        if next_maintenance:
-        """
-        if next_maintenance:
-            days_until = (next_maintenance - datetime.now()).days
-            if days_until < 0:
-                overdue_count += 1
-            else:
-                for day_limit in upcoming_counts.keys():
-                    if days_until <= day_limit:
-                        upcoming_counts[day_limit] += 1
-        
-        # Add status information to items
-        if next_maintenance:
-            days_until = (next_maintenance - datetime.now()).days
-            if days_until < 0:
-                item['status'] = 'Overdue'
-                item['status_class'] = 'danger'
-            elif days_until <= 7:
-                item['status'] = 'Due Soon'
-                item['status_class'] = 'warning'
-            else:
-                item['status'] = 'OK'
-                item['status_class'] = 'success'
-            item['next_maintenance'] = next_maintenance.strftime('%d/%m/%Y')
+    for item in all_equipment:
+        # Status is now directly available in item['Status']
+        status = item.get('Status', 'N/A').lower()
+        if status == 'overdue':
+            overdue_count += 1
+            item['status_class'] = 'danger'
+        elif status == 'upcoming':
+            upcoming_count += 1
+            item['status_class'] = 'warning'
+        elif status == 'maintained':
+            maintained_count += 1
+            item['status_class'] = 'success'
         else:
-            item['status'] = 'No Schedule'
-            item['status_class'] = 'secondary'
-            item['next_maintenance'] = 'Not Scheduled'
+            item['status_class'] = 'secondary' # For 'N/A' or other statuses
+
+        # 'next_maintenance' display logic
+        if item['data_type'] == 'ocm':
+             item['display_next_maintenance'] = item.get('Next_Maintenance', 'N/A')
+        else: # PPM
+             item['display_next_maintenance'] = 'N/A (PPM)'
+
 
     return render_template('index.html',
-                         current_date=current_date,
-                         total_machines=total_machines,
-                         overdue_count=overdue_count,
-                         upcoming_counts=upcoming_counts,
-                         quarterly_count=quarterly_count,
-                         yearly_count=yearly_count,
-                         equipment=data)
+                           current_date=current_date_str,
+                           total_machines=total_machines,
+                           overdue_count=overdue_count,
+                           upcoming_count=upcoming_count, # Pass simplified upcoming_count
+                           maintained_count=maintained_count,
+                           ppm_machine_count=ppm_machine_count,
+                           ocm_machine_count=ocm_machine_count,
+                           equipment=all_equipment) # Pass combined list
 
 
 @views_bp.route('/equipment/<data_type>/list')
@@ -121,9 +87,18 @@ def list_equipment(data_type):
         flash("Invalid equipment type specified.", "warning")
         return redirect(url_for('views.index'))
     try:
-        data = DataService.get_all_entries(data_type)
-        # Render the list template which now includes add/import buttons
-        return render_template('equipment/list.html', equipment=data, data_type=data_type)
+        equipment_data = DataService.get_all_entries(data_type)
+        for item in equipment_data:
+            status = item.get('Status', 'N/A').lower()
+            if status == 'overdue':
+                item['status_class'] = 'danger'
+            elif status == 'upcoming':
+                item['status_class'] = 'warning'
+            elif status == 'maintained':
+                item['status_class'] = 'success'
+            else:
+                item['status_class'] = 'secondary'
+        return render_template('equipment/list.html', equipment=equipment_data, data_type=data_type)
     except Exception as e:
         logger.error(f"Error loading {data_type} list: {str(e)}")
         flash(f"Error loading {data_type.upper()} equipment data.", "danger")
@@ -135,26 +110,84 @@ def add_ppm_equipment():
     """Handle adding new PPM equipment."""
     if request.method == 'POST':
         form_data = request.form.to_dict()
-        is_valid, errors = ValidationService.validate_ppm_form(form_data) # Using existing validation
+        # Structure data for PPMEntry model
+        # PPM_Q_X fields expect {"engineer": "name"}
+        ppm_data = {
+            "EQUIPMENT": form_data.get("EQUIPMENT"),
+            "MODEL": form_data.get("MODEL"),
+            "Name": form_data.get("Name"), # Optional
+            "MFG_SERIAL": form_data.get("MFG_SERIAL"),
+            "MANUFACTURER": form_data.get("MANUFACTURER"),
+            "Department": form_data.get("Department"),
+            "LOG_NO": form_data.get("LOG_NO"),
+            "Installation_Date": form_data.get("Installation_Date"),
+            "Warranty_End": form_data.get("Warranty_End"),
+            "Eng1": form_data.get("Eng1"),
+            "Eng2": form_data.get("Eng2"),
+            "Eng3": form_data.get("Eng3"),
+            "Eng4": form_data.get("Eng4"),
+            "Status": form_data.get("Status") if form_data.get("Status") else None, # Let DataService calculate if empty
+            "PPM_Q_I": {"engineer": form_data.get("PPM_Q_I_engineer")},
+            "PPM_Q_II": {"engineer": form_data.get("PPM_Q_II_engineer")},
+            "PPM_Q_III": {"engineer": form_data.get("PPM_Q_III_engineer")},
+            "PPM_Q_IV": {"engineer": form_data.get("PPM_Q_IV_engineer")},
+        }
+        if not ppm_data["Name"]: # Handle optional Name
+            ppm_data["Name"] = None
 
-        if is_valid:
-            try:
-                model_data = ValidationService.convert_ppm_form_to_model(form_data) # Using existing conversion
-                DataService.add_entry('ppm', model_data)
-                flash('PPM equipment added successfully!', 'success')
-                return redirect(url_for('views.list_equipment', data_type='ppm'))
-            except ValueError as e: # Handles duplicate MFG_SERIAL from DataService
-                flash(f"Error adding equipment: {str(e)}", 'danger')
-            except Exception as e:
-                logger.error(f"Error adding PPM equipment: {str(e)}")
-                flash('An unexpected error occurred while adding.', 'danger')
-        else:
-            flash('Please correct the errors below.', 'warning')
-            # Re-render add form with errors and submitted data
-            return render_template('equipment/add.html', data_type='ppm', errors=errors, form_data=form_data)
+        try:
+            DataService.add_entry('ppm', ppm_data)
+            flash('PPM equipment added successfully!', 'success')
+            return redirect(url_for('views.list_equipment', data_type='ppm'))
+        except ValueError as e:
+            flash(f"Error adding equipment: {str(e)}", 'danger')
+            # Re-render form with submitted data and errors (errors flashed)
+            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data) # Pass original form_data
+        except Exception as e:
+            logger.error(f"Error adding PPM equipment: {str(e)}")
+            flash('An unexpected error occurred while adding.', 'danger')
+            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data)
 
-    # GET request: show empty form - form_data is needed to avoid errors in template rendering
-    return render_template('equipment/add.html', data_type='ppm', errors={}, form_data={})
+    # GET request: show empty form
+    return render_template('equipment/add_ppm.html', data_type='ppm', form_data={})
+
+@views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
+def add_ocm_equipment():
+    """Handle adding new OCM equipment."""
+    if request.method == 'POST':
+        form_data = request.form.to_dict()
+        ocm_data = {
+            "EQUIPMENT": form_data.get("EQUIPMENT"),
+            "MODEL": form_data.get("MODEL"),
+            "Name": form_data.get("Name"), # Optional
+            "MFG_SERIAL": form_data.get("MFG_SERIAL"),
+            "MANUFACTURER": form_data.get("MANUFACTURER"),
+            "Department": form_data.get("Department"),
+            "LOG_NO": form_data.get("LOG_NO"),
+            "Installation_Date": form_data.get("Installation_Date"),
+            "Warranty_End": form_data.get("Warranty_End"),
+            "Service_Date": form_data.get("Service_Date"),
+            "Next_Maintenance": form_data.get("Next_Maintenance"),
+            "ENGINEER": form_data.get("ENGINEER"),
+            "Status": form_data.get("Status") if form_data.get("Status") else None, # Let DataService calculate
+            "PPM": form_data.get("PPM", "") # Optional field from OCM model
+        }
+        if not ocm_data["Name"]: # Handle optional Name
+            ocm_data["Name"] = None
+
+        try:
+            DataService.add_entry('ocm', ocm_data)
+            flash('OCM equipment added successfully!', 'success')
+            return redirect(url_for('views.list_equipment', data_type='ocm'))
+        except ValueError as e:
+            flash(f"Error adding equipment: {str(e)}", 'danger')
+            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data)
+        except Exception as e:
+            logger.error(f"Error adding OCM equipment: {str(e)}")
+            flash('An unexpected error occurred while adding.', 'danger')
+            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data)
+
+    return render_template('equipment/add_ocm.html', data_type='ocm', form_data={})
 
 
 @views_bp.route('/equipment/ppm/edit/<mfg_serial>', methods=['GET', 'POST'])
@@ -162,51 +195,114 @@ def edit_ppm_equipment(mfg_serial):
     """Handle editing existing PPM equipment."""
     entry = DataService.get_entry('ppm', mfg_serial)
     if not entry:
-        flash(f"Equipment with serial '{mfg_serial}' not found.", 'warning')
+        flash(f"PPM Equipment with serial '{mfg_serial}' not found.", 'warning')
         return redirect(url_for('views.list_equipment', data_type='ppm'))
 
     if request.method == 'POST':
         form_data = request.form.to_dict()
-        # Validate the submitted form data (excluding MFG_SERIAL change check)
-        is_valid, errors = ValidationService.validate_ppm_form(form_data)
+        ppm_data_update = {
+            "EQUIPMENT": form_data.get("EQUIPMENT"),
+            "MODEL": form_data.get("MODEL"),
+            "Name": form_data.get("Name"),
+            "MFG_SERIAL": mfg_serial, # Should not change
+            "MANUFACTURER": form_data.get("MANUFACTURER"),
+            "Department": form_data.get("Department"),
+            "LOG_NO": form_data.get("LOG_NO"),
+            "Installation_Date": form_data.get("Installation_Date"),
+            "Warranty_End": form_data.get("Warranty_End"),
+            "Eng1": form_data.get("Eng1"),
+            "Eng2": form_data.get("Eng2"),
+            "Eng3": form_data.get("Eng3"),
+            "Eng4": form_data.get("Eng4"),
+            "Status": form_data.get("Status") if form_data.get("Status") else None,
+            "PPM_Q_I": {"engineer": form_data.get("PPM_Q_I_engineer")},
+            "PPM_Q_II": {"engineer": form_data.get("PPM_Q_II_engineer")},
+            "PPM_Q_III": {"engineer": form_data.get("PPM_Q_III_engineer")},
+            "PPM_Q_IV": {"engineer": form_data.get("PPM_Q_IV_engineer")},
+        }
+        if not ppm_data_update["Name"]: ppm_data_update["Name"] = None
 
-        if is_valid:
-            try:
-                 # Explicitly check if MFG_SERIAL was changed in form
-                if form_data.get('MFG_SERIAL') != mfg_serial:
-                     raise ValueError("Cannot change MFG_SERIAL during edit.")
+        try:
+            DataService.update_entry('ppm', mfg_serial, ppm_data_update)
+            flash('PPM equipment updated successfully!', 'success')
+            return redirect(url_for('views.list_equipment', data_type='ppm'))
+        except ValueError as e:
+            flash(f"Error updating equipment: {str(e)}", 'danger')
+        except KeyError:
+             flash(f"Equipment with serial '{mfg_serial}' not found for update.", 'warning')
+             return redirect(url_for('views.list_equipment', data_type='ppm'))
+        except Exception as e:
+            logger.error(f"Error updating PPM equipment {mfg_serial}: {str(e)}")
+            flash('An unexpected error occurred during update.', 'danger')
+        # Re-render form with current data (entry combined with form_data) and errors
+        # For GET, entry is already prepared. For POST error, use combined data.
+        current_render_data = entry.copy()
+        current_render_data.update(form_data) # Overlay submitted values
+        # PPM_Q_X are dicts in entry, but form_data has PPM_Q_X_engineer
+        for q_key_form, q_field_model in [
+            ("PPM_Q_I_engineer", "PPM_Q_I"), ("PPM_Q_II_engineer", "PPM_Q_II"),
+            ("PPM_Q_III_engineer", "PPM_Q_III"), ("PPM_Q_IV_engineer", "PPM_Q_IV")
+        ]:
+            current_render_data[q_field_model] = {"engineer": form_data.get(q_key_form, "")}
 
-                model_data = ValidationService.convert_ppm_form_to_model(form_data)
-                DataService.update_entry('ppm', mfg_serial, model_data)
-                flash('PPM equipment updated successfully!', 'success')
-                return redirect(url_for('views.list_equipment', data_type='ppm'))
-            except ValueError as e: # Handles MFG_SERIAL change attempt or DataService validation error
-                flash(f"Error updating equipment: {str(e)}", 'danger')
-            except KeyError: # Should not happen if entry check passed, but good practice
-                 flash(f"Equipment with serial '{mfg_serial}' not found for update.", 'warning')
-                 return redirect(url_for('views.list_equipment', data_type='ppm'))
-            except Exception as e:
-                logger.error(f"Error updating PPM equipment {mfg_serial}: {str(e)}")
-                flash('An unexpected error occurred during update.', 'danger')
-        else: # Validation failed
-            flash('Please correct the errors below.', 'warning')
-            # Re-render edit form with errors and the submitted data
-            # Combine original entry data with form data for display
-            current_data = entry.copy()
-            current_data.update(form_data)
-             # Reformat quarter data from potentially submitted values
-            current_data['PPM_Q_I_date'] = form_data.get('PPM_Q_I_date', '')
-            for q in ['I', 'II', 'III', 'IV']: current_data[f'PPM_Q_{q}_engineer'] = form_data.get(f'PPM_Q_{q}_engineer', '')
-            return render_template('equipment/edit.html', data_type='ppm', entry=current_data, errors=errors, mfg_serial=mfg_serial)
+        return render_template('equipment/edit_ppm.html', data_type='ppm', entry=current_render_data, mfg_serial=mfg_serial)
 
-    # GET request: Populate form with existing data
-    form_data_display = entry.copy()
-     # Reformat quarter data from stored structure for template display
-    for q in ['I', 'II', 'III', 'IV']:
-         q_data = entry.get(f'PPM_Q_{q}', {})
-         if q == 'I': form_data_display[f'PPM_Q_{q}_date'] = q_data.get('date', '') # Only Q1 has a date field
-         form_data_display[f'PPM_Q_{q}_engineer'] = q_data.get('engineer', '')
-    return render_template('equipment/edit.html', data_type='ppm', entry=form_data_display, errors={}, mfg_serial=mfg_serial)
+    # GET request: Populate form with existing data (entry is already prepared by DataService)
+    # Ensure PPM_Q_X data is directly usable by the template expecting PPM_Q_X_engineer
+    display_entry = entry.copy()
+    for q_model, q_form_eng in [("PPM_Q_I", "PPM_Q_I_engineer"), ("PPM_Q_II", "PPM_Q_II_engineer"),
+                                ("PPM_Q_III", "PPM_Q_III_engineer"), ("PPM_Q_IV", "PPM_Q_IV_engineer")]:
+        display_entry[q_form_eng] = entry.get(q_model, {}).get('engineer', '')
+
+    return render_template('equipment/edit_ppm.html', data_type='ppm', entry=display_entry, mfg_serial=mfg_serial)
+
+
+@views_bp.route('/equipment/ocm/edit/<mfg_serial>', methods=['GET', 'POST'])
+def edit_ocm_equipment(mfg_serial):
+    """Handle editing existing OCM equipment."""
+    entry = DataService.get_entry('ocm', mfg_serial)
+    if not entry:
+        flash(f"OCM Equipment with serial '{mfg_serial}' not found.", 'warning')
+        return redirect(url_for('views.list_equipment', data_type='ocm'))
+
+    if request.method == 'POST':
+        form_data = request.form.to_dict()
+        ocm_data_update = {
+            "EQUIPMENT": form_data.get("EQUIPMENT"),
+            "MODEL": form_data.get("MODEL"),
+            "Name": form_data.get("Name"),
+            "MFG_SERIAL": mfg_serial, # Should not change
+            "MANUFACTURER": form_data.get("MANUFACTURER"),
+            "Department": form_data.get("Department"),
+            "LOG_NO": form_data.get("LOG_NO"),
+            "Installation_Date": form_data.get("Installation_Date"),
+            "Warranty_End": form_data.get("Warranty_End"),
+            "Service_Date": form_data.get("Service_Date"),
+            "Next_Maintenance": form_data.get("Next_Maintenance"),
+            "ENGINEER": form_data.get("ENGINEER"),
+            "Status": form_data.get("Status") if form_data.get("Status") else None,
+            "PPM": form_data.get("PPM", "")
+        }
+        if not ocm_data_update["Name"]: ocm_data_update["Name"] = None
+
+        try:
+            DataService.update_entry('ocm', mfg_serial, ocm_data_update)
+            flash('OCM equipment updated successfully!', 'success')
+            return redirect(url_for('views.list_equipment', data_type='ocm'))
+        except ValueError as e:
+            flash(f"Error updating equipment: {str(e)}", 'danger')
+        except KeyError: # Should not happen
+             flash(f"Equipment with serial '{mfg_serial}' not found for update.", 'warning')
+             return redirect(url_for('views.list_equipment', data_type='ocm'))
+        except Exception as e:
+            logger.error(f"Error updating OCM equipment {mfg_serial}: {str(e)}")
+            flash('An unexpected error occurred during update.', 'danger')
+
+        current_render_data = entry.copy()
+        current_render_data.update(form_data)
+        return render_template('equipment/edit_ocm.html', data_type='ocm', entry=current_render_data, mfg_serial=mfg_serial)
+
+    return render_template('equipment/edit_ocm.html', data_type='ocm', entry=entry, mfg_serial=mfg_serial)
 
 
 @views_bp.route('/equipment/<data_type>/delete/<path:mfg_serial>', methods=['POST'])
@@ -254,44 +350,56 @@ def import_equipment():
 
             # Determine data_type from header before passing to DataService
             # Read header safely
+            # Read header safely to infer data_type
+            # This part of logic remains, but using file_stream directly
+            # We need to be careful with consuming the stream before pandas uses it.
+            # One way is to read a line, then reset.
             try:
-                reader = csv.reader(file_stream)
-                header = next(reader)
-                file_stream.seek(0) # Reset stream position for pandas
-            except (StopIteration, csv.Error) as e:
-                 flash(f'Error reading CSV header: {e}', 'danger')
-                 return redirect(url_for('views.import_export_page'))
+                # Peek at the header to infer data_type
+                first_line = file_stream.readline()
+                file_stream.seek(0) # Reset stream for DataService.import_data
 
-
-            # Infer data_type based on header columns (adjust logic as needed)
-            if 'PPM Q I' in header or 'Q1_ENGINEER' in header: # Check for PPM specific columns
-                data_type = 'ppm'
-            elif 'OCM' in header and 'ENGINEER' in header: # Check for OCM specific columns
-                data_type = 'ocm'
-            else:
-                # Default or raise error if type cannot be inferred
-                flash('Could not determine data type (PPM/OCM) from CSV header.', 'warning')
+                # Basic inference (can be made more robust)
+                # This is a simplified version of header check.
+                # DataService.import_data will use pandas which handles CSV parsing robustly.
+                if 'PPM_Q_I' in first_line or 'Eng1' in first_line: # PPM specific fields
+                    data_type_inferred = 'ppm'
+                elif 'Next_Maintenance' in first_line or 'Service_Date' in first_line: # OCM specific fields
+                    data_type_inferred = 'ocm'
+                else:
+                    flash('Could not reliably determine data type (PPM/OCM) from CSV header.', 'warning')
+                    return redirect(url_for('views.import_export_page'))
+            except Exception as header_read_error:
+                logger.error(f"Failed to read CSV header for type inference: {header_read_error}")
+                flash(f'Error reading CSV header: {header_read_error}', 'danger')
                 return redirect(url_for('views.import_export_page'))
 
 
-            # Call DataService to handle the import logic
-            result = DataService.import_data(data_type, file_stream)
+            result = DataService.import_data(data_type_inferred, file_stream)
 
-            # Process results and flash messages
-            if result['added_count'] > 0:
-                flash(f"Successfully imported {result['added_count']} {data_type.upper()} records.", 'success')
-            if result['skipped_count'] > 0:
-                flash(f"Skipped {result['skipped_count']} records due to duplicates or validation errors. Check logs for details.", 'warning')
-            if not result['errors'] and result['added_count'] == 0 and result['skipped_count'] == 0:
-                 flash("No new records were added. The file might be empty or contain only existing records.", "info")
-            # Optionally show specific errors if needed, but keep it concise for the user
-            # for error in result['errors'][:3]: # Show first few errors
-            #    flash(f"Import issue: {error}", "danger")
+            msg_parts = []
+            if result.get('added_count', 0) > 0:
+                msg_parts.append(f"{result['added_count']} new records added.")
+            if result.get('updated_count', 0) > 0:
+                msg_parts.append(f"{result['updated_count']} records updated.")
+            if result.get('skipped_count', 0) > 0:
+                msg_parts.append(f"{result['skipped_count']} records skipped.")
 
-            return redirect(url_for('views.list_equipment', data_type=data_type))
+            final_message = " ".join(msg_parts) if msg_parts else "No changes made from the import."
+
+            if result.get('errors'):
+                flash(f"Import completed with issues. {final_message}", 'warning')
+                for error in result['errors'][:5]: # Show up to 5 specific errors
+                    flash(f"- {error}", 'danger')
+            elif not msg_parts and not result.get('errors'): # No adds, no updates, no skips, no errors
+                 flash("The imported file did not result in any changes.", "info")
+            else:
+                flash(f"Import successful. {final_message}", 'success')
+
+            return redirect(url_for('views.list_equipment', data_type=data_type_inferred))
 
         except Exception as e:
-            logger.exception("Error during file import process.") # Log full traceback
+            logger.exception("Error during file import process.")
             flash(f'An unexpected error occurred during import: {str(e)}', 'danger')
             return redirect(url_for('views.import_export_page'))
     else:
@@ -300,31 +408,40 @@ def import_equipment():
 
 
 @views_bp.route('/export/ppm')
-def export_equipment():
-    """
-    Export PPM equipment data to CSV for download."""
-    data_type = 'ppm'
+def export_equipment_ppm():
+    """Export PPM equipment data to CSV."""
     try:
-        # Call DataService to handle the export logic for PPM
-
         csv_content = DataService.export_data(data_type='ppm')
-
-         # Create temporary file for download
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as tmpfile:
-            tmpfile.write(csv_content)
-            tmp_file_path = tmpfile.name
-
-        # Drop 'NO' column from output (auto-generated on import)
-        # Create temporary file for download
-        # Send file to client
+        # Use BytesIO for in-memory file handling with send_file
+        mem_file = io.BytesIO()
+        mem_file.write(csv_content.encode('utf-8'))
+        mem_file.seek(0)
         return send_file(
-            tmp_file_path,
+            mem_file,
             mimetype='text/csv',
             as_attachment=True,
             download_name='ppm_export.csv'
         )
-
     except Exception as e:
-        logger.exception(f"Error exporting {data_type} data: {str(e)}")
-        flash(f"An error occurred during export: {str(e)}", 'danger')
+        logger.exception("Error exporting PPM data.")
+        flash(f"An error occurred during PPM export: {str(e)}", 'danger')
+        return redirect(url_for('views.import_export_page'))
+
+@views_bp.route('/export/ocm')
+def export_equipment_ocm():
+    """Export OCM equipment data to CSV."""
+    try:
+        csv_content = DataService.export_data(data_type='ocm')
+        mem_file = io.BytesIO()
+        mem_file.write(csv_content.encode('utf-8'))
+        mem_file.seek(0)
+        return send_file(
+            mem_file,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='ocm_export.csv'
+        )
+    except Exception as e:
+        logger.exception("Error exporting OCM data.")
+        flash(f"An error occurred during OCM export: {str(e)}", 'danger')
         return redirect(url_for('views.import_export_page'))
