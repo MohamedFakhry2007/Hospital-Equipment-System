@@ -9,18 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 class QuarterData(BaseModel):
     """Model for quarterly maintenance data."""
-    date: str
     engineer: str
-    
-    @field_validator('date')
-    @classmethod
-    def validate_date_format(cls, v: str) -> str:
-        """Validate date is in DD/MM/YYYY format."""
-        try:
-            datetime.strptime(v, '%d/%m/%Y')
-            return v
-        except ValueError:
-            raise ValueError(f"Invalid date format: {v}. Expected format: DD/MM/YYYY")
 
     @field_validator('engineer')
     @classmethod
@@ -36,26 +25,34 @@ class PPMEntry(BaseModel):
     NO: Optional[int] = None
     EQUIPMENT: str
     MODEL: str
+    Name: Optional[str] = None
     MFG_SERIAL: str
     MANUFACTURER: str
+    Department: str
     LOG_NO: str
-    PPM: Literal['Yes', 'No']
+    Installation_Date: str
+    Warranty_End: str
+    Eng1: str
+    Eng2: str
+    Eng3: str
+    Eng4: str
+    Status: Literal["Upcoming", "Overdue", "Maintained"]
     PPM_Q_I: QuarterData
     PPM_Q_II: QuarterData
     PPM_Q_III: QuarterData
-    PPM_Q_IV: QuarterData    
+    PPM_Q_IV: QuarterData
 
-    @field_validator('PPM')
+    @field_validator('Installation_Date', 'Warranty_End')
     @classmethod
-    def normalize_ppm(cls, v: str) -> str:
-        """Normalize PPM value to Yes/No."""
-        if v.strip().lower() == 'yes':
-            return 'Yes'
-        elif v.strip().lower() == 'no':
-            return 'No'
-        raise ValueError("PPM must be 'Yes' or 'No'")
-    
-    @field_validator('EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO')
+    def validate_date_format(cls, v: str) -> str:
+        """Validate date is in DD/MM/YYYY format."""
+        try:
+            datetime.strptime(v, '%d/%m/%Y')
+            return v
+        except ValueError:
+            raise ValueError(f"Invalid date format: {v}. Expected format: DD/MM/YYYY")
+
+    @field_validator('EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'Department', 'Eng1', 'Eng2', 'Eng3', 'Eng4')
     @classmethod
     def validate_not_empty(cls, v: str) -> str:
         """Validate required fields are not empty."""
@@ -74,10 +71,18 @@ class PPMEntryCreate(BaseModel):
     """Model for creating a new PPM entry (without NO field)."""
     EQUIPMENT: str
     MODEL: str
+    Name: Optional[str] = None
     MFG_SERIAL: str
     MANUFACTURER: str
+    Department: str
     LOG_NO: str
-    PPM: Literal['Yes', 'No']
+    Installation_Date: str
+    Warranty_End: str
+    Eng1: str
+    Eng2: str
+    Eng3: str
+    Eng4: str
+    Status: Literal["Upcoming", "Overdue", "Maintained"]
     OCM: Optional[str] = ''
     PPM_Q_I: Dict[str, str]
     PPM_Q_II: Dict[str, str]
