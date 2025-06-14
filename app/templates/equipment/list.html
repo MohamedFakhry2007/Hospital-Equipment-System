@@ -44,14 +44,14 @@
                         <th>Warranty End</th>
                         <th>Status</th>
                         {% if data_type == 'ppm' %}
-                            <th>Eng1</th>
-                            <th>Eng2</th>
-                            <th>Eng3</th>
-                            <th>Eng4</th>
-                            <th>Q1 Eng.</th>
-                            <th>Q2 Eng.</th>
-                            <th>Q3 Eng.</th>
-                            <th>Q4 Eng.</th>
+                            <th>Q1 Date</th>
+                            <th>Q1 Engineer</th>
+                            <th>Q2 Date</th>
+                            <th>Q2 Engineer</th>
+                            <th>Q3 Date</th>
+                            <th>Q3 Engineer</th>
+                            <th>Q4 Date</th>
+                            <th>Q4 Engineer</th>
                         {% elif data_type == 'ocm' %}
                             <th>Service Date</th>
                             <th>Next Maintenance</th>
@@ -77,13 +77,13 @@
                             <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
 
                             {% if data_type == 'ppm' %}
-                                <td>{{ entry.get('Eng1', '') }}</td>
-                                <td>{{ entry.get('Eng2', '') }}</td>
-                                <td>{{ entry.get('Eng3', '') }}</td>
-                                <td>{{ entry.get('Eng4', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_I', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_I', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_II', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_II', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_III', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_III', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_IV', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', '') }}</td>
                             {% elif data_type == 'ocm' %}
                                 <td>{{ entry.get('Service_Date', '') }}</td>

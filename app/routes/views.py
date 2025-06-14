@@ -120,19 +120,17 @@ def add_ppm_equipment():
             "MANUFACTURER": form_data.get("MANUFACTURER"),
             "Department": form_data.get("Department"),
             "LOG_NO": form_data.get("LOG_NO"),
-            "Installation_Date": form_data.get("Installation_Date"),
-            "Warranty_End": form_data.get("Warranty_End"),
-            "Eng1": form_data.get("Eng1"),
-            "Eng2": form_data.get("Eng2"),
-            "Eng3": form_data.get("Eng3"),
-            "Eng4": form_data.get("Eng4"),
-            "Status": form_data.get("Status") if form_data.get("Status") else None, # Let DataService calculate if empty
-            "PPM_Q_I": {"engineer": form_data.get("PPM_Q_I_engineer")},
-            "PPM_Q_II": {"engineer": form_data.get("PPM_Q_II_engineer")},
-            "PPM_Q_III": {"engineer": form_data.get("PPM_Q_III_engineer")},
-            "PPM_Q_IV": {"engineer": form_data.get("PPM_Q_IV_engineer")},
+            "Installation_Date": form_data.get("Installation_Date", "").strip() or None,
+            "Warranty_End": form_data.get("Warranty_End", "").strip() or None,
+            # Eng1-Eng4 removed
+            "Status": form_data.get("Status", "").strip() or None, # Let DataService calculate if empty or None
+            "PPM_Q_I": {"engineer": form_data.get("Q1_Engineer", "").strip() or None},
+            "PPM_Q_II": {"engineer": form_data.get("Q2_Engineer", "").strip() or None},
+            "PPM_Q_III": {"engineer": form_data.get("Q3_Engineer", "").strip() or None},
+            "PPM_Q_IV": {"engineer": form_data.get("Q4_Engineer", "").strip() or None},
         }
-        if not ppm_data["Name"]: # Handle optional Name
+        # Ensure Name is None if empty, not just for "if not ppm_data['Name']" which might fail if key missing
+        if ppm_data.get("Name") == "":
             ppm_data["Name"] = None
 
         try:
@@ -208,19 +206,17 @@ def edit_ppm_equipment(mfg_serial):
             "MANUFACTURER": form_data.get("MANUFACTURER"),
             "Department": form_data.get("Department"),
             "LOG_NO": form_data.get("LOG_NO"),
-            "Installation_Date": form_data.get("Installation_Date"),
-            "Warranty_End": form_data.get("Warranty_End"),
-            "Eng1": form_data.get("Eng1"),
-            "Eng2": form_data.get("Eng2"),
-            "Eng3": form_data.get("Eng3"),
-            "Eng4": form_data.get("Eng4"),
-            "Status": form_data.get("Status") if form_data.get("Status") else None,
-            "PPM_Q_I": {"engineer": form_data.get("PPM_Q_I_engineer")},
-            "PPM_Q_II": {"engineer": form_data.get("PPM_Q_II_engineer")},
-            "PPM_Q_III": {"engineer": form_data.get("PPM_Q_III_engineer")},
-            "PPM_Q_IV": {"engineer": form_data.get("PPM_Q_IV_engineer")},
+            "Installation_Date": form_data.get("Installation_Date", "").strip() or None,
+            "Warranty_End": form_data.get("Warranty_End", "").strip() or None,
+            # Eng1-Eng4 removed
+            "Status": form_data.get("Status", "").strip() or None,
+            "PPM_Q_I": {"engineer": form_data.get("Q1_Engineer", "").strip() or None},
+            "PPM_Q_II": {"engineer": form_data.get("Q2_Engineer", "").strip() or None},
+            "PPM_Q_III": {"engineer": form_data.get("Q3_Engineer", "").strip() or None},
+            "PPM_Q_IV": {"engineer": form_data.get("Q4_Engineer", "").strip() or None},
         }
-        if not ppm_data_update["Name"]: ppm_data_update["Name"] = None
+        if ppm_data_update.get("Name") == "":
+            ppm_data_update["Name"] = None
 
         try:
             DataService.update_entry('ppm', mfg_serial, ppm_data_update)
@@ -228,31 +224,45 @@ def edit_ppm_equipment(mfg_serial):
             return redirect(url_for('views.list_equipment', data_type='ppm'))
         except ValueError as e:
             flash(f"Error updating equipment: {str(e)}", 'danger')
-        except KeyError:
+        except KeyError: # Should not typically be raised by DataService.update_entry for not found.
              flash(f"Equipment with serial '{mfg_serial}' not found for update.", 'warning')
              return redirect(url_for('views.list_equipment', data_type='ppm'))
         except Exception as e:
             logger.error(f"Error updating PPM equipment {mfg_serial}: {str(e)}")
             flash('An unexpected error occurred during update.', 'danger')
-        # Re-render form with current data (entry combined with form_data) and errors
-        # For GET, entry is already prepared. For POST error, use combined data.
-        current_render_data = entry.copy()
-        current_render_data.update(form_data) # Overlay submitted values
-        # PPM_Q_X are dicts in entry, but form_data has PPM_Q_X_engineer
-        for q_key_form, q_field_model in [
-            ("PPM_Q_I_engineer", "PPM_Q_I"), ("PPM_Q_II_engineer", "PPM_Q_II"),
-            ("PPM_Q_III_engineer", "PPM_Q_III"), ("PPM_Q_IV_engineer", "PPM_Q_IV")
-        ]:
-            current_render_data[q_field_model] = {"engineer": form_data.get(q_key_form, "")}
+
+        # Re-render form on POST error: use form_data directly for field values
+        # and supplement with calculated dates from the original entry for display.
+        current_render_data = form_data.copy() # Start with what user submitted
+        # Add dates from original entry for display consistency, as they are not submitted by form
+        current_render_data['Q1_Date'] = entry.get('PPM_Q_I', {}).get('quarter_date', '')
+        current_render_data['Q2_Date'] = entry.get('PPM_Q_II', {}).get('quarter_date', '')
+        current_render_data['Q3_Date'] = entry.get('PPM_Q_III', {}).get('quarter_date', '')
+        current_render_data['Q4_Date'] = entry.get('PPM_Q_IV', {}).get('quarter_date', '')
+        # Ensure other fields from original `entry` that are not in `form_data` are present if needed by template
+        for key, value in entry.items():
+            if key not in current_render_data:
+                 current_render_data[key] = value
 
         return render_template('equipment/edit_ppm.html', data_type='ppm', entry=current_render_data, mfg_serial=mfg_serial)
 
-    # GET request: Populate form with existing data (entry is already prepared by DataService)
-    # Ensure PPM_Q_X data is directly usable by the template expecting PPM_Q_X_engineer
+    # GET request: Populate form with existing data
     display_entry = entry.copy()
-    for q_model, q_form_eng in [("PPM_Q_I", "PPM_Q_I_engineer"), ("PPM_Q_II", "PPM_Q_II_engineer"),
-                                ("PPM_Q_III", "PPM_Q_III_engineer"), ("PPM_Q_IV", "PPM_Q_IV_engineer")]:
-        display_entry[q_form_eng] = entry.get(q_model, {}).get('engineer', '')
+    # Map PPM_Q_X from loaded entry to QX_Engineer and QX_Date for template
+    q_map_to_form = {
+        "PPM_Q_I": ("Q1_Date", "Q1_Engineer"),
+        "PPM_Q_II": ("Q2_Date", "Q2_Engineer"),
+        "PPM_Q_III": ("Q3_Date", "Q3_Engineer"),
+        "PPM_Q_IV": ("Q4_Date", "Q4_Engineer"),
+    }
+    for model_q_key, (form_q_date, form_q_eng) in q_map_to_form.items():
+        quarter_data = entry.get(model_q_key, {})
+        display_entry[form_q_date] = quarter_data.get('quarter_date', '')
+        display_entry[form_q_eng] = quarter_data.get('engineer', '')
+
+    # Remove old Eng fields if they are still in display_entry from old data (though unlikely for new model)
+    for i in range(1, 5): display_entry.pop(f'Eng{i}', None)
+
 
     return render_template('equipment/edit_ppm.html', data_type='ppm', entry=display_entry, mfg_serial=mfg_serial)
 
@@ -362,9 +372,14 @@ def import_equipment():
                 # Basic inference (can be made more robust)
                 # This is a simplified version of header check.
                 # DataService.import_data will use pandas which handles CSV parsing robustly.
-                if 'PPM_Q_I' in first_line or 'Eng1' in first_line: # PPM specific fields
+                # Updated to check for new PPM specific headers like Q1_Engineer, Q2_Engineer etc.
+                if 'Q1_Engineer' in first_line or \
+                   'Q2_Engineer' in first_line or \
+                   'Q3_Engineer' in first_line or \
+                   'Q4_Engineer' in first_line: # New PPM specific fields
                     data_type_inferred = 'ppm'
-                elif 'Next_Maintenance' in first_line or 'Service_Date' in first_line: # OCM specific fields
+                elif 'Next_Maintenance' in first_line or \
+                     'Service_Date' in first_line: # OCM specific fields
                     data_type_inferred = 'ocm'
                 else:
                     flash('Could not reliably determine data type (PPM/OCM) from CSV header.', 'warning')

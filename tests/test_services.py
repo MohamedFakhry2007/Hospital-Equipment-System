@@ -22,16 +22,23 @@ def create_valid_ppm_dict(mfg_serial="PPM_SN001", equipment="PPM Device", model=
         "MANUFACTURER": "PPM Manufacturer",
         "Department": "PPM Department",
         "LOG_NO": "PPM_LOG001",
-        "Installation_Date": "01/01/2023",
-        "Warranty_End": "01/01/2025",
-        "Eng1": "Eng PPM1", "Eng2": "Eng PPM2", "Eng3": "", "Eng4": "",
+        "Installation_Date": "01/01/2023", # Default, can be overridden by kwargs
+        "Warranty_End": "01/01/2025",   # Default, can be overridden by kwargs
+        # Eng1-Eng4 removed
         "Status": "Upcoming", # Will be recalculated by add/update unless specified
-        "PPM_Q_I": {"engineer": "Q1 Engineer"},
-        "PPM_Q_II": {"engineer": "Q2 Engineer"},
-        "PPM_Q_III": {"engineer": ""},
-        "PPM_Q_IV": {"engineer": ""},
+        # PPM_Q_X fields will now also contain quarter_date after service processing
+        # For input, they might only have 'engineer'
+        "PPM_Q_I": {"engineer": "Q1 Engineer Default"},
+        "PPM_Q_II": {"engineer": "Q2 Engineer Default"},
+        "PPM_Q_III": {"engineer": ""}, # Default empty engineer
+        "PPM_Q_IV": {"engineer": ""},  # Default empty engineer
     }
-    base_data.update(kwargs)
+    # Allow kwargs to override any field, including nested PPM_Q_X fields
+    for key, value in kwargs.items():
+        if key in ["PPM_Q_I", "PPM_Q_II", "PPM_Q_III", "PPM_Q_IV"] and isinstance(value, dict):
+            base_data[key].update(value)
+        else:
+            base_data[key] = value
     return base_data
 
 def create_valid_ocm_dict(mfg_serial="OCM_SN001", equipment="OCM Device", model="OCM1000", **kwargs):
@@ -86,9 +93,12 @@ def test_add_ppm_entry(mock_data_service):
 
     assert added_entry["MFG_SERIAL"] == "PPM_S001"
     assert added_entry["NO"] == 1
-    # Status calculation for PPM is basic: "Upcoming" if not all EngX filled, "Maintained" if all filled.
-    # For default create_valid_ppm_dict, Eng3 and Eng4 are empty.
-    assert added_entry["Status"] == "Upcoming"
+    # Status calculation will now depend on quarter_dates and engineers.
+    # _calculate_ppm_quarter_dates will run, using today if Installation_Date is problematic.
+    # Let's assume default "Upcoming" or test more specifically later.
+    # For now, we'll focus on the structure.
+    assert "PPM_Q_I" in added_entry
+    assert "quarter_date" in added_entry["PPM_Q_I"] # Service should have added this
 
     all_entries = mock_data_service.get_all_entries("ppm")
     assert len(all_entries) == 1
@@ -118,24 +128,63 @@ def test_add_duplicate_mfg_serial(mock_data_service):
         mock_data_service.add_entry("ppm", data2)
 
 
-def test_update_ppm_entry(mock_data_service):
+def test_update_ppm_entry(mock_data_service, mocker):
     """Test updating an existing PPM entry."""
-    original_data = create_valid_ppm_dict(MFG_SERIAL="PPM_U001", Eng1="Done", Eng2="Done", Eng3="", Eng4="")
-    mock_data_service.add_entry("ppm", original_data)
-    # Original status should be "Upcoming"
+    # Mock today for consistent quarter date calculation by the service
+    fixed_today = date(2023, 1, 10) # Example: Jan 10, 2023
+    # Mock datetime.date.today() within the service's scope for _calculate_ppm_quarter_dates
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
 
-    update_payload = {"Eng3": "Now Done", "Eng4": "Also Done", "MODEL": "PPM1000-rev2"}
-    # Create a full dict for update, DataService.update_entry expects all required fields
-    updated_data_full = original_data.copy()
-    updated_data_full.update(update_payload)
+    original_data_input = create_valid_ppm_dict(
+        MFG_SERIAL="PPM_U001",
+        Installation_Date="01/01/2023", # Q1 will be 01/04/2023
+        PPM_Q_I={"engineer": "Eng Q1 Orig"}
+    )
+    # DataService.add_entry will calculate initial quarter_dates and status
+    initial_added_entry = mock_data_service.add_entry("ppm", original_data_input)
+    assert initial_added_entry["PPM_Q_I"]["engineer"] == "Eng Q1 Orig"
+    assert initial_added_entry["PPM_Q_I"]["quarter_date"] == "01/04/2023"
 
-    returned_updated_entry = mock_data_service.update_entry("ppm", "PPM_U001", updated_data_full)
+    update_payload_form_input = { # Mimics form input, only engineer might be provided for quarters
+        "MODEL": "PPM1000-rev2",
+        "PPM_Q_I": {"engineer": "Eng Q1 Updated"},
+        "PPM_Q_II": {"engineer": "Eng Q2 New"},
+        "Installation_Date": "01/02/2023" # Change installation date, should trigger new quarter_dates
+    }
+
+    # DataService.update_entry expects a full model-like dict, but it will re-calculate quarter_dates
+    # and status. So, we base the full update dict on the original structure but apply changes.
+    # The service will handle filling in missing quarter_dates in the update_payload.
+
+    # Construct the full data for update_entry based on what would be submitted (merged by view)
+    # The view would typically pass the full existing entry merged with form changes.
+    # Here, we simulate that `update_entry` receives the necessary fields for validation,
+    # and it will recalculate quarter_dates based on the new Installation_Date.
+
+    # Simulate a full payload as if prepared by views.py from form + existing data
+    # For update_entry, it's important that all required model fields are present.
+    # The service then recalculates quarter_dates and status.
+    data_for_update_service = initial_added_entry.copy() # Start with the full current state
+    data_for_update_service["MODEL"] = update_payload_form_input["MODEL"]
+    data_for_update_service["Installation_Date"] = update_payload_form_input["Installation_Date"]
+    # Update engineer info for quarters based on "form input"
+    data_for_update_service["PPM_Q_I"]["engineer"] = update_payload_form_input["PPM_Q_I"]["engineer"]
+    # If Q_II was empty before, and now gets an engineer
+    data_for_update_service["PPM_Q_II"] = update_payload_form_input["PPM_Q_II"]
+
+
+    returned_updated_entry = mock_data_service.update_entry("ppm", "PPM_U001", data_for_update_service)
 
     assert returned_updated_entry["MODEL"] == "PPM1000-rev2"
-    assert returned_updated_entry["Eng3"] == "Now Done"
-    # Now all Eng1-4 are filled, status should be "Maintained"
-    assert returned_updated_entry["Status"] == "Maintained"
+    assert returned_updated_entry["PPM_Q_I"]["engineer"] == "Eng Q1 Updated"
+    assert returned_updated_entry["PPM_Q_II"]["engineer"] == "Eng Q2 New"
+
+    # Check if quarter dates were recalculated based on new Installation_Date "01/02/2023"
+    # Q1 should be 01/05/2023, Q2 01/08/2023 etc.
+    assert returned_updated_entry["PPM_Q_I"]["quarter_date"] == "01/05/2023"
+    assert returned_updated_entry["PPM_Q_II"]["quarter_date"] == "01/08/2023"
     assert returned_updated_entry["NO"] == 1 # NO should be preserved
+    # Status would also be recalculated, test separately or verify if logic is simple enough.
 
 
 def test_update_ocm_next_maintenance_to_overdue(mock_data_service, mocker):
@@ -406,29 +455,109 @@ def test_calculate_status_ocm_maintained_cases(mock_data_service, mocker):
     assert mock_data_service.calculate_status(entry3, "ocm") == "Upcoming"
 
 
-@pytest.mark.parametrize("eng_fields, expected_status", [
-    ({"Eng1": "Done", "Eng2": "Done", "Eng3": "Done", "Eng4": "Done"}, "Maintained"),
-    ({"Eng1": "Done", "Eng2": "Done", "Eng3": "Done", "Eng4": ""}, "Upcoming"),
-    ({"Eng1": "Done", "Eng2": "", "Eng3": "", "Eng4": ""}, "Upcoming"),
-    ({"Eng1": "", "Eng2": "", "Eng3": "", "Eng4": ""}, "Upcoming"),
+from dateutil.relativedelta import relativedelta
+
+# Test for _calculate_ppm_quarter_dates
+def test_calculate_ppm_quarter_dates(mock_data_service, mocker):
+    # Mock datetime.today() for predictable results when no installation_date is given
+    fixed_today = date(2023, 1, 15) # January 15, 2023
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
+
+    # Scenario 1: Valid installation_date_str
+    install_date_str = "01/10/2022" # Oct 1, 2022
+    q_dates = DataService._calculate_ppm_quarter_dates(install_date_str)
+    expected_q1 = (datetime.strptime(install_date_str, "%d/%m/%Y") + relativedelta(months=3)).strftime("%d/%m/%Y")
+    expected_q2 = (datetime.strptime(expected_q1, "%d/%m/%Y") + relativedelta(months=3)).strftime("%d/%m/%Y")
+    expected_q3 = (datetime.strptime(expected_q2, "%d/%m/%Y") + relativedelta(months=3)).strftime("%d/%m/%Y")
+    expected_q4 = (datetime.strptime(expected_q3, "%d/%m/%Y") + relativedelta(months=3)).strftime("%d/%m/%Y")
+    assert q_dates == [expected_q1, expected_q2, expected_q3, expected_q4]
+    assert q_dates[0] == "01/01/2023"
+    assert q_dates[3] == "01/10/2023" # Check year change
+
+    # Scenario 2: installation_date_str is None
+    q_dates_none = DataService._calculate_ppm_quarter_dates(None)
+    expected_q1_from_today = (fixed_today + relativedelta(months=3)).strftime("%d/%m/%Y")
+    assert q_dates_none[0] == expected_q1_from_today
+    assert q_dates_none[0] == "15/04/2023"
+
+    # Scenario 3: installation_date_str is empty
+    q_dates_empty = DataService._calculate_ppm_quarter_dates("")
+    assert q_dates_empty[0] == expected_q1_from_today # Should also use today
+
+    # Scenario 4: Invalid installation_date_str format
+    q_dates_invalid = DataService._calculate_ppm_quarter_dates("invalid-date")
+    assert q_dates_invalid[0] == expected_q1_from_today # Should use today
+
+
+# Updated tests for PPM status calculation
+@pytest.mark.parametrize("ppm_quarters_data, expected_status, today_str", [
+    # Scenario: Overdue (past date, no engineer)
+    ({"PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": None}}, "Overdue", "15/03/2024"),
+    ({"PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": ""}}, "Overdue", "15/03/2024"),
+    # Scenario: Overdue (multiple past, one missing engineer)
+    ({
+        "PPM_Q_I": {"quarter_date": "01/10/2023", "engineer": "EngA"},
+        "PPM_Q_II": {"quarter_date": "01/01/2024", "engineer": None}
+    }, "Overdue", "15/03/2024"),
+    # Scenario: Maintained (all past quarters have engineers)
+    ({
+        "PPM_Q_I": {"quarter_date": "01/10/2023", "engineer": "EngA"},
+        "PPM_Q_II": {"quarter_date": "01/01/2024", "engineer": "EngB"}
+    }, "Maintained", "15/03/2024"),
+    # Scenario: Upcoming (all future dates, no engineers)
+    ({
+        "PPM_Q_I": {"quarter_date": "01/04/2024", "engineer": None},
+        "PPM_Q_II": {"quarter_date": "01/07/2024", "engineer": None}
+    }, "Upcoming", "15/03/2024"),
+    # Scenario: Upcoming (all future dates, some engineers)
+    ({
+        "PPM_Q_I": {"quarter_date": "01/04/2024", "engineer": "EngA"},
+        "PPM_Q_II": {"quarter_date": "01/07/2024", "engineer": None}
+    }, "Upcoming", "15/03/2024"), # Still upcoming as no past due items.
+    # Scenario: Mixed - past maintained, future upcoming
+    ({
+        "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": "EngA"}, # Past, maintained
+        "PPM_Q_II": {"quarter_date": "01/04/2024", "engineer": None}  # Future, no eng
+    }, "Maintained", "15/03/2024"), # Considered Maintained because past work is done.
+    # Scenario: Upcoming (no past due quarters, but no engineers assigned yet for future)
+    ({ "PPM_Q_I": {"quarter_date": "01/06/2024", "engineer": None} }, "Upcoming", "15/03/2024"),
+    # Scenario: Upcoming (one quarter with no date info - should not make it overdue)
+    ({ "PPM_Q_I": {"engineer": "EngA"} }, "Upcoming", "15/03/2024"),
+    # Scenario: Maintained (only one past quarter, and it's maintained)
+    ({ "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": "EngA"} }, "Maintained", "15/03/2024"),
 ])
-def test_calculate_status_ppm(mock_data_service, eng_fields, expected_status):
-    # PPM status calculation is currently basic, not date-dependent in `calculate_status`
-    ppm_entry_data = {**eng_fields, "MFG_SERIAL": "TestPPMStatus"}
+def test_calculate_status_ppm_new_logic(mock_data_service, mocker, ppm_quarters_data, expected_status, today_str):
+    fixed_today = datetime.strptime(today_str, "%d/%m/%Y").date()
+    mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+
+    ppm_entry_data = {"MFG_SERIAL": "TestPPMStatus"}
+    ppm_entry_data.update(ppm_quarters_data) # Add PPM_Q_X data
+
     status = mock_data_service.calculate_status(ppm_entry_data, "ppm")
     assert status == expected_status
 
-# --- Tests for add_entry with status ---
-def test_add_ppm_entry_calculates_status(mock_data_service):
-    data_no_status = create_valid_ppm_dict(MFG_SERIAL="PPM_ADD_S001", Eng1="X", Eng2="X", Eng3="X", Eng4="X")
-    del data_no_status["Status"] # Remove status so it's calculated
-    added_entry = mock_data_service.add_entry("ppm", data_no_status)
-    assert added_entry["Status"] == "Maintained"
 
-    data_partial_eng = create_valid_ppm_dict(MFG_SERIAL="PPM_ADD_S002", Eng1="X", Eng2="", Eng3="", Eng4="")
-    del data_partial_eng["Status"]
-    added_entry_2 = mock_data_service.add_entry("ppm", data_partial_eng)
-    assert added_entry_2["Status"] == "Upcoming"
+# --- Tests for add_entry with status ---
+def test_add_ppm_entry_calculates_status_new(mock_data_service, mocker):
+    # Mock today for consistent quarter date calculation by the service
+    fixed_today = date(2023, 1, 10)
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
+
+    # This data will have quarter_dates calculated from fixed_today + 3,6,9,12 months, all future
+    # Example: Q1_date = 10/04/2023, Q2_date = 10/07/2023 etc.
+    # Since all dates are future, status should be Upcoming.
+    data_no_status = create_valid_ppm_dict(
+        MFG_SERIAL="PPM_ADD_S001",
+        Installation_Date=None, # Will use fixed_today for quarter calculation base
+        PPM_Q_I={"engineer": "EngTest"} # Only engineer provided
+    )
+    if "Status" in data_no_status: del data_no_status["Status"]
+
+    added_entry = mock_data_service.add_entry("ppm", data_no_status)
+    assert added_entry["Status"] == "Upcoming" # All calculated quarter dates will be future
+    assert "quarter_date" in added_entry["PPM_Q_I"]
+    assert added_entry["PPM_Q_I"]["quarter_date"] == "10/04/2023"
+
 
 def test_add_ocm_entry_calculates_status(mock_data_service, mocker):
     fixed_today = date(2024, 3, 15)
@@ -445,17 +574,35 @@ def test_add_ocm_entry_calculates_status(mock_data_service, mocker):
     assert added_entry_2["Status"] == "Upcoming"
 
 # --- Tests for update_entry with status ---
-def test_update_ppm_entry_recalculates_status(mock_data_service):
-    ppm_data = create_valid_ppm_dict(MFG_SERIAL="PPM_UPD_S001", Eng1="X", Eng2="", Eng3="", Eng4="") # Initially Upcoming
-    mock_data_service.add_entry("ppm", ppm_data)
+def test_update_ppm_entry_recalculates_status_new(mock_data_service, mocker):
+    fixed_today = date(2024, 3, 15)
+    mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today # For _calculate_ppm_quarter_dates
 
-    update_payload = ppm_data.copy() # Start with full original data
-    update_payload["Eng2"] = "X"
-    update_payload["Eng3"] = "X"
-    update_payload["Eng4"] = "X" # Now all Eng fields will be filled
-    if "Status" in update_payload: del update_payload["Status"] # Ensure status is recalculated
+    # Initial entry: Q1 is past & no engineer -> Overdue
+    ppm_data_initial = create_valid_ppm_dict(
+        MFG_SERIAL="PPM_UPD_S001",
+        Installation_Date="01/09/2023", # Q1=01/12/2023 (past), Q2=01/03/2024 (past)
+        PPM_Q_I={"engineer": None},
+        PPM_Q_II={"engineer": "EngB"}
+    )
+    if "Status" in ppm_data_initial: del ppm_data_initial["Status"]
+    added_initial_entry = mock_data_service.add_entry("ppm", ppm_data_initial)
+    assert added_initial_entry["Status"] == "Overdue" # Q1 was past and no engineer
 
-    updated_entry = mock_data_service.update_entry("ppm", "PPM_UPD_S001", update_payload)
+    # Update: Provide engineer for Q1
+    # The service's update_entry will re-calculate quarter dates based on Installation_Date
+    # and then re-calculate status.
+    update_payload_form_input = {"PPM_Q_I": {"engineer": "EngA_Now"}}
+
+    # Construct full data for service update
+    data_for_update_service = added_initial_entry.copy()
+    data_for_update_service["PPM_Q_I"]["engineer"] = update_payload_form_input["PPM_Q_I"]["engineer"]
+    if "Status" in data_for_update_service: del data_for_update_service["Status"] # Ensure status is recalculated
+
+    updated_entry = mock_data_service.update_entry("ppm", "PPM_UPD_S001", data_for_update_service)
+    # Now Q1 (01/12/2023) has EngA_Now, Q2 (01/03/2024) has EngB. Both past.
+    # All past quarters are maintained.
     assert updated_entry["Status"] == "Maintained"
 
 # --- Tests for import_data ---
@@ -479,37 +626,59 @@ OCM_CSV_IMPORT_HEADERS = [h for h in OCM_MODEL_FIELDS if h != 'NO']
 
 
 def test_import_data_new_ppm_entries(mock_data_service):
-    ppm_entry_1 = create_valid_ppm_dict(MFG_SERIAL="IMP_PPM01", Status="Upcoming") # Explicit status
-    ppm_entry_2 = create_valid_ppm_dict(MFG_SERIAL="IMP_PPM02", Eng1="E1", Eng2="E2", Eng3="E3", Eng4="E4") # All eng filled
-    # For import, QuarterData should be represented by simple engineer string if header is e.g. PPM_Q_I
-    # The import_data logic converts this string to {"engineer": "string"}
+# Define new PPM CSV headers for import tests
+PPM_CSV_IMPORT_HEADERS_NEW = [
+    'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER', 'Department',
+    'LOG_NO', 'Installation_Date', 'Warranty_End', 'Status', 'OCM',
+    'Q1_Engineer', 'Q2_Engineer', 'Q3_Engineer', 'Q4_Engineer'
+]
+
+def test_import_data_new_ppm_entries_updated_format(mock_data_service, mocker):
+    fixed_today = date(2023, 1, 10)
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
+
     csv_rows = [
-        {k: (v["engineer"] if isinstance(v, dict) else v) for k, v in ppm_entry_1.items() if k != 'NO'},
-        {k: (v["engineer"] if isinstance(v, dict) else v) for k, v in ppm_entry_2.items() if k != 'NO'}
+        { # Entry 1: All info, explicit status
+            "EQUIPMENT": "PPM Device 1", "MODEL": "P1000", "Name": "PPM Alpha", "MFG_SERIAL": "IMP_PPM01_NEW",
+            "MANUFACTURER": "Manuf", "Department": "DeptX", "LOG_NO": "L001",
+            "Installation_Date": "01/10/2022", "Warranty_End": "01/10/2024",
+            "Status": "Upcoming", "OCM": "",
+            "Q1_Engineer": "EngA", "Q2_Engineer": "EngB", "Q3_Engineer": "", "Q4_Engineer": ""
+        },
+        { # Entry 2: Minimal info, let status and quarter dates be calculated
+            "EQUIPMENT": "PPM Device 2", "MODEL": "P2000", "Name": "", "MFG_SERIAL": "IMP_PPM02_NEW",
+            "MANUFACTURER": "Manuf", "Department": "DeptY", "LOG_NO": "L002",
+            "Installation_Date": "", "Warranty_End": "", # Optional dates empty
+            "Status": "", "OCM": "",
+            "Q1_Engineer": "EngC", "Q2_Engineer": "", "Q3_Engineer": "", "Q4_Engineer": ""
+        }
     ]
-    # Status will be recalculated if not valid, or taken if valid.
-    # For ppm_entry_2, status will be "Maintained" after calculation if not provided or invalid.
-    del csv_rows[1]["Status"] # Let status be calculated for the second entry
-
-    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS, csv_rows)
-
+    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS_NEW, csv_rows)
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
 
-    assert result["added_count"] == 2
+    assert result["added_count"] == 2, f"Errors: {result['errors']}"
     assert result["updated_count"] == 0
     assert result["skipped_count"] == 0
     assert not result["errors"]
 
-    entry1_db = mock_data_service.get_entry("ppm", "IMP_PPM01")
+    entry1_db = mock_data_service.get_entry("ppm", "IMP_PPM01_NEW")
     assert entry1_db is not None
-    assert entry1_db["Status"] == "Upcoming" # Used provided valid status
+    assert entry1_db["Status"] == "Upcoming" # Used provided
+    assert entry1_db["PPM_Q_I"]["engineer"] == "EngA"
+    assert entry1_db["PPM_Q_I"]["quarter_date"] == "01/01/2023" # Calculated from 01/10/2022
+    assert entry1_db["Installation_Date"] == "01/10/2022"
 
-    entry2_db = mock_data_service.get_entry("ppm", "IMP_PPM02")
+    entry2_db = mock_data_service.get_entry("ppm", "IMP_PPM02_NEW")
     assert entry2_db is not None
-    assert entry2_db["Status"] == "Maintained" # Recalculated
+    # Status for entry2: Install date empty, so quarter_dates from fixed_today (all future).
+    # Q1_Engineer is EngC. All future dates, one engineer -> Upcoming.
+    assert entry2_db["Status"] == "Upcoming"
+    assert entry2_db["PPM_Q_I"]["engineer"] == "EngC"
+    assert entry2_db["PPM_Q_I"]["quarter_date"] == "10/04/2023" # Calculated from fixed_today
+    assert entry2_db["Installation_Date"] is None # Was empty in CSV
 
 
-def test_import_data_new_ocm_entries(mock_data_service, mocker):
+def test_import_data_new_ocm_entries(mock_data_service, mocker): # Keep OCM tests as they are good
     fixed_today = date(2024, 3, 15)
     mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
 
@@ -540,59 +709,85 @@ def test_import_data_new_ocm_entries(mock_data_service, mocker):
 
 def test_import_data_updates_existing_entries(mock_data_service):
     # Pre-populate data
-    existing_ppm = create_valid_ppm_dict(MFG_SERIAL="EXIST_PPM01", MODEL="OldModel")
-    mock_data_service.add_entry("ppm", existing_ppm)
-    assert mock_data_service.get_entry("ppm", "EXIST_PPM01")["MODEL"] == "OldModel"
+    existing_ppm_data = create_valid_ppm_dict(
+        MFG_SERIAL="EXIST_PPM01_NEW",
+        MODEL="OldModel",
+        Installation_Date="01/01/2023", # Q1=01/04/2023
+        PPM_Q_I={"engineer": "OldEng"}
+    )
+    mock_data_service.add_entry("ppm", existing_ppm_data) # This will add calculated dates
+
+    entry_before_update = mock_data_service.get_entry("ppm", "EXIST_PPM01_NEW")
+    assert entry_before_update["MODEL"] == "OldModel"
+    assert entry_before_update["PPM_Q_I"]["engineer"] == "OldEng"
+    assert entry_before_update["PPM_Q_I"]["quarter_date"] == "01/04/2023"
 
     # CSV data to update the existing entry
-    update_csv_row_dict = create_valid_ppm_dict(MFG_SERIAL="EXIST_PPM01", MODEL="NewModelPPM")
-    # Flatten QuarterData for CSV representation
-    update_csv_row_flat = {k: (v["engineer"] if isinstance(v, dict) else v) for k,v in update_csv_row_dict.items() if k != 'NO'}
-
-    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS, [update_csv_row_flat])
+    update_csv_row = {
+        "EQUIPMENT": entry_before_update["EQUIPMENT"], "MODEL": "NewModelPPM_NEW", "Name": entry_before_update["Name"],
+        "MFG_SERIAL": "EXIST_PPM01_NEW", "MANUFACTURER": entry_before_update["MANUFACTURER"],
+        "Department": entry_before_update["Department"], "LOG_NO": entry_before_update["LOG_NO"],
+        "Installation_Date": "01/02/2023", # New Install Date -> new quarter dates
+        "Warranty_End": entry_before_update["Warranty_End"], "Status": "", "OCM": "",
+        "Q1_Engineer": "UpdatedEng", "Q2_Engineer": "NewQ2Eng", "Q3_Engineer": "", "Q4_Engineer": ""
+    }
+    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS_NEW, [update_csv_row])
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
 
     assert result["added_count"] == 0
-    assert result["updated_count"] == 1
+    assert result["updated_count"] == 1, f"Errors: {result['errors']}"
     assert result["skipped_count"] == 0
     assert not result["errors"]
 
-    updated_entry_db = mock_data_service.get_entry("ppm", "EXIST_PPM01")
-    assert updated_entry_db["MODEL"] == "NewModelPPM"
+    updated_entry_db = mock_data_service.get_entry("ppm", "EXIST_PPM01_NEW")
+    assert updated_entry_db["MODEL"] == "NewModelPPM_NEW"
+    assert updated_entry_db["PPM_Q_I"]["engineer"] == "UpdatedEng"
+    assert updated_entry_db["PPM_Q_II"]["engineer"] == "NewQ2Eng"
+    assert updated_entry_db["Installation_Date"] == "01/02/2023"
+    assert updated_entry_db["PPM_Q_I"]["quarter_date"] == "01/05/2023" # Recalculated from new Installation_Date
     assert updated_entry_db["NO"] == 1 # Ensure NO is preserved
 
 
-def test_import_data_invalid_rows(mock_data_service):
-    # Valid entry, entry with bad date, entry with missing required field
-    valid_ppm = create_valid_ppm_dict(MFG_SERIAL="VALID_IMP01")
-    ppm_bad_date = create_valid_ppm_dict(MFG_SERIAL="BAD_DATE01", Installation_Date="32/13/2023")
-    ppm_missing_field = create_valid_ppm_dict(MFG_SERIAL="MISSING01")
-    del ppm_missing_field["EQUIPMENT"] # EQUIPMENT is a required field
+def test_import_data_invalid_rows_ppm_new_format(mock_data_service):
+    # Valid entry, entry with bad date (optional, so should be None), entry with missing required field
+    valid_row = {
+        "EQUIPMENT": "PPM Valid", "MODEL": "V1", "MFG_SERIAL": "VALID_IMP01_NEW", "MANUFACTURER": "M",
+        "Department": "D", "LOG_NO": "L1", "Installation_Date": "01/01/2023",
+        "Q1_Engineer": "E"
+    }
+    # Installation_Date here is not DD/MM/YYYY, Pydantic validator on PPMEntry should catch this if not empty.
+    # If empty, it's None. If "invalid-date", the model's validator will raise error.
+    # DataService import logic for PPM now sets empty optional dates to None *before* Pydantic.
+    # So, a "bad date" means an *invalidly formatted non-empty* date.
+    ppm_bad_date_row = {**valid_row, "MFG_SERIAL": "BAD_DATE01_NEW", "Installation_Date": "32/13/2023"}
 
-    csv_rows = [
-        {k: (v["engineer"] if isinstance(v, dict) else v) for k,v in valid_ppm.items() if k != 'NO'},
-        {k: (v["engineer"] if isinstance(v, dict) else v) for k,v in ppm_bad_date.items() if k != 'NO'},
-        {k: (v["engineer"] if isinstance(v, dict) else v) for k,v in ppm_missing_field.items() if k != 'NO'},
-    ]
-    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS, csv_rows)
+    ppm_missing_req_field_row = {**valid_row, "MFG_SERIAL": "MISSING01_NEW"}
+    del ppm_missing_req_field_row["EQUIPMENT"]
+
+    csv_rows = [valid_row, ppm_bad_date_row, ppm_missing_req_field_row]
+    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS_NEW, csv_rows)
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
 
     assert result["added_count"] == 1 # Only valid_ppm
     assert result["updated_count"] == 0
-    assert result["skipped_count"] == 2
+    assert result["skipped_count"] == 2, f"Errors: {result['errors']}"
     assert len(result["errors"]) == 2
-    assert "Invalid date format for Installation_Date" in result["errors"][0]
-    # The Pydantic error for missing field will be caught by the model validation.
-    assert "Validation error" in result["errors"][1]
+    # Error for bad_date_row: Pydantic validation error on Installation_Date
+    assert "VALID_IMP01_NEW" == mock_data_service.get_entry("ppm", "VALID_IMP01_NEW")["MFG_SERIAL"]
+    assert "BAD_DATE01_NEW" in result["errors"][0] # Error message includes MFG_SERIAL
+    assert "Invalid date format for Installation_Date" in result["errors"][0] # Model validation error
+
+    # Error for missing_req_field_row: Pydantic validation error on EQUIPMENT
+    assert "MISSING01_NEW" in result["errors"][1]
     assert "Field required" in result["errors"][1] # Pydantic's message for missing field
 
-    assert mock_data_service.get_entry("ppm", "VALID_IMP01") is not None
-    assert mock_data_service.get_entry("ppm", "BAD_DATE01") is None
-    assert mock_data_service.get_entry("ppm", "MISSING01") is None
+    assert mock_data_service.get_entry("ppm", "VALID_IMP01_NEW") is not None
+    assert mock_data_service.get_entry("ppm", "BAD_DATE01_NEW") is None
+    assert mock_data_service.get_entry("ppm", "MISSING01_NEW") is None
 
 
-def test_import_data_empty_csv(mock_data_service):
-    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS, []) # Only headers
+def test_import_data_empty_csv_ppm_new_format(mock_data_service):
+    csv_content = create_csv_string(PPM_CSV_IMPORT_HEADERS_NEW, []) # Only headers
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
     assert result["added_count"] == 0
     assert result["updated_count"] == 0
@@ -605,47 +800,73 @@ def test_import_data_empty_csv(mock_data_service):
     assert "Import Error: The uploaded CSV file is empty." in result_empty_file["errors"]
 
 
-def test_import_data_bad_headers(mock_data_service):
-    # CSV with missing or incorrect headers.
-    # The current pandas based import might still try to process if some headers match,
-    # or might raise error if critical headers for model are missing.
-    # Pydantic validation will catch missing required fields.
-    bad_headers = ["MFG_SERIAL", "MODEL", "WRONG_HEADER_FOR_EQUIPMENT"]
-    row_data = [{"MFG_SERIAL": "TestBadHeader", "MODEL": "TestModel", "WRONG_HEADER_FOR_EQUIPMENT": "SomeEquip"}]
+def test_import_data_bad_headers_ppm_new_format(mock_data_service):
+    bad_headers = ["MFG_SERIAL", "MODEL", "Q1_Engineer_WRONG_NAME"] # Missing required EQUIPMENT, wrong Q eng name
+    row_data = [{"MFG_SERIAL": "TestBadHeader", "MODEL": "TestModel", "Q1_Engineer_WRONG_NAME": "EngX"}]
     csv_content = create_csv_string(bad_headers, row_data)
 
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
     assert result["skipped_count"] == 1
-    assert "Validation error" in result["errors"][0] # Pydantic will complain about missing EQUIPMENT
-    assert "Field required" in result["errors"][0]
+    assert "Validation error" in result["errors"][0]
+    assert "Field required" in result["errors"][0] # For EQUIPMENT
 
 
 # --- Tests for export_data ---
-def test_export_data_ppm(mock_data_service):
-    ppm1 = create_valid_ppm_dict(MFG_SERIAL="EXP_PPM01", Eng1="E1", PPM_Q_I={"engineer": "Q1Eng"})
-    ppm2 = create_valid_ppm_dict(MFG_SERIAL="EXP_PPM02", Name=None) # Optional name not provided
-    mock_data_service.add_entry("ppm", ppm1)
-    mock_data_service.add_entry("ppm", ppm2)
+def test_export_data_ppm_new_format(mock_data_service, mocker):
+    # Mock today for consistent quarter date calculation by the service
+    fixed_today = date(2023, 1, 10)
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
+
+    # Prepare data that would be in the system (i.e., with quarter_dates calculated)
+    ppm1_input = create_valid_ppm_dict(
+        MFG_SERIAL="EXP_PPM01_NEW",
+        Installation_Date="01/10/2022", # Q1=01/01/2023
+        PPM_Q_I={"engineer": "EngExportQ1"},
+        PPM_Q_II={"engineer": "EngExportQ2"}
+    )
+    ppm2_input = create_valid_ppm_dict(
+        MFG_SERIAL="EXP_PPM02_NEW",
+        Name=None, # Optional name not provided
+        Installation_Date=None, # Q1 from fixed_today = 10/04/2023
+        PPM_Q_IV={"engineer": "EngExportQ4"}
+    )
+    mock_data_service.add_entry("ppm", ppm1_input)
+    mock_data_service.add_entry("ppm", ppm2_input)
 
     csv_output_string = mock_data_service.export_data("ppm")
-
-    # Parse the CSV string back to check content
     csv_reader = csv.DictReader(io.StringIO(csv_output_string))
     exported_rows = list(csv_reader)
 
     assert len(exported_rows) == 2
-    assert exported_rows[0]["MFG_SERIAL"] == "EXP_PPM01"
-    assert exported_rows[0]["Eng1"] == "E1"
-    assert exported_rows[0]["PPM_Q_I"] == "Q1Eng" # Check flattened QuarterData
-    assert exported_rows[1]["MFG_SERIAL"] == "EXP_PPM02"
-    assert exported_rows[1]["Name"] == "" # Optional None field exported as empty string by default DictWriter behavior
 
-    # Check headers - NO should be first
-    expected_headers = ['NO'] + [h for h in PPM_MODEL_FIELDS if h != 'NO']
-    assert csv_reader.fieldnames == expected_headers
+    # Expected headers for new PPM export format
+    PPM_EXPORT_HEADERS_NEW = [
+        'NO', 'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER',
+        'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'OCM', 'Status',
+        'Q1_Date', 'Q1_Engineer', 'Q2_Date', 'Q2_Engineer',
+        'Q3_Date', 'Q3_Engineer', 'Q4_Date', 'Q4_Engineer'
+    ]
+    assert csv_reader.fieldnames == PPM_EXPORT_HEADERS_NEW
+
+    # Verify row 1 (EXP_PPM01_NEW)
+    row1 = next(r for r in exported_rows if r["MFG_SERIAL"] == "EXP_PPM01_NEW")
+    assert row1["Installation_Date"] == "01/10/2022"
+    assert row1["Q1_Date"] == "01/01/2023"
+    assert row1["Q1_Engineer"] == "EngExportQ1"
+    assert row1["Q2_Date"] == "01/04/2023"
+    assert row1["Q2_Engineer"] == "EngExportQ2"
+    assert row1["Q3_Engineer"] == "" # Default from create_valid_ppm_dict
+
+    # Verify row 2 (EXP_PPM02_NEW)
+    row2 = next(r for r in exported_rows if r["MFG_SERIAL"] == "EXP_PPM02_NEW")
+    assert row2["Name"] == "" # Optional None field exported as empty
+    assert row2["Installation_Date"] == "" # Was None, exported as empty
+    assert row2["Q1_Date"] == "10/04/2023" # Calculated from fixed_today
+    assert row2["Q1_Engineer"] == ""       # Default
+    assert row2["Q4_Engineer"] == "EngExportQ4"
 
 
-def test_export_data_ocm(mock_data_service):
+def test_export_data_ocm(mock_data_service): # Keep OCM test as is
     ocm1 = create_valid_ocm_dict(MFG_SERIAL="EXP_OCM01")
     mock_data_service.add_entry("ocm", ocm1)
     csv_output_string = mock_data_service.export_data("ocm")
