@@ -1,0 +1,51 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ title if title else 'Add Training Record' }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>{{ title if title else 'Add New Training Record' }}</h2>
+
+    {% include '_flash_messages.html' %}
+
+    {# The form action should ideally be dynamic if this template is reused for edit, but for add it's fixed #}
+    <form method="POST" action="{{ url_for('views.add_training_record_view') }}">
+        <div class="mb-3">
+            <label for="employee_id" class="form-label">Employee ID <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="employee_id" name="employee_id" value="{{ record.employee_id if record and record.employee_id is not none else '' }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ record.name if record and record.name is not none else '' }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="department" class="form-label">Department</label>
+            <input type="text" class="form-control" id="department" name="department" value="{{ record.department if record and record.department is not none else '' }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="trainer" class="form-label">Trainer</label>
+            <input type="text" class="form-control" id="trainer" name="trainer" value="{{ record.trainer if record and record.trainer is not none else '' }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="trained_machines" class="form-label">Trained Machines</label>
+            {# Handles if record.trained_machines is a list (for edit form population) or string (if form re-submitted) #}
+            <textarea class="form-control" id="trained_machines" name="trained_machines" rows="3" placeholder="Enter machine names, comma separated">{{ record.trained_machines_str if record and record.trained_machines_str is not none else (record.trained_machines if record and record.trained_machines is not none and not record.trained_machines is list else '') }}</textarea>
+            <small class="form-text text-muted">Comma-separated list of machine names or identifiers.</small>
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Save Record
+            </button>
+            <a href="{{ url_for('views.training_list') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

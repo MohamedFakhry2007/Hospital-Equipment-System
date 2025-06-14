@@ -13,6 +13,7 @@ def app():
     app = create_app()
     # Set the testing config or modify as needed
     app.config['TESTING'] = True
+    app.config['SERVER_NAME'] = 'localhost.test' # Added for url_for to work correctly
     with app.app_context():
         yield app
 

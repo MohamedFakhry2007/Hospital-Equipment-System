@@ -1,0 +1,69 @@
+
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Training Records{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Training Records</h2>
+        <a href="{{ url_for('views.add_training_record_view') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add New Training Record
+        </a>
+    </div>
+
+    {% include '_flash_messages.html' %}
+
+    {% if records %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Trainer</th>
+                    <th>Trained Machines</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ record.employee_id }}</td>
+                    <td>{{ record.name }}</td>
+                    <td>{{ record.department | default('N/A') }}</td>
+                    <td>{{ record.trainer | default('N/A') }}</td>
+                    <td>
+                        {% if record.trained_machines and record.trained_machines is iterable and record.trained_machines is not string %}
+                            {{ record.trained_machines | join(', ') }}
+                        {% elif record.trained_machines %}
+                            {{ record.trained_machines }} {# If it's a string already, just display #}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('views.edit_training_record_view', record_id=record.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form action="{{ url_for('views.delete_training_record_view', record_id=record.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        No training records found. <a href="{{ url_for('views.add_training_record_view') }}">Add the first one!</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

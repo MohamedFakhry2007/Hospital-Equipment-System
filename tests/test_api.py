@@ -2,6 +2,33 @@ import json
 from unittest.mock import patch
 
 # Helper function to create sample data (can be expanded or moved)
+
+from unittest.mock import patch # Ensure patch is imported if not already common
+from app.services.training_service import TrainingService # For patching
+
+def create_sample_training_record_payload(employee_id="TRN_API_E001", name="API Test User", **override_kwargs):
+    data = {
+        "employee_id": employee_id,
+        "name": name,
+        "department": "API Test Dept",
+        "trainer": "API Test Trainer",
+        "trained_machines": ["MachineAPI", "MachineTest"]
+    }
+    data.update(override_kwargs)
+    return data
+
+def create_sample_training_record_response_data(id=1, employee_id="TRN_API_E001", name="API Test User", **override_kwargs):
+    data = {
+        "id": id,
+        "employee_id": employee_id,
+        "name": name,
+        "department": "API Test Dept",
+        "trainer": "API Test Trainer",
+        "trained_machines": ["MachineAPI", "MachineTest"]
+    }
+    data.update(override_kwargs)
+    return data
+
 def create_sample_ppm_entry(mfg_serial="PPM_API_S001", **override_kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "PPM Test Device", "MODEL": "PPM-XYZ", "Name": "PPM Device XYZ",
@@ -323,3 +350,239 @@ def test_bulk_delete_invalid_data_type(client):
     assert response.status_code == 400
     json_data = response.get_json()
     assert "Invalid data type" in json_data['message']
+
+# --- Tests for Training API (/api/training) ---
+
+# POST /api/training
+def test_create_training_record_api_success(client): # client fixture from conftest.py
+    payload = create_sample_training_record_payload()
+    service_response = create_sample_training_record_response_data(id=1, **payload)
+
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        # Mock the instance and its method
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.create_training_record.return_value = service_response
+
+        response = client.post('/api/training', json=payload)
+
+        assert response.status_code == 201
+        json_data = response.get_json()
+        assert json_data["id"] == 1
+        assert json_data["employee_id"] == payload["employee_id"]
+        mock_service_instance.create_training_record.assert_called_once_with(payload)
+
+def test_create_training_record_api_validation_error(client):
+    payload = {"name": "Only Name"} # Missing employee_id
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.create_training_record.side_effect = ValueError("Employee ID is required")
+
+        response = client.post('/api/training', json=payload)
+
+        assert response.status_code == 400
+        json_data = response.get_json()
+        assert "Employee ID is required" in json_data['error']
+        mock_service_instance.create_training_record.assert_called_once_with(payload)
+
+def test_create_training_record_api_bad_request_no_json(client):
+    response = client.post('/api/training', data="not json") # Sending raw data, not json
+    assert response.status_code == 400 # Flask typically returns 400 if request.is_json is false
+    json_response = response.get_json()
+    assert json_response is not None
+    assert "Request must be JSON" in json_response.get('error', '')
+
+
+def test_create_training_record_api_service_exception(client):
+    payload = create_sample_training_record_payload()
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.create_training_record.side_effect = Exception("Service unavailable")
+
+        response = client.post('/api/training', json=payload)
+
+        assert response.status_code == 500
+        assert "Failed to create training record" in response.get_json()['error']
+        mock_service_instance.create_training_record.assert_called_once_with(payload)
+
+
+# GET /api/training
+def test_get_all_training_records_api_success(client):
+    records_data = [
+        create_sample_training_record_response_data(id=1, employee_id="E01"),
+        create_sample_training_record_response_data(id=2, employee_id="E02")
+    ]
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.return_value = records_data
+
+        response = client.get('/api/training') # Assuming /api/training is correct from Flask blueprint
+
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert len(json_data) == 2
+        assert json_data[0]["employee_id"] == "E01"
+        mock_service_instance.get_all_training_records.assert_called_once_with(skip=0, limit=0) # Check default args
+
+def test_get_all_training_records_api_with_pagination(client):
+    records_data = [create_sample_training_record_response_data(id=1)]
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.return_value = records_data
+
+        response = client.get('/api/training?skip=5&limit=10')
+        assert response.status_code == 200
+        mock_service_instance.get_all_training_records.assert_called_once_with(skip=5, limit=10)
+
+
+def test_get_all_training_records_api_empty(client):
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.return_value = []
+
+        response = client.get('/api/training')
+
+        assert response.status_code == 200
+        assert response.get_json() == []
+        mock_service_instance.get_all_training_records.assert_called_once_with(skip=0, limit=0)
+
+def test_get_all_training_records_api_service_exception(client):
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_all_training_records.side_effect = Exception("DB error")
+
+        response = client.get('/api/training')
+
+        assert response.status_code == 500
+        assert "Failed to retrieve training records" in response.get_json()['error']
+        mock_service_instance.get_all_training_records.assert_called_once_with(skip=0, limit=0)
+
+# GET /api/training/<record_id>
+def test_get_training_record_by_id_api_success(client):
+    record_data = create_sample_training_record_response_data(id=123)
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_training_record.return_value = record_data
+
+        response = client.get('/api/training/123')
+
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert json_data["id"] == 123
+        mock_service_instance.get_training_record.assert_called_once_with(123)
+
+def test_get_training_record_by_id_api_not_found(client):
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_training_record.return_value = None
+
+        response = client.get('/api/training/404')
+
+        assert response.status_code == 404
+        assert "Training record not found" in response.get_json()['error']
+        mock_service_instance.get_training_record.assert_called_once_with(404)
+
+def test_get_training_record_by_id_api_service_exception(client):
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.get_training_record.side_effect = Exception("Service error")
+
+        response = client.get('/api/training/789')
+
+        assert response.status_code == 500
+        assert "Failed to retrieve training record" in response.get_json()['error']
+        mock_service_instance.get_training_record.assert_called_once_with(789)
+
+# PUT /api/training/<record_id>
+def test_update_training_record_api_success(client):
+    record_id = 456
+    payload = create_sample_training_record_payload(name="Updated Name")
+    service_response = create_sample_training_record_response_data(id=record_id, **payload)
+
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.return_value = service_response
+
+        response = client.put(f'/api/training/{record_id}', json=payload)
+
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert json_data["name"] == "Updated Name"
+        assert json_data["id"] == record_id
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, payload)
+
+def test_update_training_record_api_not_found(client):
+    record_id = 4041
+    payload = create_sample_training_record_payload()
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.return_value = None
+
+        response = client.put(f'/api/training/{record_id}', json=payload)
+
+        assert response.status_code == 404
+        assert "Training record not found" in response.get_json()['error'] # Updated message from route
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, payload)
+
+def test_update_training_record_api_validation_error(client):
+    record_id = 789
+    payload = create_sample_training_record_payload(name="") # Empty name
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.side_effect = ValueError("Name cannot be empty")
+
+        response = client.put(f'/api/training/{record_id}', json=payload)
+
+        assert response.status_code == 400
+        assert "Name cannot be empty" in response.get_json()['error']
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, payload)
+
+def test_update_training_record_api_service_exception(client):
+    record_id = 101
+    payload = create_sample_training_record_payload()
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.update_training_record.side_effect = Exception("DB down")
+
+        response = client.put(f'/api/training/{record_id}', json=payload)
+
+        assert response.status_code == 500
+        assert "Failed to update training record" in response.get_json()['error']
+        mock_service_instance.update_training_record.assert_called_once_with(record_id, payload)
+
+
+# DELETE /api/training/<record_id>
+def test_delete_training_record_api_success(client):
+    record_id = 777
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.delete_training_record.return_value = True
+
+        response = client.delete(f'/api/training/{record_id}')
+
+        assert response.status_code == 200
+        assert "Training record deleted successfully" in response.get_json()['message']
+        mock_service_instance.delete_training_record.assert_called_once_with(record_id)
+
+def test_delete_training_record_api_not_found(client):
+    record_id = 4042
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.delete_training_record.return_value = False
+
+        response = client.delete(f'/api/training/{record_id}')
+
+        assert response.status_code == 404
+        assert "Training record not found" in response.get_json()['error']
+        mock_service_instance.delete_training_record.assert_called_once_with(record_id)
+
+def test_delete_training_record_api_service_exception(client):
+    record_id = 888
+    with patch('app.routes.api.TrainingService') as mock_training_service_class:
+        mock_service_instance = mock_training_service_class.return_value
+        mock_service_instance.delete_training_record.side_effect = Exception("Lock error")
+
+        response = client.delete(f'/api/training/{record_id}')
+
+        assert response.status_code == 500
+        assert "Failed to delete training record" in response.get_json()['error']
+        mock_service_instance.delete_training_record.assert_called_once_with(record_id)
