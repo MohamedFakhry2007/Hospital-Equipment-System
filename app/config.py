@@ -1,9 +1,13 @@
+import logging
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 # Load environment variables from .env file
 load_dotenv()
+logger.debug("Environment variables loaded from .env file")
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent

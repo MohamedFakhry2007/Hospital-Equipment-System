@@ -3,10 +3,10 @@ import io
 
 # Helper function to create sample data (can be expanded or moved)
 # These are simplified for view tests where we mostly check for presence of data in HTML
-def create_sample_view_ppm_entry(mfg_serial="PPM_VIEW_S001", status="Upcoming", status_class="warning", **kwargs):
+def create_sample_view_ppm_entry(SERIAL="PPM_VIEW_S001", status="Upcoming", status_class="warning", **kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "PPM View Device", "MODEL": "PPM-VXYZ", "Name": "PPM Device XYZ View",
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": "PPM Corp View", "Department": "View Dept",
+        "SERIAL": SERIAL, "MANUFACTURER": "PPM Corp View", "Department": "View Dept",
         "LOG_NO": "VLOG001", "Installation_Date": "01/01/2024", "Warranty_End": "01/01/2026",
         # Eng1-Eng4 removed
         "Status": status, "status_class": status_class,
@@ -43,10 +43,10 @@ def create_sample_view_ppm_entry(mfg_serial="PPM_VIEW_S001", status="Upcoming", 
             data[key] = value
     return data
 
-def create_sample_view_ocm_entry(mfg_serial="OCM_VIEW_S001", status="Upcoming", status_class="warning", next_maint="01/09/2024", **kwargs):
+def create_sample_view_ocm_entry(SERIAL="OCM_VIEW_S001", status="Upcoming", status_class="warning", next_maint="01/09/2024", **kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "OCM View Device", "MODEL": "OCM-VABC", "Name": "OCM Device ABC View",
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": "OCM Corp View", "Department": "View Dept OCM",
+        "SERIAL": SERIAL, "MANUFACTURER": "OCM Corp View", "Department": "View Dept OCM",
         "LOG_NO": "VLOG002", "Installation_Date": "02/01/2024", "Warranty_End": "02/01/2026",
         "Service_Date": "01/03/2024", "Next_Maintenance": next_maint,
         "ENGINEER": "OCM EngX View", "Status": status, "status_class": status_class, # For dashboard/list view
@@ -171,7 +171,7 @@ def test_add_ppm_equipment_get(client):
 # POST /equipment/ppm/add - Success
 def test_add_ppm_equipment_post_success(client):
     form_data = {
-        "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "MFG_SERIAL": "PPM_ADD01",
+        "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "SERIAL": "PPM_ADD01",
         "MANUFACTURER": "PPM Makers", "Department": "Main PPM", "LOG_NO": "LOGP01",
         "Installation_Date": "10/10/2023", "Warranty_End": "10/10/2025",
         # Eng1-4 removed
@@ -182,7 +182,7 @@ def test_add_ppm_equipment_post_success(client):
     # What DataService.add_entry is expected to receive (engineer: None if empty string from form)
     expected_service_payload = {
         "EQUIPMENT": "New PPM Device", "MODEL": "PPM2K", "Name": None,
-        "MFG_SERIAL": "PPM_ADD01", "MANUFACTURER": "PPM Makers", "Department": "Main PPM",
+        "SERIAL": "PPM_ADD01", "MANUFACTURER": "PPM Makers", "Department": "Main PPM",
         "LOG_NO": "LOGP01",
         "Installation_Date": "10/10/2023",
         "Warranty_End": "10/10/2025",
@@ -202,7 +202,7 @@ def test_add_ppm_equipment_post_success(client):
 
 # POST /equipment/ppm/add - Validation Error from DataService
 def test_add_ppm_equipment_post_validation_error(client):
-    form_data = {"EQUIPMENT": "Bad PPM", "MFG_SERIAL": "PPM_VALID_ERR"} # Missing many fields
+    form_data = {"EQUIPMENT": "Bad PPM", "SERIAL": "PPM_VALID_ERR"} # Missing many fields
     with patch('app.services.data_service.DataService.add_entry', side_effect=ValueError("Mocked Validation Error from DS")) as mock_add:
         response = client.post('/equipment/ppm/add', data=form_data)
         assert response.status_code == 200 # Re-renders form
@@ -223,7 +223,7 @@ def test_add_ocm_equipment_get(client):
 # POST /equipment/ocm/add - Success
 def test_add_ocm_equipment_post_success(client):
     form_data = {
-        "EQUIPMENT": "New OCM Device", "MODEL": "OCM500", "MFG_SERIAL": "OCM_ADD01",
+        "EQUIPMENT": "New OCM Device", "MODEL": "OCM500", "SERIAL": "OCM_ADD01",
         "MANUFACTURER": "OCM Makers", "Department": "Main OCM", "LOG_NO": "LOGO01",
         "Installation_Date": "11/11/2023", "Warranty_End": "11/11/2025",
         "Service_Date": "01/01/2024", "Next_Maintenance": "01/01/2025",
@@ -231,7 +231,7 @@ def test_add_ocm_equipment_post_success(client):
     }
     expected_service_payload = {
         "EQUIPMENT": "New OCM Device", "MODEL": "OCM500", "Name": None,
-        "MFG_SERIAL": "OCM_ADD01", "MANUFACTURER": "OCM Makers", "Department": "Main OCM",
+        "SERIAL": "OCM_ADD01", "MANUFACTURER": "OCM Makers", "Department": "Main OCM",
         "LOG_NO": "LOGO01", "Installation_Date": "11/11/2023", "Warranty_End": "11/11/2025",
         "Service_Date": "01/01/2024", "Next_Maintenance": "01/01/2025",
         "ENGINEER": "Tech OCM", "Status": "Upcoming", "PPM": "OptionalLink"
@@ -246,7 +246,7 @@ def test_add_ocm_equipment_post_success(client):
 
 # POST /equipment/ocm/add - Validation Error
 def test_add_ocm_equipment_post_validation_error(client):
-    form_data = {"EQUIPMENT": "Bad OCM", "MFG_SERIAL": "OCM_VALID_ERR"} # Missing fields
+    form_data = {"EQUIPMENT": "Bad OCM", "SERIAL": "OCM_VALID_ERR"} # Missing fields
     with patch('app.services.data_service.DataService.add_entry', side_effect=ValueError("OCM Validation Fail")) as mock_add:
         response = client.post('/equipment/ocm/add', data=form_data)
         assert response.status_code == 200
@@ -257,7 +257,7 @@ def test_add_ocm_equipment_post_validation_error(client):
 
 # --- Tests for Edit Equipment Routes (GET and POST) ---
 
-# GET /equipment/ppm/edit/<mfg_serial>
+# GET /equipment/ppm/edit/<SERIAL>
 def test_edit_ppm_equipment_get_exists(client):
     # Helper now includes QX_Date and QX_Engineer directly for template context
     sample_ppm_from_db = create_sample_view_ppm_entry(
@@ -287,19 +287,19 @@ def test_edit_ppm_equipment_get_not_found(client):
         assert "PPM Equipment List" in response_data_str
         mock_get.assert_called_once_with('ppm', "PPM_NO_EXIST")
 
-# POST /equipment/ppm/edit/<mfg_serial> - Success
+# POST /equipment/ppm/edit/<SERIAL> - Success
 def test_edit_ppm_equipment_post_success(client):
-    mfg_serial = "PPM_EDT_S01"
+    SERIAL = "PPM_EDT_S01"
     # Sample data DataService.get_entry would return (includes calculated dates)
     original_ppm_data_from_db = create_sample_view_ppm_entry(
-        mfg_serial,
+        SERIAL,
         Name="Original Name",
         PPM_Q_I={"engineer": "OrigQ1Eng", "quarter_date": "10/04/2024"},
         PPM_Q_II={"engineer": "OrigQ2Eng", "quarter_date": "10/07/2024"}
     )
 
     form_data_update = { # Data from submitted form
-        "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro", "MFG_SERIAL": mfg_serial,
+        "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro", "SERIAL": SERIAL,
         "Department": "Pro Dept",
         "Installation_Date": "01/02/2024", # Changed Installation Date
         "Warranty_End": original_ppm_data_from_db["Warranty_End"],
@@ -315,7 +315,7 @@ def test_edit_ppm_equipment_post_success(client):
     expected_service_payload = {
         "EQUIPMENT": "Updated PPM Device", "MODEL": "PPM-Pro",
         "Name": None, # Empty string from form becomes None
-        "MFG_SERIAL": mfg_serial,
+        "SERIAL": SERIAL,
         "MANUFACTURER": original_ppm_data_from_db["MANUFACTURER"],
         "Department": "Pro Dept", "LOG_NO": original_ppm_data_from_db["LOG_NO"],
         "Installation_Date": "01/02/2024",
@@ -342,16 +342,16 @@ def test_edit_ppm_equipment_post_success(client):
     with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm_data_from_db), \
          patch('app.services.data_service.DataService.update_entry', return_value=returned_service_data) as mock_update:
 
-        response = client.post(f'/equipment/ppm/edit/{mfg_serial}', data=form_data_update, follow_redirects=True)
+        response = client.post(f'/equipment/ppm/edit/{SERIAL}', data=form_data_update, follow_redirects=True)
         assert response.status_code == 200 # After redirect
         assert "PPM equipment updated successfully!" in response_data_str
         assert "PPM Equipment List" in response_data_str
-        mock_update.assert_called_once_with('ppm', mfg_serial, expected_service_payload)
+        mock_update.assert_called_once_with('ppm', SERIAL, expected_service_payload)
 
-# POST /equipment/ppm/edit/<mfg_serial> - Validation Error
+# POST /equipment/ppm/edit/<SERIAL> - Validation Error
 def test_edit_ppm_equipment_post_validation_error(client):
-    mfg_serial = "PPM_EDT_V_ERR"
-    original_ppm_from_db = create_sample_view_ppm_entry(mfg_serial) # Helper now sets Qx_Date/Qx_Engineer
+    SERIAL = "PPM_EDT_V_ERR"
+    original_ppm_from_db = create_sample_view_ppm_entry(SERIAL) # Helper now sets Qx_Date/Qx_Engineer
 
     # Simulate form data that would be re-passed to template on error
     form_data_on_error = {
@@ -369,14 +369,14 @@ def test_edit_ppm_equipment_post_validation_error(client):
     with patch('app.services.data_service.DataService.get_entry', return_value=original_ppm_from_db), \
          patch('app.services.data_service.DataService.update_entry', side_effect=ValueError("PPM Edit Validation Fail")) as mock_update:
         # When POSTing, form data should use QX_Engineer names, not PPM_Q_X_engineer
-        response = client.post(f'/equipment/ppm/edit/{mfg_serial}', data=form_data_on_error)
+        response = client.post(f'/equipment/ppm/edit/{SERIAL}', data=form_data_on_error)
         assert response.status_code == 200 # Re-renders form
         response_data_str = response.data.decode('utf-8')
         assert "Edit PPM Equipment" in response_data_str
         assert "Error updating equipment: PPM Edit Validation Fail" in response_data_str
         mock_update.assert_called_once()
 
-# GET /equipment/ocm/edit/<mfg_serial>
+# GET /equipment/ocm/edit/<SERIAL>
 def test_edit_ocm_equipment_get_exists(client):
     sample_ocm = create_sample_view_ocm_entry("OCM_EDIT01")
     with patch('app.services.data_service.DataService.get_entry', return_value=sample_ocm) as mock_get:
@@ -388,13 +388,13 @@ def test_edit_ocm_equipment_get_exists(client):
         assert 'value="OCM View Device"' in response_data_str
         mock_get.assert_called_once_with('ocm', "OCM_EDIT01")
 
-# POST /equipment/ocm/edit/<mfg_serial> - Success
+# POST /equipment/ocm/edit/<SERIAL> - Success
 def test_edit_ocm_equipment_post_success(client):
-    mfg_serial = "OCM_EDT_S01"
-    original_ocm_data = create_sample_view_ocm_entry(mfg_serial, Next_Maintenance="01/01/2025")
+    SERIAL = "OCM_EDT_S01"
+    original_ocm_data = create_sample_view_ocm_entry(SERIAL, Next_Maintenance="01/01/2025")
 
-    form_data_update = { # Only fields being changed + MFG_SERIAL (readonly)
-        "EQUIPMENT": "Updated OCM Device", "MODEL": "OCM-Pro", "MFG_SERIAL": mfg_serial,
+    form_data_update = { # Only fields being changed + SERIAL (readonly)
+        "EQUIPMENT": "Updated OCM Device", "MODEL": "OCM-Pro", "SERIAL": SERIAL,
         "Department": original_ocm_data["Department"], "LOG_NO": original_ocm_data["LOG_NO"],
         "Installation_Date": original_ocm_data["Installation_Date"], "Warranty_End": original_ocm_data["Warranty_End"],
         "MANUFACTURER": original_ocm_data["MANUFACTURER"], "ENGINEER": original_ocm_data["ENGINEER"],
@@ -403,7 +403,7 @@ def test_edit_ocm_equipment_post_success(client):
     }
     expected_service_payload = {
         "EQUIPMENT": "Updated OCM Device", "MODEL": "OCM-Pro", "Name": None,
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": original_ocm_data["MANUFACTURER"],
+        "SERIAL": SERIAL, "MANUFACTURER": original_ocm_data["MANUFACTURER"],
         "Department": original_ocm_data["Department"], "LOG_NO": original_ocm_data["LOG_NO"],
         "Installation_Date": original_ocm_data["Installation_Date"], "Warranty_End": original_ocm_data["Warranty_End"],
         "Service_Date": "15/12/2024", "Next_Maintenance": "15/12/2025",
@@ -416,12 +416,12 @@ def test_edit_ocm_equipment_post_success(client):
     with patch('app.services.data_service.DataService.get_entry', return_value=original_ocm_data), \
          patch('app.services.data_service.DataService.update_entry', return_value=returned_service_data) as mock_update:
 
-        response = client.post(f'/equipment/ocm/edit/{mfg_serial}', data=form_data_update, follow_redirects=True)
+        response = client.post(f'/equipment/ocm/edit/{SERIAL}', data=form_data_update, follow_redirects=True)
         assert response.status_code == 200
         response_data_str = response.data.decode('utf-8')
         assert "OCM equipment updated successfully!" in response_data_str
         assert "OCM Equipment List" in response_data_str
-        mock_update.assert_called_once_with('ocm', mfg_serial, expected_service_payload)
+        mock_update.assert_called_once_with('ocm', SERIAL, expected_service_payload)
 
 
 # --- Tests for Delete Equipment Route ---
@@ -462,7 +462,7 @@ def test_import_equipment_success(client):
     # We need to mock DataService.import_data. The header peeking in view is basic.
 
     # Use new PPM header for inference test, e.g. Q1_Engineer
-    csv_content = "EQUIPMENT,MODEL,MFG_SERIAL,Q1_Engineer\nDev1,Mod1,SN1,EngA"
+    csv_content = "EQUIPMENT,MODEL,SERIAL,Q1_Engineer\nDev1,Mod1,SN1,EngA"
     file_stream_bytes = io.BytesIO(csv_content.encode('utf-8'))
 
     with patch('app.services.data_service.DataService.import_data', return_value=mock_import_results) as mock_ds_import:
@@ -480,9 +480,9 @@ def test_import_equipment_success(client):
 def test_import_equipment_with_errors_and_skips(client):
     mock_import_results = {
         "added_count": 1, "updated_count": 0, "skipped_count": 2,
-        "errors": ["Row 2: Invalid MFG_SERIAL", "Row 3: Missing EQUIPMENT"]
+        "errors": ["Row 2: Invalid SERIAL", "Row 3: Missing EQUIPMENT"]
     }
-    csv_content = "EQUIPMENT,MODEL,MFG_SERIAL,Next_Maintenance\nDev1,Mod1,SN1,01/01/2025" # OCM-like header
+    csv_content = "EQUIPMENT,MODEL,SERIAL,Next_Maintenance\nDev1,Mod1,SN1,01/01/2025" # OCM-like header
     file_stream_bytes = io.BytesIO(csv_content.encode('utf-8'))
 
     with patch('app.services.data_service.DataService.import_data', return_value=mock_import_results) as mock_ds_import:
@@ -492,7 +492,7 @@ def test_import_equipment_with_errors_and_skips(client):
         assert response.status_code == 200
         response_data_str = response.data.decode('utf-8')
         assert "Import completed with issues. 1 new records added. 2 records skipped." in response_data_str
-        assert "- Row 2: Invalid MFG_SERIAL" in response_data_str
+        assert "- Row 2: Invalid SERIAL" in response_data_str
         assert "- Row 3: Missing EQUIPMENT" in response_data_str
         assert "OCM Equipment List" in response_data_str # Assuming redirect to OCM list
         mock_ds_import.assert_called_once()
@@ -515,7 +515,7 @@ def test_import_equipment_wrong_file_type(client):
 
 # GET /export/ppm and /export/ocm
 def test_export_equipment_ppm_success(client):
-    sample_csv_data = "NO,EQUIPMENT,MODEL,MFG_SERIAL\n1,PPMDev,PModel,PSN001"
+    sample_csv_data = "NO,EQUIPMENT,MODEL,SERIAL\n1,PPMDev,PModel,PSN001"
     with patch('app.services.data_service.DataService.export_data', return_value=sample_csv_data) as mock_export:
         response = client.get('/export/ppm')
         assert response.status_code == 200
@@ -525,7 +525,7 @@ def test_export_equipment_ppm_success(client):
         mock_export.assert_called_once_with(data_type='ppm')
 
 def test_export_equipment_ocm_success(client):
-    sample_csv_data = "NO,EQUIPMENT,MODEL,MFG_SERIAL\n1,OCMDev,OModel,OSN001"
+    sample_csv_data = "NO,EQUIPMENT,MODEL,SERIAL\n1,OCMDev,OModel,OSN001"
     with patch('app.services.data_service.DataService.export_data', return_value=sample_csv_data) as mock_export:
         response = client.get('/export/ocm')
         assert response.status_code == 200

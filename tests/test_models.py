@@ -10,7 +10,7 @@ valid_ppm_data = {
     "EQUIPMENT": "Test Equipment",
     "MODEL": "Test Model",
     "Name": "Optional Name",
-    "MFG_SERIAL": "SN123",
+    "SERIAL": "SN123",
     "MANUFACTURER": "Test Manufacturer",
     "Department": "Test Department",
     "LOG_NO": "Log001",
@@ -29,7 +29,7 @@ valid_ocm_data = {
     "EQUIPMENT": "OCM Equipment",
     "MODEL": "OCM Model",
     "Name": "Optional OCM Name",
-    "MFG_SERIAL": "SN456",
+    "SERIAL": "SN456",
     "MANUFACTURER": "OCM Manufacturer",
     "Department": "OCM Department",
     "LOG_NO": "Log002",
@@ -83,7 +83,7 @@ class TestPPMEntry:
 
     def test_empty_required_fields(self):
         # Eng1-4 removed, Installation_Date and Warranty_End are optional
-        required_fields = ["EQUIPMENT", "MODEL", "MFG_SERIAL", "MANUFACTURER", "Department", "LOG_NO"]
+        required_fields = ["EQUIPMENT", "MODEL", "SERIAL", "MANUFACTURER", "Department", "LOG_NO"]
         for field in required_fields:
             data = valid_ppm_data.copy()
             data[field] = "" # Empty string
@@ -164,7 +164,7 @@ class TestOCMEntry:
                 OCMEntry(**data)
 
     def test_empty_required_fields(self):
-        required_fields = ["EQUIPMENT", "MODEL", "MFG_SERIAL", "MANUFACTURER", "Department", "LOG_NO", "ENGINEER"]
+        required_fields = ["EQUIPMENT", "MODEL", "SERIAL", "MANUFACTURER", "Department", "LOG_NO", "ENGINEER"]
         for field in required_fields:
             data = valid_ocm_data.copy()
             data[field] = ""

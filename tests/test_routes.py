@@ -44,7 +44,7 @@ class TestViewRoutes:
                 with patch.object(DataService, "add_entry", return_value=None):
                     response = app_test_client.post(
                         url_for("views.add_ppm_equipment"),
-                        data={"EQUIPMENT": "Test", "MFG_SERIAL": "123", "PPM": "Yes"},
+                        data={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
                         follow_redirects=True,
                     )
                     assert response.status_code == 200
@@ -53,7 +53,7 @@ class TestViewRoutes:
     def test_edit_ppm_equipment_get(self, app_test_client, sample_ppm_data):
         """Test the edit PPM equipment route (GET)."""
         with patch.object(DataService, "get_entry", return_value=sample_ppm_data[0]):
-            response = app_test_client.get(url_for("views.edit_ppm_equipment", mfg_serial="123"))
+            response = app_test_client.get(url_for("views.edit_ppm_equipment", SERIAL="123"))
             assert response.status_code == 200
             assert b"Edit PPM Equipment" in response.data
 
@@ -64,8 +64,8 @@ class TestViewRoutes:
                 with patch.object(ValidationService, "convert_ppm_form_to_model", return_value={}):
                     with patch.object(DataService, "update_entry", return_value=sample_ppm_data[0]):
                         response = app_test_client.post(
-                            url_for("views.edit_ppm_equipment", mfg_serial="123"),
-                            data={"EQUIPMENT": "Test", "MFG_SERIAL": "123", "PPM": "Yes"},
+                            url_for("views.edit_ppm_equipment", SERIAL="123"),
+                            data={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
                             follow_redirects=True,
                         )
                         assert response.status_code == 200
@@ -98,31 +98,31 @@ class TestApiRoutes:
             assert response.status_code == 200
             assert response.is_json
             data = json.loads(response.data)
-            assert data["MFG_SERIAL"] == "123"
+            assert data["SERIAL"] == "123"
 
     def test_add_equipment(self, app_test_client):
         """Test adding a new equipment entry."""
-        with patch.object(DataService, "add_entry", return_value={"MFG_SERIAL": "456"}):
+        with patch.object(DataService, "add_entry", return_value={"SERIAL": "456"}):
             response = app_test_client.post(
                 "/api/equipment/ppm",
-                json={"EQUIPMENT": "Test", "MFG_SERIAL": "456", "PPM": "Yes"},
+                json={"EQUIPMENT": "Test", "SERIAL": "456", "PPM": "Yes"},
             )
             assert response.status_code == 201
             assert response.is_json
             data = json.loads(response.data)
-            assert data["MFG_SERIAL"] == "456"
+            assert data["SERIAL"] == "456"
 
     def test_update_equipment(self, app_test_client, sample_ppm_data):
         """Test updating an existing equipment entry."""
         with patch.object(DataService, "update_entry", return_value=sample_ppm_data[0]):
             response = app_test_client.put(
                 "/api/equipment/ppm/123",
-                json={"EQUIPMENT": "Test", "MFG_SERIAL": "123", "PPM": "Yes"},
+                json={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
             )
             assert response.status_code == 200
             assert response.is_json
             data = json.loads(response.data)
-            assert data["MFG_SERIAL"] == "123"
+            assert data["SERIAL"] == "123"
 
     def test_delete_equipment(self, app_test_client):
         """Test deleting an equipment entry."""
@@ -182,15 +182,15 @@ def test_add_equipment_invalid_json(app_test_client):
 
 
 def test_add_equipment_missing_serial(app_test_client):
-    """Test adding equipment with missing MFG_SERIAL."""
+    """Test adding equipment with missing SERIAL."""
     response = app_test_client.post("/api/equipment/ppm", json={"EQUIPMENT": "Test"})
     assert response.status_code == 400
 
 
 def test_update_equipment_serial_mismatch(app_test_client):
-    """Test updating equipment with mismatched MFG_SERIAL in payload."""
+    """Test updating equipment with mismatched SERIAL in payload."""
     response = app_test_client.put(
-        "/api/equipment/ppm/123", json={"EQUIPMENT": "Test", "MFG_SERIAL": "456", "PPM": "Yes"}
+        "/api/equipment/ppm/123", json={"EQUIPMENT": "Test", "SERIAL": "456", "PPM": "Yes"}
     )
     assert response.status_code == 400
 
@@ -199,7 +199,7 @@ def test_update_equipment_not_found(app_test_client):
     """Test updating equipment that is not found."""
     with patch.object(DataService, "update_entry", side_effect=KeyError):
         response = app_test_client.put(
-            "/api/equipment/ppm/999", json={"EQUIPMENT": "Test", "MFG_SERIAL": "999", "PPM": "Yes"}
+            "/api/equipment/ppm/999", json={"EQUIPMENT": "Test", "SERIAL": "999", "PPM": "Yes"}
         )
         assert response.status_code == 404
 

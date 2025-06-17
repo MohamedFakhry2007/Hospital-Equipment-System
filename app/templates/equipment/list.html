@@ -17,12 +17,30 @@
         <div class="col-md-auto">
             <a href="{{ url_for('views.import_export_page') }}" class="btn btn-secondary">Import/Export Page</a>
         </div>
-        <div class="col-md-auto ms-auto"> {# Search and filters pushed to the right #}
-            <input type="text" id="searchInput" class="form-control d-inline-block" style="width: auto;" placeholder="Search...">
-            {# Add more filters if needed, e.g., by status, department #}
+        <div class="col-md-auto">
+            <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">
+                Delete Selected (<span id="selectedCount">0</span>)
+            </button>
         </div>
         <div class="col-md-auto">
-             <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">Bulk Delete Selected</button>
+            <select id="filterSelect" class="form-select d-inline-block" style="width: auto;">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <select id="sortSelect" class="form-select d-inline-block" style="width: auto;">
+                <option value="">Sort By...</option>
+                <option value="EQUIPMENT">Equipment</option>
+                <option value="MODEL">Model</option>
+                <option value="SERIAL">Serial</option>
+                <option value="MANUFACTURER">Manufacturer</option>
+            </select>
+        </div>
+        <div class="col-md-auto ms-auto">
+            <input type="text" id="searchInput" class="form-control d-inline-block" style="width: auto;" placeholder="Search...">
         </div>
     </div>
 
@@ -31,31 +49,34 @@
             <table class="table table-striped table-hover equipment-table">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" id="selectAll"></th>
+                        <th class="text-center">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="selectAll">
+                                <label class="form-check-label" for="selectAll"></label>
+                            </div>
+                        </th>
                         <th>NO</th>
                         <th>Department</th>
-                        <th>Equipment</th>
                         <th>Name</th>
                         <th>Model</th>
-                        <th>MFG Serial</th>
+                        <th>Serial</th>
                         <th>Manufacturer</th>
-                        <th>Log No</th>
-                        <th>Install Date</th>
+                        <th>Log Number</th>
+                        <th>Installation Date</th>
                         <th>Warranty End</th>
-                        <th>Status</th>
                         {% if data_type == 'ppm' %}
-                            <th>Q1 Date</th>
-                            <th>Q1 Engineer</th>
-                            <th>Q2 Date</th>
-                            <th>Q2 Engineer</th>
-                            <th>Q3 Date</th>
-                            <th>Q3 Engineer</th>
-                            <th>Q4 Date</th>
-                            <th>Q4 Engineer</th>
-                        {% elif data_type == 'ocm' %}
+                            <th>Q1</th>
+                            <th>Eng1</th>
+                            <th>Q2</th>
+                            <th>Eng2</th>
+                            <th>Q3</th>
+                            <th>Eng3</th>
+                            <th>Q4</th>
+                            <th>Eng4</th>                        {% elif data_type == 'ocm' %}
                             <th>Service Date</th>
                             <th>Next Maintenance</th>
                             <th>Engineer</th>
+                            <th>Status</th>
                         {% endif %}
                         <th>Actions</th>
                     </tr>
@@ -63,18 +84,29 @@
                 <tbody>
                     {% for entry in equipment %}
                         <tr>
-                            <td><input type="checkbox" class="item-checkbox" data-serial="{{ entry.MFG_SERIAL }}"></td>
-                            <td>{{ entry.NO }}</td>
-                            <td>{{ entry.get('Department', '') }}</td>
-                            <td>{{ entry.get('EQUIPMENT', '') }}</td>
-                            <td>{{ entry.get('Name', '') }}</td>
-                            <td>{{ entry.get('MODEL', '') }}</td>
-                            <td>{{ entry.get('MFG_SERIAL', '') }}</td>
-                            <td>{{ entry.get('MANUFACTURER', '') }}</td>
-                            <td>{{ entry.get('LOG_NO', '') }}</td>
-                            <td>{{ entry.get('Installation_Date', '') }}</td>
+                            <td class="text-center">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input item-checkbox" data-serial="{{ entry.SERIAL if data_type == 'ppm' else entry.Serial }}">
+                                </div>
+                            </td>                            {% if data_type == 'ppm' %}
+                                <td>{{ entry.NO }}</td>
+                                <td>{{ entry.get('Department', '') }}</td>
+                                <td>{{ entry.get('Name', '') }}</td>
+                                <td>{{ entry.get('MODEL', '') }}</td>
+                                <td>{{ entry.get('SERIAL', '') }}</td>
+                                <td>{{ entry.get('MANUFACTURER', '') }}</td>
+                                <td>{{ entry.get('LOG_Number', '') }}</td>
+                                <td>{{ entry.get('Installation_Date', '') }}</td>                            {% else %}
+                                <td>{{ entry.get('NO', loop.index) }}</td>
+                                <td>{{ entry.get('Department', '') }}</td>
+                                <td>{{ entry.get('Name', '') }}</td>
+                                <td>{{ entry.get('Model', '') }}</td>
+                                <td>{{ entry.get('Serial', '') }}</td>
+                                <td>{{ entry.get('Manufacturer', '') }}</td>
+                                <td>{{ entry.get('Log_Number', '') }}</td>
+                                <td>{{ entry.get('Installation_Date', '') }}</td>
+                            {% endif %}                            
                             <td>{{ entry.get('Warranty_End', '') }}</td>
-                            <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
 
                             {% if data_type == 'ppm' %}
                                 <td>{{ entry.get('PPM_Q_I', {}).get('quarter_date', '') }}</td>
@@ -85,18 +117,19 @@
                                 <td>{{ entry.get('PPM_Q_III', {}).get('engineer', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_IV', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
                             {% elif data_type == 'ocm' %}
                                 <td>{{ entry.get('Service_Date', '') }}</td>
                                 <td>{{ entry.get('Next_Maintenance', '') }}</td>
-                                <td>{{ entry.get('ENGINEER', '') }}</td>
+                                <td>{{ entry.get('Engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
                             {% endif %}
                             <td>
                                 {% if data_type == 'ppm' %}
-                                    <a href="{{ url_for('views.edit_ppm_equipment', mfg_serial=entry.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
-                                {% elif data_type == 'ocm' %}
-                                     <a href="{{ url_for('views.edit_ocm_equipment', mfg_serial=entry.MFG_SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                    <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=entry.SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>                                {% elif data_type == 'ocm' %}
+                                     <a href="{{ url_for('views.edit_ocm_equipment', Serial=entry.Serial) }}" class="btn btn-sm btn-warning">Edit</a>
                                 {% endif %}
-                                <form action="{{ url_for('views.delete_equipment', data_type=data_type, mfg_serial=entry.MFG_SERIAL) }}" method="post" style="display: inline;">
+                                <form action="{{ url_for('views.delete_equipment', data_type=data_type, SERIAL=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}" method="post" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Delete</button>
                                 </form>
                             </td>
@@ -113,88 +146,5 @@
 
 {% block scripts %}
 {{ super() }}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('searchInput');
-    const table = document.querySelector('.equipment-table tbody');
-    const rows = table ? table.querySelectorAll('tr') : [];
-
-    if (searchInput) {
-        searchInput.addEventListener('keyup', function () {
-            const searchTerm = searchInput.value.toLowerCase();
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
-            });
-        });
-    }
-
-    // Bulk delete functionality
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const itemCheckboxes = document.querySelectorAll('.item-checkbox');
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-
-    function toggleBulkDeleteButton() {
-        const anyChecked = Array.from(itemCheckboxes).some(cb => cb.checked);
-        bulkDeleteBtn.style.display = anyChecked ? 'inline-block' : 'none';
-    }
-
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function () {
-            itemCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
-            });
-            toggleBulkDeleteButton();
-        });
-    }
-
-    itemCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            if (!checkbox.checked && selectAllCheckbox) {
-                selectAllCheckbox.checked = false;
-            }
-            toggleBulkDeleteButton();
-        });
-    });
-
-    if (bulkDeleteBtn) {
-        bulkDeleteBtn.addEventListener('click', function() {
-            const selectedSerials = Array.from(itemCheckboxes)
-                                        .filter(cb => cb.checked)
-                                        .map(cb => cb.dataset.serial);
-            if (selectedSerials.length === 0) {
-                alert('Please select at least one item to delete.');
-                return;
-            }
-
-            if (confirm(`Are you sure you want to delete ${selectedSerials.length} selected items?`)) {
-                // Assuming current data_type is available in the template context
-                const dataType = "{{ data_type }}";
-                fetch(`/api/bulk_delete/${dataType}`, { // Using the API endpoint directly
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ serials: selectedSerials }),
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(`Successfully deleted ${data.deleted_count} items. ${data.not_found > 0 ? data.not_found + ' items not found.' : ''}`);
-                        window.location.reload(); // Reload to reflect changes
-                    } else {
-                        alert(`Error during bulk delete: ${data.message || 'Unknown error'}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error during bulk delete:', error);
-                    alert('An error occurred while trying to bulk delete items.');
-                });
-            }
-        });
-    }
-    // Initial check in case of page reload with checkboxes checked (e.g. browser back button)
-    toggleBulkDeleteButton();
-});
-</script>
+<script src="{{ url_for('static', filename='js/equipment_list.js') }}"></script>
 {% endblock %}

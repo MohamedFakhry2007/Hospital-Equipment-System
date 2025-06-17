@@ -1,13 +1,16 @@
 """
 Main entry point for the Hospital Equipment Maintenance Management System.
 """
+import logging
 import threading
 
 from app import create_app, start_email_scheduler
 from app.config import Config
 
+logger = logging.getLogger(__name__)
 
 app = create_app()
+logger.debug("Application created successfully")
 
 
 # Start email scheduler in a separate thread if enabled

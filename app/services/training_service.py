@@ -20,11 +20,9 @@ except ImportError:
 # but its structure (fields like employee_id, name, etc.) is the basis for the dicts handled.
 
 logger = logging.getLogger(__name__)
-# Ensure logger is configured if running standalone or in a context where it's not already set up
-if not logger.hasHandlers():
-    logging.basicConfig(level=logging.INFO) # Basic config for the logger
 
 TRAINING_DATA_PATH = Path(Config.DATA_DIR) / "training.json"
+logger.debug(f"Training data path set to: {TRAINING_DATA_PATH}")
 
 class TrainingService:
     def __init__(self):

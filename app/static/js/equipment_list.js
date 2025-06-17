@@ -1,21 +1,40 @@
 console.log('equipment_list.js loaded');
+
+// Add selected class style
+const style = document.createElement('style');
+style.textContent = `
+    .equipment-table tr.selected {
+        background-color: #e2e6ea !important;
+    }
+    .item-checkbox:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+`;
+document.head.appendChild(style);
+
 document.addEventListener('DOMContentLoaded', function() {
+    // UI Elements
     const searchInput = document.getElementById('searchInput');
     const filterSelect = document.getElementById('filterSelect');
     const sortSelect = document.getElementById('sortSelect');
-    const tableBody = document.querySelector('tbody');
+    const tableBody = document.querySelector('.equipment-table tbody');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const selectedCountSpan = document.getElementById('selectedCount');
     
-    if (!searchInput || !filterSelect || !sortSelect || !tableBody) {
-        console.error('Missing control elements:', { searchInput, filterSelect, sortSelect, tableBody });
+    if (!tableBody) {
+        console.error('Table body not found');
         return;
     }
     
     let sortDirection = 1;
     let lastSortColumn = '';
     
-    searchInput.addEventListener('input', updateTable);
-    filterSelect.addEventListener('change', updateTable);
-    sortSelect.addEventListener('change', () => {
+    // Event listeners for table controls
+    searchInput?.addEventListener('input', updateTable);
+    filterSelect?.addEventListener('change', updateTable);
+    sortSelect?.addEventListener('change', () => {
         if (sortSelect.value === lastSortColumn) {
             sortDirection *= -1;
         } else {
@@ -25,119 +44,164 @@ document.addEventListener('DOMContentLoaded', function() {
         updateTable();
     });
 
+    // Determine data type from URL
+    const dataType = window.location.pathname.includes('ppm') ? 'ppm' : 'ocm';
+    
+    // Column map based on data type
+    const columnMap = dataType === 'ppm' ? {
+        'EQUIPMENT': 3,
+        'MODEL': 4,
+        'SERIAL': 5,
+        'MANUFACTURER': 6
+    } : {
+        'Name': 3,
+        'Model': 4,
+        'Serial': 5,
+        'Manufacturer': 6
+    };
+
+    // Table update function
     function updateTable() {
         try {
             console.log('Updating table:', {
-                search: searchInput.value,
-                filter: filterSelect.value,
-                sort: sortSelect.value
+                search: searchInput?.value || '',
+                filter: filterSelect?.value || '',
+                sort: sortSelect?.value || ''
             });
 
             const rows = Array.from(tableBody.getElementsByTagName('tr'));
-            const searchTerm = searchInput.value.toLowerCase();
-            const filterValue = filterSelect.value.toLowerCase();
-            const sortColumn = sortSelect.value;
+            const searchTerm = (searchInput?.value || '').toLowerCase();
+            const filterValue = (filterSelect?.value || '').toLowerCase();
+            const sortColumn = sortSelect?.value || '';
+
+            // Reset select all checkbox
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
 
             // Filter and search
             rows.forEach(row => {
                 const text = row.textContent.toLowerCase();
-                const ppmCell = row.querySelector('td:nth-child(7)');
-                const ppmValue = ppmCell ? ppmCell.textContent.trim().toLowerCase() : '';
+                const statusCell = row.querySelector('td span.badge');
+                const statusValue = statusCell ? statusCell.textContent.trim().toLowerCase() : '';
                 const matchesSearch = text.includes(searchTerm);
-                const matchesFilter = !filterValue || ppmValue === filterValue;
+                const matchesFilter = !filterValue || statusValue === filterValue;
                 row.style.display = matchesSearch && matchesFilter ? '' : 'none';
             });
 
             // Show no results message
-            if (rows.every(row => row.style.display === 'none')) {
-                tableBody.innerHTML = '<tr><td colspan="16">No results found</td></tr>';
+            const visibleRows = rows.filter(row => row.style.display !== 'none');
+            if (visibleRows.length === 0) {
+                const colspan = tableBody.querySelector('tr')?.cells.length || 16;
+                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">No results found</td></tr>`;
+                updateBulkDeleteButton();
                 return;
             }
 
             // Sort
-            if (sortColumn && getColumnIndex(sortColumn) !== 0) {
-                const visibleRows = rows.filter(row => row.style.display !== 'none');
+            if (sortColumn) {
                 const sortedRows = visibleRows.sort((a, b) => {
                     const columnIndex = getColumnIndex(sortColumn);
-                    const aValue = a.cells[columnIndex]?.textContent || '';
-                    const bValue = b.cells[columnIndex]?.textContent || '';
+                    const aValue = a.cells[columnIndex]?.textContent.trim() || '';
+                    const bValue = b.cells[columnIndex]?.textContent.trim() || '';
                     return aValue.localeCompare(bValue) * sortDirection;
                 });
+
                 const fragment = document.createDocumentFragment();
                 sortedRows.forEach(row => fragment.appendChild(row));
-                // Clear table before appending sorted rows
+                rows.forEach(row => {
+                    if (row.style.display === 'none') {
+                        fragment.appendChild(row);
+                    }
+                });
                 tableBody.innerHTML = '';
                 tableBody.appendChild(fragment);
             }
 
-            // After updating the table, re-attach event listeners to checkboxes
+            // Reattach checkbox event listeners
             attachCheckboxEventListeners();
+            updateBulkDeleteButton();
 
         } catch (error) {
             console.error('Error in updateTable:', error);
         }
     }
 
-    const columnMap = {
-        'EQUIPMENT': 1,
-        'MODEL': 2,
-        'MFG_SERIAL': 3,
-        'MANUFACTURER': 4
-    };
-
     function getColumnIndex(columnName) {
         return columnMap[columnName] || 0;
     }
 
-    // Bulk delete functionality
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-
+    // Checkbox functionality
     function attachCheckboxEventListeners() {
         const itemCheckboxes = document.querySelectorAll('.item-checkbox');
 
-        selectAllCheckbox.addEventListener('change', function() {
-            itemCheckboxes.forEach(checkbox => {
-                const row = checkbox.closest('tr');
-                if (row.style.display !== 'none') {
+        selectAllCheckbox?.addEventListener('change', function() {
+            const visibleRows = Array.from(tableBody.querySelectorAll('tr'))
+                .filter(row => row.style.display !== 'none');
+            
+            visibleRows.forEach(row => {
+                const checkbox = row.querySelector('.item-checkbox');
+                if (checkbox) {
                     checkbox.checked = selectAllCheckbox.checked;
+                    toggleRowSelection(checkbox);
                 }
             });
-            console.log('selectAllCheckbox change event');
-            updateBulkDeleteButton();
         });
 
         itemCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                console.log('itemCheckbox change event');
-                updateBulkDeleteButton();
+                if (!checkbox.checked && selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                }
+                toggleRowSelection(checkbox);
             });
         });
     }
 
-    attachCheckboxEventListeners();
+    function toggleRowSelection(checkbox) {
+        const row = checkbox.closest('tr');
+        if (row) {
+            if (checkbox.checked) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
+        }
+        updateBulkDeleteButton();
+    }
 
     function updateBulkDeleteButton() {
         const checkedCount = document.querySelectorAll('.item-checkbox:checked').length;
         console.log('updateBulkDeleteButton called, checkedCount:', checkedCount);
+        
         if (bulkDeleteBtn) {
             bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
-            bulkDeleteBtn.style.visibility = checkedCount > 0 ? 'visible' : 'hidden';
+        }
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = checkedCount;
         }
     }
 
+    // Initial setup
+    attachCheckboxEventListeners();
+    
+    // Bulk delete functionality
     bulkDeleteBtn?.addEventListener('click', async function() {
-        const selectedSerials = Array.from(document.querySelectorAll('.item-checkbox:checked'))
-            .map(checkbox => checkbox.dataset.serial);
+        const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+        const selectedSerials = Array.from(checkedBoxes).map(checkbox => {
+            return dataType === 'ppm' ? checkbox.dataset.serial : checkbox.closest('tr').querySelector('td:nth-child(6)').textContent.trim();
+        });
         
-        if (!selectedSerials.length) return;
+        if (!selectedSerials.length) {
+            alert('Please select at least one item to delete.');
+            return;
+        }
 
         if (!confirm(`Are you sure you want to delete ${selectedSerials.length} selected records?`)) {
             return;
         }
 
         try {
-            const dataType = window.location.pathname.includes('ppm') ? 'ppm' : 'ocm';
             const response = await fetch(`/api/bulk_delete/${dataType}`, {
                 method: 'POST',
                 headers: {
@@ -146,17 +210,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ serials: selectedSerials })
             });
 
-            const result = await response.json();
-            
-            if (result.success) {
-                alert(`Successfully deleted ${result.deleted_count} records.`);
+            if (response.ok) {
                 window.location.reload();
             } else {
-                alert('Error occurred during deletion.');
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.error || 'Failed to delete items'));
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred during bulk deletion.');
+            alert('An error occurred while deleting items');
         }
     });
 });

@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 class ValidationService:
     """Service for validating form data."""
     
+    logger.debug("Initializing ValidationService")
+    
     @staticmethod
     def validate_date_format(date_str: str) -> Tuple[bool, Optional[str]]:
         """Validate date is in DD/MM/YYYY or YYYY-MM-DD format, returning DD/MM/YYYY.
@@ -45,7 +47,7 @@ class ValidationService:
     @staticmethod
     def validate_ppm_form(form_data: Dict[str, Any]) -> Tuple[bool, Dict[str, List[str]]]:
         errors = {}
-        required_fields = ['EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'PPM']
+        required_fields = ['EQUIPMENT', 'MODEL', 'SERIAL', 'MANUFACTURER', 'LOG_NO', 'PPM']
         for field in required_fields:
             if not form_data.get(field, '').strip():
                 errors[field] = [f"{field} is required"]
@@ -71,7 +73,7 @@ class ValidationService:
         errors = {}
         
         # Required fields
-        required_fields = ['EQUIPMENT', 'MODEL', 'MFG_SERIAL', 'MANUFACTURER', 'LOG_NO', 'OCM', 'ENGINEER']
+        required_fields = ['EQUIPMENT', 'MODEL', 'SERIAL', 'MANUFACTURER', 'LOG_NO', 'OCM', 'ENGINEER']
         for field in required_fields:
             if not form_data.get(field, '').strip():
                 errors[field] = [f"{field} is required"]
@@ -117,7 +119,7 @@ class ValidationService:
         model_data = {
             'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
             'MODEL': form_data.get('MODEL', '').strip(),
-            'MFG_SERIAL': form_data.get('MFG_SERIAL', '').strip(),
+            'SERIAL': form_data.get('SERIAL', '').strip(),
             'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
             'LOG_NO': form_data.get('LOG_NO', '').strip(),
             'PPM': form_data.get('PPM', '').strip().title()
@@ -158,7 +160,7 @@ class ValidationService:
         model_data = {
             'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
             'MODEL': form_data.get('MODEL', '').strip(),
-            'MFG_SERIAL': form_data.get('MFG_SERIAL', '').strip(),
+            'SERIAL': form_data.get('SERIAL', '').strip(),
             'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
             'LOG_NO': form_data.get('LOG_NO', '').strip(),
             'PPM': form_data.get('PPM', '').strip(),

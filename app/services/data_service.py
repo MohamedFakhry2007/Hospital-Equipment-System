@@ -23,21 +23,26 @@ logger = logging.getLogger(__name__)
 
 class DataService:
     """Service for managing equipment maintenance data."""
-
     @staticmethod
     def ensure_data_files_exist():
         """Ensure data directory and files exist."""
+        logger.debug("Ensuring data files exist")
         data_dir = Path(Config.DATA_DIR)
+        logger.debug(f"Using data directory: {data_dir}")
         data_dir.mkdir(exist_ok=True)
 
         ppm_path = Path(Config.PPM_JSON_PATH)
         ocm_path = Path(Config.OCM_JSON_PATH)
 
+        logger.debug(f"Checking PPM data file: {ppm_path}")
         if not ppm_path.exists():
+            logger.info(f"Creating new PPM data file: {ppm_path}")
             with open(ppm_path, 'w') as f:
                 json.dump([], f)
 
+        logger.debug(f"Checking OCM data file: {ocm_path}")
         if not ocm_path.exists():
+            logger.info(f"Creating new OCM data file: {ocm_path}")
             with open(ocm_path, 'w') as f:
                 json.dump([], f)
 
@@ -51,39 +56,50 @@ class DataService:
         Returns:
             List of data entries
         """
+        logger.debug("Starting load_data method with data_type='%s'", data_type)
+
         try:
+            logger.debug("Calling DataService.ensure_data_files_exist()")
             DataService.ensure_data_files_exist()
 
-            file_path = Config.PPM_JSON_PATH if data_type == 'ppm' else Config.OCM_JSON_PATH
+            logger.debug("Determining file path based on data_type")
+            if data_type == 'ppm':
+                file_path = Config.PPM_JSON_PATH
+                logger.debug("Selected PPM file path: %s", file_path)
+            else:
+                file_path = Config.OCM_JSON_PATH
+                logger.debug("Selected OCM file path: %s", file_path)
+
+            logger.debug("Opening file for reading: %s", file_path)
             with open(file_path, 'r') as f:
-                # Handle empty file case
+                logger.debug("Reading content from file: %s", file_path)
                 content = f.read()
+
+                logger.debug("Checking if file content is empty")
                 if not content:
+                    logger.debug("File is empty. Returning an empty list.")
                     return []
 
-                data = json.loads(content)
-                # Validate each entry against the respective model
-                # This helps catch data inconsistencies early
-                Model = PPMEntry if data_type == 'ppm' else OCMEntry
-                validated_data = []
-                for entry_dict in data:
-                    try:
-                        Model(**entry_dict) # Validate
-                        validated_data.append(entry_dict) # Add if valid
-                    except ValidationError as ve:
-                        logger.warning(f"Data validation error loading {data_type} entry {entry_dict.get('MFG_SERIAL', 'N/A')}: {ve}. Skipping this entry.")
-                return validated_data
+                logger.debug("Attempting to decode JSON content")
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error decoding JSON from {file_path}: {str(e)}. Returning empty list.")
+                    return []
 
-        except json.JSONDecodeError as e:
-            logger.error(f"Error decoding JSON from {file_path}: {str(e)}. Returning empty list.")
-            return []
+                logger.debug("Successfully decoded JSON. Data type: %s", type(data))
+                logger.debug("Loaded data sample (first 2 items): %s", data[:2] if isinstance(data, list) else data)
+
+                logger.debug("Returning loaded data with %d entries", len(data) if isinstance(data, list) else 0)
+                return data
+
         except FileNotFoundError:
             logger.warning(f"Data file {file_path} not found. Returning empty list.")
             return []
         except Exception as e:
             logger.error(f"Unexpected error loading {data_type} data from {file_path}: {str(e)}. Returning empty list.")
             return []
-
+    
     @staticmethod
     def save_data(data: List[Dict[str, Any]], data_type: Literal['ppm', 'ocm']):
         """Save data to JSON file.
@@ -141,7 +157,7 @@ class DataService:
                 try:
                     current_quarter_date = datetime.strptime(quarter_date_str, '%d/%m/%Y').date()
                 except ValueError:
-                    logger.warning(f"Invalid quarter_date format for {entry_data.get('MFG_SERIAL')}, quarter {q_key}: {quarter_date_str}")
+                    logger.warning(f"Invalid quarter_date format for {entry_data.get('SERIAL')}, quarter {q_key}: {quarter_date_str}")
                     continue # Skip this quarter for status calculation if date is invalid
 
                 if current_quarter_date < today_date:
@@ -187,7 +203,7 @@ class DataService:
             try:
                 next_maintenance_date = datetime.strptime(next_maintenance_str, '%d/%m/%Y').date()
             except ValueError:
-                logger.warning(f"Invalid Next_Maintenance date format for {entry_data.get('MFG_SERIAL')}: {next_maintenance_str}")
+                logger.warning(f"Invalid Next_Maintenance date format for {entry_data.get('SERIAL')}: {next_maintenance_str}")
                 return "Upcoming" # Default status if date is invalid
 
             # If there's a service date, and it's on or after the next maintenance, consider it Maintained.
@@ -206,7 +222,7 @@ class DataService:
                     # it's complex to know if it's "Maintained" for the *next* cycle yet.
                     # Let's assume if Next_Maintenance is in the future, it's "Upcoming" unless service date is very recent.
                 except ValueError:
-                    logger.warning(f"Invalid Service_Date format for {entry_data.get('MFG_SERIAL')}: {service_date_str}")
+                    logger.warning(f"Invalid Service_Date format for {entry_data.get('SERIAL')}: {service_date_str}")
 
             if next_maintenance_date < today:
                 return "Overdue"
@@ -241,222 +257,284 @@ class DataService:
         return q_dates
 
     @staticmethod
-    def ensure_unique_mfg_serial(data: List[Dict[str, Any]], new_entry: Dict[str, Any], exclude_serial: Optional[str] = None):
-        """Ensure MFG_SERIAL is unique in the data.
+    def _ensure_unique_serial(data: List[Dict[str, Any]], new_entry: Dict[str, Any], data_type: Literal['ppm', 'ocm'], exclude_serial: Optional[str] = None):
+        """Ensure Serial/SERIAL is unique in the data."""
+        serial_key = 'SERIAL' if data_type == 'ppm' else 'Serial'
+        serial = new_entry.get(serial_key)
+        if not serial:
+            raise ValueError(f"{serial_key} cannot be empty.")
 
-        Args:
-            data: Current data list
-            new_entry: New entry to add or check
-            exclude_serial: Serial to exclude from check (for updates)
-
-        Raises:
-            ValueError: If MFG_SERIAL is not unique
-        """
-        mfg_serial = new_entry.get('MFG_SERIAL')
-        if not mfg_serial:
-             raise ValueError("MFG_SERIAL cannot be empty.")
-
-        # If exclude_serial is provided (during update), skip check if serial matches
-        if exclude_serial and mfg_serial == exclude_serial:
+        if exclude_serial and serial == exclude_serial:
             return
 
-        # Check against existing data
-        count = sum(1 for entry in data if entry.get('MFG_SERIAL') == mfg_serial)
+        count = sum(1 for entry in data if entry.get(serial_key) == serial)
         if count >= 1:
-            raise ValueError(f"Duplicate MFG_SERIAL detected: {mfg_serial}")
-
+            raise ValueError(f"Duplicate {serial_key} detected: {serial}")
 
     @staticmethod
     def reindex(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Reindex data entries. Adds 'NO' field sequentially.
-
+        """Reindex entries after deletion or reordering.
+        
         Args:
-            data: List of data entries
-
+            data: List of entries to reindex
+            
         Returns:
-            Reindexed list of data entries
+            List of reindexed entries
         """
+        logger.debug(f"Reindexing {len(data)} entries")
         for i, entry in enumerate(data, start=1):
             entry['NO'] = i
+            logger.debug(f"Set NO={i} for entry with Serial/SERIAL: {entry.get('Serial', entry.get('SERIAL'))}")
         return data
 
     @staticmethod
     def add_entry(data_type: Literal['ppm', 'ocm'], entry: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new entry to the data.
-
+        
         Args:
             data_type: Type of data to add entry to ('ppm' or 'ocm')
-            entry: Entry to add
-
+            entry: Entry data to add
+            
         Returns:
-            Added entry with NO assigned
-
-        Raises:
-            ValueError: If entry is invalid or MFG_SERIAL is not unique
+            Added entry with assigned NO
         """
-        entry_copy = entry.copy()
-        entry_copy.pop('NO', None) # Remove 'NO' as it's managed internally
-
-        # Calculate status before validation if Status is not provided or needs recalculation
-        # The model now has Status, so it should be part of entry_copy or calculated.
-        # If status is provided in `entry`, it will be used, otherwise calculate.
-        if 'Status' not in entry_copy or entry_copy['Status'] is None:
-             entry_copy['Status'] = DataService.calculate_status(entry_copy, data_type)
+        logger.debug("Starting add_entry function.")
+        logger.debug(f"Received data_type: {data_type}")
+        logger.debug(f"Received entry: {entry}")
 
         try:
-            if data_type == 'ppm':
-                # Populate quarter dates before validation
-                installation_date_str = entry_copy.get('Installation_Date')
-                q_dates = DataService._calculate_ppm_quarter_dates(installation_date_str)
-                for i, q_key in enumerate(['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']):
-                    # entry_copy from PPMEntryCreate has PPM_Q_X as Dict[str, str] e.g. {"engineer": "name"}
-                    # We need to add quarter_date to it.
-                    quarter_data_dict = entry_copy.get(q_key, {})
-                    if not isinstance(quarter_data_dict, dict): # Ensure it's a dictionary
-                        quarter_data_dict = {} # Initialize if not present or wrong type
-                    quarter_data_dict['quarter_date'] = q_dates[i]
-                    entry_copy[q_key] = quarter_data_dict
+            # Create copy of entry to avoid modifying original
+            entry_copy = entry.copy()
+            logger.debug(f"Created copy of entry: {entry_copy}")
 
+            # Remove NO if present (we'll calculate it)
+            entry_copy.pop('NO', None)
+            logger.debug(f"After removing 'NO': {entry_copy}")
+
+            # Load existing data to calculate new NO
+            all_data = DataService.load_data(data_type)
+            new_no = len(all_data) + 1
+            logger.debug(f"Calculated new NO: {new_no}")
+
+            # Add NO to entry_copy before validation
+            entry_copy['NO'] = new_no
+            logger.debug(f"Added NO to entry: {entry_copy}")
+
+            if 'Status' in entry_copy:
+                logger.debug(f"Using provided Status: {entry_copy['Status']}")
+            else:
+                # Default Status handling if needed
+                pass
+
+            # Process and validate the entry
+            if data_type == 'ppm':
+                logger.debug("Processing PPM entry...")
+                # PPM specific processing
+                if isinstance(entry_copy.get('Status'), str) and not entry_copy['Status'].strip():
+                    entry_copy['Status'] = None
+
+                # Process PPM quarter fields
+                for quarter_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+                    if isinstance(entry_copy.get(quarter_key), str):
+                        entry_copy[quarter_key] = {
+                            'engineer': entry_copy[quarter_key]
+                        }
+                    elif isinstance(entry_copy.get(quarter_key), dict):
+                        entry_copy[quarter_key].setdefault('engineer', None)
+                        logger.debug(f"Ensured 'engineer' key in {quarter_key}: {entry_copy[quarter_key]}")
+
+                logger.debug(f"Final entry_copy before PPM validation: {entry_copy}")
                 validated_entry_model = PPMEntry(**entry_copy)
             else:
+                logger.debug("Processing OCM entry...")
+                logger.debug(f"Final entry_copy before OCM validation: {entry_copy}")
                 validated_entry_model = OCMEntry(**entry_copy)
+
             validated_entry = validated_entry_model.model_dump()
+            logger.debug(f"Validated entry after model dump: {validated_entry}")
+
+            # Ensure serial is unique
+            DataService._ensure_unique_serial(all_data, validated_entry, data_type)
+
+            # Add to data
+            all_data.append(validated_entry)
+            logger.debug(f"Added entry to data. New total: {len(all_data)}")
+
+            # Save updated data
+            DataService.save_data(all_data, data_type)
+            logger.info(f"Successfully added new {data_type} entry with NO: {new_no}")
+
+            return validated_entry
+
         except ValidationError as e:
             logger.error(f"Validation error adding {data_type} entry: {str(e)}")
-            # Propagate a more user-friendly error message
-            raise ValueError(f"Invalid {data_type.upper()} entry data: {e}") from e
-
-        all_data = DataService.load_data(data_type)
-        DataService.ensure_unique_mfg_serial(all_data, validated_entry)
-
-        all_data.append(validated_entry)
-        reindexed_data = DataService.reindex(all_data)
-        DataService.save_data(reindexed_data, data_type)
-
-        # Return the added entry (it's the last one after reindexing if no error)
-        # Find by MFG_SERIAL to be sure
-        for e_new in reindexed_data:
-            if e_new['MFG_SERIAL'] == validated_entry['MFG_SERIAL']:
-                return e_new
-        # This part should ideally not be reached if save is successful and MFG_SERIAL is unique
-        logger.error(f"Failed to find newly added entry {validated_entry['MFG_SERIAL']} in reindexed data.")
-        return validated_entry # Fallback
+            raise ValueError(str(e))
+        except Exception as e:
+            logger.error(f"Error adding {data_type} entry: {str(e)}", exc_info=True)
+            raise
 
     @staticmethod
-    def update_entry(data_type: Literal['ppm', 'ocm'], mfg_serial: str, new_entry_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update an existing entry. MFG_SERIAL cannot be changed.
-        'NO' field is preserved. Status is recalculated.
+    def update_entry(data_type: Literal['ppm', 'ocm'], serial: str, updated_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update an existing entry.
+
+        Args:
+            data_type: Type of data to update ('ppm' or 'ocm')
+            serial: Serial number of entry to update
+            updated_data: New data for the entry
+
+        Returns:
+            Updated entry if successful, None if entry not found
+
+        Raises:
+            ValueError: If validation fails
         """
-        entry_copy = new_entry_data.copy()
-        entry_copy.pop('NO', None)  # 'NO' is preserved from existing, not taken from input
-
-        if 'MFG_SERIAL' in entry_copy and entry_copy['MFG_SERIAL'] != mfg_serial:
-            raise ValueError(f"Cannot change MFG_SERIAL. Attempted to change from '{mfg_serial}' to '{entry_copy['MFG_SERIAL']}'.")
-        entry_copy['MFG_SERIAL'] = mfg_serial # Ensure MFG_SERIAL is part of the dict for validation
-
-        # Recalculate status or use provided status
-        if 'Status' not in entry_copy or entry_copy['Status'] is None:
-            entry_copy['Status'] = DataService.calculate_status(entry_copy, data_type)
+        logger.info(f"Attempting to update {data_type} entry with serial: {serial}")
+        logger.debug(f"Update data received: {updated_data}")
 
         try:
-            if data_type == 'ppm':
-                # Populate/update quarter dates before validation for PPM type
-                installation_date_str = entry_copy.get('Installation_Date')
-                q_dates = DataService._calculate_ppm_quarter_dates(installation_date_str)
-                for i, q_key in enumerate(['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']):
-                    # new_entry_data (aliased as entry_copy) should have PPM_Q_X fields as dicts
-                    quarter_data_dict = entry_copy.get(q_key, {})
-                    if not isinstance(quarter_data_dict, dict):
-                        quarter_data_dict = {} # Initialize if somehow missing or wrong type
-                    quarter_data_dict['quarter_date'] = q_dates[i]
-                    entry_copy[q_key] = quarter_data_dict
+            # Load all data
+            logger.debug(f"Loading all {data_type} data to find entry with serial {serial}")
+            data = DataService.load_data(data_type)
+            
+            # Find and update the entry
+            found = False
+            for i, entry in enumerate(data):
+                entry_serial = entry.get('Serial', entry.get('SERIAL'))
+                logger.debug(f"Comparing entry serial '{entry_serial}' with update serial '{serial}'")
+                
+                if entry_serial == serial:
+                    logger.info(f"Found matching {data_type} entry to update")
+                    logger.debug(f"Original entry data: {entry}")
+                    
+                    # Preserve required fields if not in updated_data
+                    if data_type == 'ocm' and 'NO' not in updated_data and 'NO' in entry:
+                        logger.debug(f"Preserving NO field from original entry: {entry['NO']}")
+                        updated_data['NO'] = entry['NO']
+                    
+                    # Validate updated data
+                    logger.debug(f"Validating updated data for {data_type}: {updated_data}")
+                    try:
+                        if data_type == 'ppm':
+                            PPMEntry(**updated_data)
+                        else:
+                            OCMEntry(**updated_data)
+                        logger.debug("Data validation successful")
+                    except ValidationError as e:
+                        logger.error(f"Validation error for {data_type} update: {str(e)}")
+                        raise ValueError(f"Invalid {data_type.upper()} data: {str(e)}")
+                    
+                    # Update the entry
+                    data[i] = updated_data
+                    found = True
+                    logger.debug(f"Updated entry data: {updated_data}")
+                    break
+            
+            if not found:
+                logger.warning(f"No {data_type} entry found with serial {serial} for update")
+                return None
+            
+            # Save the updated data
+            logger.info(f"Saving updated {data_type} data")
+            DataService.save_data(data, data_type)
+            
+            logger.info(f"Successfully updated {data_type} entry with serial {serial}")
+            return updated_data
 
-                validated_model = PPMEntry(**entry_copy)
-            else:
-                validated_model = OCMEntry(**entry_copy)
-            validated_entry_dict = validated_model.model_dump()
-        except ValidationError as e:
-            logger.error(f"Validation error updating {data_type} entry {mfg_serial}: {str(e)}")
-            raise ValueError(f"Invalid {data_type.upper()} entry data for update: {e}") from e
-
-        all_data = DataService.load_data(data_type)
-        entry_found_and_updated = False
-
-        # Ensure MFG_SERIAL uniqueness if it were allowed to change (but it's not here)
-        # If MFG_SERIAL in entry_copy is different from path mfg_serial, and that new serial already exists (excluding current object)
-        # This is not needed here as we forbid MFG_SERIAL change.
-
-        updated_data_list = []
-        original_no = None
-        for i, existing_entry in enumerate(all_data):
-            if existing_entry.get('MFG_SERIAL') == mfg_serial:
-                original_no = existing_entry.get('NO') # Preserve original 'NO'
-                # Update the entry, ensuring 'NO' is preserved
-                entry_to_save = validated_entry_dict.copy()
-                entry_to_save['NO'] = original_no
-                updated_data_list.append(entry_to_save)
-                entry_found_and_updated = True
-            else:
-                updated_data_list.append(existing_entry)
-
-        if not entry_found_and_updated:
-            raise KeyError(f"Entry with MFG_SERIAL '{mfg_serial}' not found for update.")
-
-        # Reindexing is generally good practice after any modification that could affect order or if 'NO' needs recalculation
-        # However, if 'NO' is strictly preserved and no deletions, it might be skipped.
-        # For safety, reindex if there's any doubt. Here, we've preserved NO.
-        # Let's assume reindex handles 'NO' correctly even if we set it.
-        reindexed_data = DataService.reindex(updated_data_list)
-        DataService.save_data(reindexed_data, data_type)
-
-        # Return the updated entry from the saved data
-        for e_upd in reindexed_data:
-            if e_upd['MFG_SERIAL'] == mfg_serial:
-                return e_upd
-
-        logger.error(f"Failed to find updated entry {mfg_serial} in reindexed data after saving.")
-        # This indicates a potential issue if not found, but validated_entry_dict is the data we attempted to save
-        return validated_entry_dict # Fallback, but should be found above
+        except Exception as e:
+            logger.error(f"Error updating {data_type} entry with serial {serial}: {str(e)}", exc_info=True)
+            raise
 
     @staticmethod
-    def delete_entry(data_type: Literal['ppm', 'ocm'], mfg_serial: str) -> bool:
+    def delete_entry(data_type: Literal['ppm', 'ocm'], SERIAL: str) -> bool:
         """Delete an entry.
 
         Args:
             data_type: Type of data to delete entry from ('ppm' or 'ocm')
-            mfg_serial: MFG_SERIAL of entry to delete
+            SERIAL: SERIAL of entry to delete
 
         Returns:
             True if entry was deleted, False if not found
         """
-        data = DataService.load_data(data_type)
-        initial_len = len(data)
-        # Filter out the entry to delete
-        data[:] = [e for e in data if e.get('MFG_SERIAL') != mfg_serial]
-
-        if len(data) == initial_len:
-            return False # Entry not found
-
-        reindexed_data = DataService.reindex(data) # Reindex after deletion
-        DataService.save_data(reindexed_data, data_type)
-        return True
+        logger.info(f"Attempting to delete {data_type} entry with serial: {SERIAL}")
+        
+        try:
+            data = DataService.load_data(data_type)
+            initial_len = len(data)
+            logger.debug(f"Loaded {initial_len} entries from {data_type} data")
+            
+            # Handle different serial field names for PPM and OCM
+            serial_field = 'SERIAL' if data_type == 'ppm' else 'Serial'
+            logger.debug(f"Using serial field name: {serial_field}")
+            
+            # Find the entry to delete first
+            entry_to_delete = None
+            entry_index = -1
+            
+            for i, entry in enumerate(data):
+                entry_serial = entry.get(serial_field)
+                logger.debug(f"Comparing entry serial '{entry_serial}' with target serial '{SERIAL}'")
+                if entry_serial == SERIAL:
+                    entry_to_delete = entry
+                    entry_index = i
+                    break
+            
+            if entry_to_delete is None:
+                logger.warning(f"No {data_type} entry found with serial {SERIAL}")
+                return False
+                
+            logger.info(f"Found {data_type} entry to delete: {entry_to_delete}")
+            
+            # Remove the entry
+            data.pop(entry_index)
+            logger.debug(f"Removed entry at index {entry_index}")
+            
+            # Reindex the remaining entries
+            reindexed_data = DataService.reindex(data)
+            logger.debug(f"Reindexed remaining {len(reindexed_data)} entries")
+            
+            # Save the updated data
+            DataService.save_data(reindexed_data, data_type)
+            logger.info(f"Successfully deleted {data_type} entry with serial {SERIAL}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting {data_type} entry with serial {SERIAL}: {str(e)}", exc_info=True)
+            raise
 
     @staticmethod
-    def get_entry(data_type: Literal['ppm', 'ocm'], mfg_serial: str) -> Optional[Dict[str, Any]]:
-        """Get an entry by MFG_SERIAL.
+    def get_entry(data_type: Literal['ppm', 'ocm'], serial: str) -> Optional[Dict[str, Any]]:
+        """Get a single entry by serial number.
 
         Args:
-            data_type: Type of data to get entry from ('ppm' or 'ocm')
-            mfg_serial: MFG_SERIAL of entry to get
+            data_type: Type of data to search ('ppm' or 'ocm')
+            serial: Serial number to search for
 
         Returns:
             Entry if found, None otherwise
         """
-        data = DataService.load_data(data_type)
-        for entry in data:
-            if entry.get('MFG_SERIAL') == mfg_serial:
-                return entry
-        return None
+        logger.info(f"Attempting to get {data_type} entry with serial: {serial}")
+        try:
+            # Load all data
+            logger.debug(f"Loading all {data_type} data to search for serial {serial}")
+            data = DataService.load_data(data_type)
+            
+            # Find entry with matching serial
+            logger.debug(f"Searching for entry with serial {serial} in {len(data)} {data_type} entries")
+            for entry in data:
+                entry_serial = entry.get('Serial', entry.get('SERIAL'))  # Handle both field names
+                logger.debug(f"Comparing entry serial '{entry_serial}' with search serial '{serial}'")
+                if entry_serial == serial:
+                    logger.info(f"Found matching {data_type} entry for serial {serial}")
+                    logger.debug(f"Entry data: {entry}")
+                    return entry
+            
+            logger.warning(f"No {data_type} entry found with serial {serial}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error retrieving {data_type} entry with serial {serial}: {str(e)}", exc_info=True)
+            return None
 
     @staticmethod
     def get_all_entries(data_type: Literal['ppm', 'ocm']) -> List[Dict[str, Any]]:
@@ -474,266 +552,203 @@ class DataService:
     def import_data(data_type: Literal['ppm', 'ocm'], file_stream: TextIO) -> Dict[str, Any]:
         """
         Bulk import data from a CSV file stream.
-        'NO' field in CSV is ignored. MFG_SERIAL uniqueness is enforced by replacing existing.
+        'NO' field in CSV is ignored. SERIAL uniqueness is enforced by replacing existing.
         Status is calculated if not provided or invalid.
-        Args:
-            data_type: The type of data ('ppm' or 'ocm').
-            file_stream: The text IO stream of the CSV file.
-        Returns:
-            A dictionary containing import status (added_count, updated_count, skipped_count, errors).
         """
+        logger.info(f"Starting bulk import for data type: {data_type}")
         added_count = 0
         updated_count = 0
         skipped_count = 0
         errors = []
 
-        # Define expected columns based on models (excluding 'NO' as it's auto-generated)
-        # and QuarterData objects which need special handling for PPM.
-        if data_type == 'ppm':
-            Model = PPMEntry
-            # CSV columns should match PPMEntry fields.
-            # PPM_Q_I, PPM_Q_II, PPM_Q_III, PPM_Q_IV in CSV will contain engineer names.
-            expected_base_columns = [f.name for f in Model.model_fields.values() if f.name not in ['NO', 'PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']]
-            quarter_eng_columns = ['PPM_Q_I_Engineer', 'PPM_Q_II_Engineer', 'PPM_Q_III_Engineer', 'PPM_Q_IV_Engineer']
-            # Actual CSV columns expected for PPM
-            # We expect Eng1, Eng2, Eng3, Eng4 directly as per new model.
-            # The PPM_Q_X fields are QuarterData which only hold an engineer.
-            # So the CSV should provide Eng1, Eng2, Eng3, Eng4 directly.
-            # Let's adjust: the model has Eng1, Eng2, Eng3, Eng4, and PPM_Q_I to IV for engineers.
-            # The prompt says "Eng1 (String), Eng2 (String), Eng3 (String), Eng4 (String)" for PPMEntry
-            # And PPM_Q_I to IV are QuarterData (holding engineer). This is confusing.
-            # Let's assume the CSV will provide Eng1, Eng2, Eng3, Eng4 AND the PPM_Q_X engineer names.
-            # Re-reading the model changes: PPMEntry has Eng1, Eng2, Eng3, Eng4.
-            # And PPM_Q_I, PPM_Q_II, PPM_Q_III, PPM_Q_IV are QuarterData objects.
-            # QuarterData was simplified to only contain 'engineer'.
-            # So, CSV should have: ... Eng1, Eng2, Eng3, Eng4, PPM_Q_I_engineer, PPM_Q_II_engineer ...
-            # This is still a bit ambiguous. Let's assume the model fields Eng1-4 are primary for "who did it"
-            # and PPM_Q_I to IV are for "who is scheduled for quarter X".
-            # The prompt stated: "Add Eng1, Eng2, Eng3, Eng4 (String)" and "PPM_Q_I: QuarterData" (which holds engineer)
-            # Let's assume the CSV will provide the fields as they are in the model,
-            # with PPM_Q_I etc. being dicts like {"engineer": "name"} or just the name.
-            # For simplicity of CSV, we'll expect PPM_Q_I_Engineer, etc.
-
-            # Define expected CSV columns for PPM import
-            PPM_CSV_BASE_FIELDS = ['EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER', 'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'Status', 'OCM']
-            PPM_CSV_QUARTER_ENGINEER_FIELDS = ['Q1_Engineer', 'Q2_Engineer', 'Q3_Engineer', 'Q4_Engineer']
-            PPM_EXPECTED_CSV_COLS = PPM_CSV_BASE_FIELDS + PPM_CSV_QUARTER_ENGINEER_FIELDS
-            Model = PPMEntry
-        else: # ocm
-            Model = OCMEntry
-            # For OCM, we can still derive from model fields, assuming direct mapping
-            OCM_EXPECTED_CSV_COLS = [f for f in OCMEntry.model_fields if f != 'NO']
-
-
         try:
-            df = pd.read_csv(file_stream, dtype=str) # Read all as string initially
-            df.fillna('', inplace=True) # Replace NaN with empty strings
+            logger.debug("Reading CSV file with pandas")
+            df = pd.read_csv(file_stream, dtype=str)
+            df.fillna('', inplace=True)
+            logger.debug(f"CSV columns found: {', '.join(df.columns)}")
 
-            if 'NO' in df.columns: # 'NO' is ignored from CSV
-                df = df.drop(columns=['NO'])
+            if 'SERIAL' not in df.columns:
+                error_msg = "CSV file missing required SERIAL column"
+                logger.error(error_msg)
+                errors.append(error_msg)
+                return {"errors": errors}
 
-            current_data_map = {entry['MFG_SERIAL']: entry for entry in DataService.load_data(data_type)}
+            if data_type == 'ppm':
+                logger.debug("Processing PPM data")
+                # Define expected CSV columns for PPM import
+                expected_columns = ['MODEL', 'SERIAL', 'MANUFACTURER', 'Department']
+                missing_columns = [col for col in expected_columns if col not in df.columns]
+                if missing_columns:
+                    error_msg = f"Missing required columns for PPM: {', '.join(missing_columns)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    return {"errors": errors}
+            else:  # ocm
+                logger.debug("Processing OCM data")
+                expected_columns = ['MODEL', 'SERIAL', 'MANUFACTURER', 'Service_Date']
+                missing_columns = [col for col in expected_columns if col not in df.columns]
+                if missing_columns:
+                    error_msg = f"Missing required columns for OCM: {', '.join(missing_columns)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+                    return {"errors": errors}
+
+            logger.info(f"Found {len(df)} rows to process")
+            current_data = DataService.load_data(data_type)
+            logger.debug(f"Loaded {len(current_data)} existing records")
+            current_data_map = {entry.get('SERIAL'): entry for entry in current_data}
+
+            processed_data = current_data.copy()  # Start with existing data
 
             for index, row in df.iterrows():
-                row_dict_raw = row.to_dict()
-                entry_data = {}
-
-                if data_type == 'ppm':
-                    # Map base PPM fields
-                    for field_name in PPM_CSV_BASE_FIELDS:
-                        raw_value = row_dict_raw.get(field_name, '').strip()
-                        # Handle optional fields that should be None if empty
-                        if field_name in ['Name', 'Installation_Date', 'Warranty_End', 'OCM'] and not raw_value:
-                            entry_data[field_name] = None
-                        else:
-                            entry_data[field_name] = raw_value
-
-                    # Calculate quarter dates
-                    installation_date_csv = entry_data.get('Installation_Date')
-                    calculated_q_dates = DataService._calculate_ppm_quarter_dates(installation_date_csv)
-
-                    # Populate PPM_Q_I to PPM_Q_IV
-                    entry_data['PPM_Q_I'] = {
-                        'engineer': row_dict_raw.get('Q1_Engineer', '').strip() or None,
-                        'quarter_date': calculated_q_dates[0]
-                    }
-                    entry_data['PPM_Q_II'] = {
-                        'engineer': row_dict_raw.get('Q2_Engineer', '').strip() or None,
-                        'quarter_date': calculated_q_dates[1]
-                    }
-                    entry_data['PPM_Q_III'] = {
-                        'engineer': row_dict_raw.get('Q3_Engineer', '').strip() or None,
-                        'quarter_date': calculated_q_dates[2]
-                    }
-                    entry_data['PPM_Q_IV'] = {
-                        'engineer': row_dict_raw.get('Q4_Engineer', '').strip() or None,
-                        'quarter_date': calculated_q_dates[3]
-                    }
-                else: # OCM data type
-                    for field_name in OCM_EXPECTED_CSV_COLS:
-                        raw_value = row_dict_raw.get(field_name, '').strip()
-                        # Handle optional fields for OCM if any are treated as None when empty
-                        # For now, assuming OCM fields are fine with empty strings or have specific validators
-                        entry_data[field_name] = raw_value
-
-                # Optional: Name field logic (common to both, if applicable, already handled for PPM)
-                if data_type == 'ocm' and 'Name' in entry_data and 'MODEL' in entry_data:
-                    if not entry_data['Name'] or entry_data['Name'] == entry_data['MODEL']:
-                        entry_data['Name'] = None
-
-                # Date validation for required model date fields (PPM: none required, OCM: some might be)
-                # Note: PPMEntry Installation_Date/Warranty_End are Optional[str], validator handles None/empty.
-                # OCMEntry date fields might be mandatory string, needing validation here if not ''
-
-                # For PPM, specific date fields like Installation_Date, Warranty_End are already set to None if empty.
-                # Their validation (DD/MM/YYYY if not empty) happens in the PPMEntry model.
-                # For OCM, let's assume similar handling or that model validators are sufficient.
-                # The original code had a loop here, which is good for explicit checks if needed.
-                # For now, relying on Pydantic model validation for date formats.
-
-                # Status: Use from CSV if valid, else calculate
-                # Status field is in PPM_CSV_BASE_FIELDS, so it's already in entry_data if provided.
-                # If not provided or invalid, it will be calculated.
-                csv_status_value = entry_data.get('Status') # Might be None if column was missing or empty and mapped to None
-                if isinstance(csv_status_value, str): # Ensure it's a string before stripping
-                    csv_status_value = csv_status_value.strip()
-
-                valid_statuses = get_args(Literal["Upcoming", "Overdue", "Maintained"])
-                if csv_status_value and csv_status_value in valid_statuses:
-                    entry_data['Status'] = csv_status_value # Use valid provided status
-                else:
-                    if csv_status_value and csv_status_value not in valid_statuses: # Log if invalid status was provided
-                         errors.append(f"Row {index+2}: Invalid Status '{csv_status_value}'. Will be recalculated.")
-                    # Calculate status if not provided, or if provided status was invalid, or if it was None
-                    entry_data['Status'] = DataService.calculate_status(entry_data, data_type)
-
                 try:
-                    validated_model = Model(**entry_data)
-                    validated_dict = validated_model.model_dump()
-
-                    mfg_serial = validated_dict['MFG_SERIAL']
-                    if not mfg_serial:
-                        errors.append(f"Row {index+2}: MFG_SERIAL is empty. Skipping.")
-                        skipped_count +=1
+                    logger.debug(f"Processing row {index + 1}/{len(df)}")
+                    serial = row.get('SERIAL', '').strip()
+                    
+                    if not serial:
+                        logger.warning(f"Skipping row {index + 1}: Empty SERIAL")
+                        skipped_count += 1
+                        errors.append(f"Row {index + 1}: Empty SERIAL")
                         continue
+                    
+                    entry_data = row.to_dict()
+                    entry_data = {k: str(v).strip() if isinstance(v, str) else v for k, v in entry_data.items()}
+                      # First get the Q1 date to base other quarters on
+                    q1_date = entry_data.get("PPM_Q_I.date", "")
+                    base_date = None
+                    if q1_date:
+                        try:
+                            base_date = datetime.strptime(q1_date, '%d/%m/%Y').date()
+                        except ValueError:
+                            logger.warning(f"Invalid Q1 date format: {q1_date}")
+                            base_date = None
+                    
+                    if not base_date:
+                        # If no valid Q1 date, fall back to installation date or current date
+                        installation_date = entry_data.get("Installation_Date", "")
+                        if installation_date:
+                            try:
+                                base_date = datetime.strptime(installation_date, '%d/%m/%Y').date()
+                            except ValueError:
+                                base_date = datetime.now().date()
+                        else:
+                            base_date = datetime.now().date()
 
-                    if mfg_serial in current_data_map:
-                        # Update existing entry (preserve 'NO')
-                        validated_dict['NO'] = current_data_map[mfg_serial].get('NO')
-                        current_data_map[mfg_serial] = validated_dict # Replace in map
+                    # Calculate quarter dates based on Q1 date
+                    q_dates = []
+                    current_date = base_date
+                    for _ in range(4):
+                        if not q_dates:  # First quarter uses actual Q1 date if available
+                            q_dates.append(q1_date if q1_date else current_date.strftime('%d/%m/%Y'))
+                        else:
+                            current_date += relativedelta(months=3)
+                            q_dates.append(current_date.strftime('%d/%m/%Y'))
+
+                    # Transform the data to match PPM structure, starting with NO
+                    transformed_entry = {
+                        "NO": len(processed_data) + 1,  # Add NO at the beginning
+                        "Department": entry_data.get("Department", ""),
+                        "Name": entry_data.get("Name", ""),
+                        "MODEL": entry_data.get("MODEL", ""),
+                        "SERIAL": serial,
+                        "MANUFACTURER": entry_data.get("MANUFACTURER", ""),
+                        "LOG_Number": entry_data.get("LOG_Number", ""),
+                        "Installation_Date": entry_data.get("Installation_Date", ""),
+                        "Warranty_End": entry_data.get("Warranty_End", "")
+                    }
+
+                    # Process PPM quarters
+                    transformed_entry["PPM_Q_I"] = {
+                        "engineer": entry_data.get("PPM_Q_I.engineer", ""),
+                        "quarter_date": q_dates[0]
+                    }
+                    transformed_entry["PPM_Q_II"] = {
+                        "engineer": entry_data.get("PPM_Q_II.engineer", ""),
+                        "quarter_date": q_dates[1]
+                    }
+                    transformed_entry["PPM_Q_III"] = {
+                        "engineer": entry_data.get("PPM_Q_III.engineer", ""),
+                        "quarter_date": q_dates[2]
+                    }
+                    transformed_entry["PPM_Q_IV"] = {
+                        "engineer": entry_data.get("PPM_Q_IV.engineer", ""),
+                        "quarter_date": q_dates[3]
+                    }
+                    
+                    # Calculate Status if not present
+                    transformed_entry["Status"] = entry_data.get("Status") or DataService.calculate_status(transformed_entry, data_type)
+
+                    if serial in current_data_map:
+                        # Update existing record
+                        for i, entry in enumerate(processed_data):
+                            if entry.get('SERIAL') == serial:
+                                processed_data[i].update(transformed_entry)
+                                break
+                        logger.debug(f"Updated existing record for SERIAL: {serial}")
                         updated_count += 1
                     else:
-                        # Add as new entry (NO will be assigned later)
-                        current_data_map[mfg_serial] = validated_dict # Add to map
+                        # Add new record with NO field
+                        transformed_entry["NO"] = len(processed_data) + 1
+                        processed_data.append(transformed_entry)
+                        logger.debug(f"Added new record for SERIAL: {serial}")
                         added_count += 1
 
-                except ValidationError as e:
-                    msg = f"Row {index+2} ({row_dict_raw.get('MFG_SERIAL', 'N/A')}): Validation error: {str(e)}"
-                    errors.append(msg)
+                except Exception as row_error:
+                    error_msg = f"Error processing row {index + 1}: {str(row_error)}"
+                    logger.error(error_msg, exc_info=True)
+                    errors.append(error_msg)
                     skipped_count += 1
-                    continue
-                except Exception as ex: # Catch any other unexpected error during processing a row
-                    msg = f"Row {index+2} ({row_dict_raw.get('MFG_SERIAL', 'N/A')}): Unexpected error: {str(ex)}"
-                    errors.append(msg)
-                    skipped_count += 1
-                    continue
 
-            # Save all processed entries (new and updated)
-            final_data_list = list(current_data_map.values())
-            reindexed_data = DataService.reindex(final_data_list)
-            DataService.save_data(reindexed_data, data_type)
+            # Save the updated data back to the JSON file
+            DataService.save_data(processed_data, data_type)
 
-        except pd.errors.EmptyDataError:
-            errors.append("Import Error: The uploaded CSV file is empty.")
-        except KeyError as e: # More specific for missing columns if not handled by get()
-            errors.append(f"Import Error: Missing expected column in CSV: {e}.")
+            logger.info(f"Import complete. Added: {added_count}, Updated: {updated_count}, Skipped: {skipped_count}")
+            if errors:
+                logger.warning(f"Import completed with {len(errors)} errors")
+
+            return {
+                "added_count": added_count,
+                "updated_count": updated_count,
+                "skipped_count": skipped_count,
+                "errors": errors
+            }
+
         except Exception as e:
-            logger.error(f"Generic import data error: {str(e)}")
-            errors.append(f"Import failed due to an unexpected error: {str(e)}")
-            # If a df was loaded, count all its rows as skipped.
-            skipped_count = df.shape[0] if 'df' in locals() else skipped_count + (added_count + updated_count)
-            added_count = 0 # Reset counts as save might not have happened
-            updated_count = 0
+            error_msg = f"Error during import: {str(e)}"
+            logger.exception(error_msg)
+            errors.append(error_msg)
+            return {
+                "added_count": added_count,
+                "updated_count": updated_count,
+                "skipped_count": skipped_count,
+                "errors": errors
+            }
+    @classmethod
+    def export_data(cls, data_type: Literal['ppm', 'ocm']) -> str:
+        """Export data to CSV format."""
+        logger.debug(f"DataService.export_data called for {data_type}")
+        try:
+            # Load data from appropriate file
+            data = cls.load_data(data_type)
+            logger.debug(f"Loaded {len(data) if data else 0} entries for export")
+            
+            if not data:
+                logger.warning(f"No {data_type} data available for export")
+                return ""
 
-        return {
-            "added_count": added_count,
-            "updated_count": updated_count,
-            "skipped_count": skipped_count,
-            "errors": errors
-        }
-
-        return {
-            "added_count": added_count,
-            "skipped_count": skipped_count,
-            "errors": errors
-        }
-
-    @staticmethod
-    def export_data(data_type: str) -> str:
-        """
-        Export data of the specified type to CSV format.
-
-        Args:
-            data_type: The type of data to export ('ppm' or 'ocm').
-
-        Returns:
-            The CSV content as a string.
-        """
-        if data_type not in ['ppm', 'ocm']:
-            raise ValueError("Unsupported data type for export. Choose 'ppm' or 'ocm'.")
-
-        all_data = DataService.load_data(data_type)
-        if not all_data:
-            return ""
-
-        output = io.StringIO()
-        writer = None
-
-        if data_type == 'ppm':
-            Model = PPMEntry
-            # Define specific column order for PPM export
-            PPM_EXPORT_COLUMNS = [
-                'NO', 'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER',
-                'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'OCM', 'Status',
-                'Q1_Date', 'Q1_Engineer', 'Q2_Date', 'Q2_Engineer',
-                'Q3_Date', 'Q3_Engineer', 'Q4_Date', 'Q4_Engineer'
-            ]
-            writer = csv.DictWriter(output, fieldnames=PPM_EXPORT_COLUMNS, extrasaction='ignore')
-            writer.writeheader()
-
-            for entry_model_dict in all_data:
-                row_to_write = {}
-                # Populate base fields
-                for col in PPM_EXPORT_COLUMNS:
-                    if col.startswith('Q1_') or col.startswith('Q2_') or \
-                       col.startswith('Q3_') or col.startswith('Q4_'):
-                        continue # Skip quarter fields, will handle next
-                    row_to_write[col] = entry_model_dict.get(col, '')
-
-                # Populate flattened quarter data
-                ppm_q_map = {
-                    'PPM_Q_I': ('Q1_Date', 'Q1_Engineer'),
-                    'PPM_Q_II': ('Q2_Date', 'Q2_Engineer'),
-                    'PPM_Q_III': ('Q3_Date', 'Q3_Engineer'),
-                    'PPM_Q_IV': ('Q4_Date', 'Q4_Engineer'),
-                }
-                for q_model_field, (q_date_col, q_eng_col) in ppm_q_map.items():
-                    quarter_data = entry_model_dict.get(q_model_field, {})
-                    if not isinstance(quarter_data, dict): quarter_data = {} # Ensure dict
-                    row_to_write[q_date_col] = quarter_data.get('quarter_date', '')
-                    row_to_write[q_eng_col] = quarter_data.get('engineer', '')
-
-                writer.writerow(row_to_write)
-
-        else: # ocm
-            Model = OCMEntry
-            # For OCM, can derive from model fields, assuming direct mapping and NO first.
-            ocm_columns = ['NO'] + [field for field in Model.model_fields if field != 'NO']
-            writer = csv.DictWriter(output, fieldnames=ocm_columns, extrasaction='ignore')
-            writer.writeheader()
-
-            for entry_model_dict in all_data:
-                # Dates are already strings in DD/MM/YYYY in the model due to validators for OCM too
-                writer.writerow(entry_model_dict)
-
-        return output.getvalue()
+            # Convert data for export
+            from app.services.import_export import ImportExportService
+            logger.debug(f"Calling ImportExportService.export_to_csv for {data_type}")
+            success, message, csv_content = ImportExportService.export_to_csv(data_type)
+            
+            if not success:
+                logger.error(f"Export failed: {message}")
+                return ""
+                
+            logger.debug(f"Export successful. CSV content length: {len(csv_content)} bytes")
+            logger.debug(f"First 200 characters of CSV: {csv_content[:200]}")
+            return csv_content
+            
+        except Exception as e:
+            logger.exception(f"Error in export_data for {data_type}: {str(e)}")
+            raise

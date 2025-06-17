@@ -2,10 +2,10 @@ import json
 from unittest.mock import patch
 
 # Helper function to create sample data (can be expanded or moved)
-def create_sample_ppm_entry(mfg_serial="PPM_API_S001", **override_kwargs):
+def create_sample_ppm_entry(SERIAL="PPM_API_S001", **override_kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "PPM Test Device", "MODEL": "PPM-XYZ", "Name": "PPM Device XYZ",
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": "PPM Corp", "Department": "Test Dept",
+        "SERIAL": SERIAL, "MANUFACTURER": "PPM Corp", "Department": "Test Dept",
         "LOG_NO": "LOG001", "Installation_Date": "01/01/2024", "Warranty_End": "01/01/2026",
         "Eng1": "E1", "Eng2": "", "Eng3": "", "Eng4": "",
         "Status": "Upcoming",
@@ -15,10 +15,10 @@ def create_sample_ppm_entry(mfg_serial="PPM_API_S001", **override_kwargs):
     data.update(override_kwargs)
     return data
 
-def create_sample_ocm_entry(mfg_serial="OCM_API_S001", **override_kwargs):
+def create_sample_ocm_entry(SERIAL="OCM_API_S001", **override_kwargs):
     data = {
         "NO": 1, "EQUIPMENT": "OCM Test Device", "MODEL": "OCM-ABC", "Name": "OCM Device ABC",
-        "MFG_SERIAL": mfg_serial, "MANUFACTURER": "OCM Corp", "Department": "Test Dept OCM",
+        "SERIAL": SERIAL, "MANUFACTURER": "OCM Corp", "Department": "Test Dept OCM",
         "LOG_NO": "LOG002", "Installation_Date": "02/01/2024", "Warranty_End": "02/01/2026",
         "Service_Date": "01/03/2024", "Next_Maintenance": "01/09/2024", "ENGINEER": "OCM EngX",
         "Status": "Upcoming", "PPM": ""
@@ -34,7 +34,7 @@ def test_get_all_equipment_ppm_success(client):
         assert response.status_code == 200
         json_data = response.get_json()
         assert len(json_data) == 2
-        assert json_data[0]['MFG_SERIAL'] == "PPM01"
+        assert json_data[0]['SERIAL'] == "PPM01"
         mock_get_all.assert_called_once_with('ppm')
 
 def test_get_all_equipment_ocm_success(client):
@@ -44,7 +44,7 @@ def test_get_all_equipment_ocm_success(client):
         assert response.status_code == 200
         json_data = response.get_json()
         assert len(json_data) == 1
-        assert json_data[0]['MFG_SERIAL'] == "OCM01"
+        assert json_data[0]['SERIAL'] == "OCM01"
         mock_get_all.assert_called_once_with('ocm')
 
 def test_get_all_equipment_invalid_data_type(client):
@@ -53,14 +53,14 @@ def test_get_all_equipment_invalid_data_type(client):
     json_data = response.get_json()
     assert "Invalid data type" in json_data['error']
 
-# --- Tests for GET /equipment/<data_type>/<mfg_serial> ---
+# --- Tests for GET /equipment/<data_type>/<SERIAL> ---
 def test_get_equipment_by_serial_ppm_success(client):
     sample_ppm = create_sample_ppm_entry("PPM_S001")
     with patch('app.services.data_service.DataService.get_entry', return_value=sample_ppm) as mock_get_one:
         response = client.get('/api/equipment/ppm/PPM_S001')
         assert response.status_code == 200
         json_data = response.get_json()
-        assert json_data['MFG_SERIAL'] == "PPM_S001"
+        assert json_data['SERIAL'] == "PPM_S001"
         assert json_data['MODEL'] == "PPM-XYZ"
         mock_get_one.assert_called_once_with('ppm', "PPM_S001")
 
@@ -70,7 +70,7 @@ def test_get_equipment_by_serial_ocm_success(client):
         response = client.get('/api/equipment/ocm/OCM_S001')
         assert response.status_code == 200
         json_data = response.get_json()
-        assert json_data['MFG_SERIAL'] == "OCM_S001"
+        assert json_data['SERIAL'] == "OCM_S001"
         mock_get_one.assert_called_once_with('ocm', "OCM_S001")
 
 def test_get_equipment_by_serial_not_found(client):
@@ -100,7 +100,7 @@ def test_add_equipment_ppm_success(client):
         response = client.post('/api/equipment/ppm', json=new_ppm_data_payload)
         assert response.status_code == 201
         json_data = response.get_json()
-        assert json_data['MFG_SERIAL'] == "PPM_NEW01"
+        assert json_data['SERIAL'] == "PPM_NEW01"
         assert json_data['NO'] == 10 # Check if NO from service is in response
         mock_add.assert_called_once_with('ppm', new_ppm_data_payload)
 
@@ -112,7 +112,7 @@ def test_add_equipment_ocm_success(client):
         response = client.post('/api/equipment/ocm', json=new_ocm_data_payload)
         assert response.status_code == 201
         json_data = response.get_json()
-        assert json_data['MFG_SERIAL'] == "OCM_NEW01"
+        assert json_data['SERIAL'] == "OCM_NEW01"
         assert json_data['NO'] == 11
         mock_add.assert_called_once_with('ocm', new_ocm_data_payload)
 
@@ -127,17 +127,17 @@ def test_add_equipment_validation_error(client):
 
 def test_add_equipment_duplicate_serial(client):
     ppm_payload = {k: v for k,v in create_sample_ppm_entry("PPM_DUP01").items() if k != 'NO'}
-    with patch('app.services.data_service.DataService.add_entry', side_effect=ValueError("Duplicate MFG_SERIAL detected")) as mock_add:
+    with patch('app.services.data_service.DataService.add_entry', side_effect=ValueError("Duplicate SERIAL detected")) as mock_add:
         response = client.post('/api/equipment/ppm', json=ppm_payload)
         assert response.status_code == 400
         json_data = response.get_json()
-        assert "Duplicate MFG_SERIAL detected" in json_data['error']
+        assert "Duplicate SERIAL detected" in json_data['error']
         mock_add.assert_called_once_with('ppm', ppm_payload)
 
-# --- Tests for PUT /equipment/<data_type>/<mfg_serial> ---
+# --- Tests for PUT /equipment/<data_type>/<SERIAL> ---
 def test_update_equipment_ppm_success(client):
     update_ppm_payload = create_sample_ppm_entry("PPM_UPD01", MODEL="PPM-XYZ-v2")
-    # The payload for update includes all fields, including MFG_SERIAL matching the URL one.
+    # The payload for update includes all fields, including SERIAL matching the URL one.
     # NO might or might not be in payload, DataService.update_entry should handle it (preserves existing NO).
 
     # This is what DataService.update_entry is expected to return
@@ -148,7 +148,7 @@ def test_update_equipment_ppm_success(client):
         assert response.status_code == 200
         json_data = response.get_json()
         assert json_data['MODEL'] == "PPM-XYZ-v2"
-        assert json_data['MFG_SERIAL'] == "PPM_UPD01"
+        assert json_data['SERIAL'] == "PPM_UPD01"
         assert json_data['NO'] == 5
         # DataService.update_entry expects the full data dict
         mock_update.assert_called_once_with('ppm', "PPM_UPD01", update_ppm_payload)
@@ -164,12 +164,12 @@ def test_update_equipment_ocm_success(client):
         assert json_data['MODEL'] == "OCM-ABC-v2"
         mock_update.assert_called_once_with('ocm', "OCM_UPD01", update_ocm_payload)
 
-def test_update_equipment_mfg_serial_mismatch(client):
-    update_payload = create_sample_ppm_entry(MFG_SERIAL="PPM_WRONG_SERIAL")
+def test_update_equipment_SERIAL_mismatch(client):
+    update_payload = create_sample_ppm_entry(SERIAL="PPM_WRONG_SERIAL")
     response = client.put('/api/equipment/ppm/PPM_ACTUAL_SERIAL', json=update_payload)
     assert response.status_code == 400
     json_data = response.get_json()
-    assert "MFG_SERIAL in payload must match URL parameter" in json_data['error']
+    assert "SERIAL in payload must match URL parameter" in json_data['error']
 
 def test_update_equipment_not_found(client):
     update_payload = create_sample_ppm_entry("PPM_NOEXIST")
@@ -191,7 +191,7 @@ def test_update_equipment_validation_error(client):
         mock_update.assert_called_once_with('ppm', "PPM_VALID_ERR", update_payload)
 
 
-# --- Tests for DELETE /equipment/<data_type>/<mfg_serial> ---
+# --- Tests for DELETE /equipment/<data_type>/<SERIAL> ---
 def test_delete_equipment_ppm_success(client):
     with patch('app.services.data_service.DataService.delete_entry', return_value=True) as mock_delete:
         response = client.delete('/api/equipment/ppm/PPM_DEL01')
@@ -218,7 +218,7 @@ import io # For simulating file uploads
 
 # --- Tests for GET /export/<data_type> ---
 def test_export_data_ppm_success(client):
-    sample_csv_string = "NO,EQUIPMENT,MODEL,MFG_SERIAL\n1,Device1,ModelX,SN001"
+    sample_csv_string = "NO,EQUIPMENT,MODEL,SERIAL\n1,Device1,ModelX,SN001"
     with patch('app.services.data_service.DataService.export_data', return_value=sample_csv_string) as mock_export:
         response = client.get('/api/export/ppm')
         assert response.status_code == 200
@@ -229,7 +229,7 @@ def test_export_data_ppm_success(client):
         mock_export.assert_called_once_with('ppm')
 
 def test_export_data_ocm_success(client):
-    sample_csv_string = "NO,EQUIPMENT,MODEL,MFG_SERIAL\n1,Device2,ModelY,SN002"
+    sample_csv_string = "NO,EQUIPMENT,MODEL,SERIAL\n1,Device2,ModelY,SN002"
     with patch('app.services.data_service.DataService.export_data', return_value=sample_csv_string) as mock_export:
         response = client.get('/api/export/ocm')
         assert response.status_code == 200
@@ -248,7 +248,7 @@ def test_import_data_ppm_success(client):
     mock_import_result = {"added_count": 1, "updated_count": 0, "skipped_count": 0, "errors": []}
     with patch('app.services.data_service.DataService.import_data', return_value=mock_import_result) as mock_import:
         # Simulate file upload
-        csv_data = b"EQUIPMENT,MODEL,MFG_SERIAL\nDevice3,ModelZ,SN003" # Minimal valid CSV row
+        csv_data = b"EQUIPMENT,MODEL,SERIAL\nDevice3,ModelZ,SN003" # Minimal valid CSV row
         data = {'file': (io.BytesIO(csv_data), 'test.csv')}
         response = client.post('/api/import/ppm', content_type='multipart/form-data', data=data)
 
@@ -260,7 +260,7 @@ def test_import_data_ppm_success(client):
 def test_import_data_ocm_partial_success_with_errors(client):
     mock_import_result = {"added_count": 0, "updated_count": 1, "skipped_count": 1, "errors": ["Row 2: Bad date format"]}
     with patch('app.services.data_service.DataService.import_data', return_value=mock_import_result) as mock_import:
-        csv_data = b"EQUIPMENT,MODEL,MFG_SERIAL\nDevice4,ModelA,SN004\nDevice5,ModelB,SN005"
+        csv_data = b"EQUIPMENT,MODEL,SERIAL\nDevice4,ModelA,SN004\nDevice5,ModelB,SN005"
         data = {'file': (io.BytesIO(csv_data), 'test.csv')}
         response = client.post('/api/import/ocm', content_type='multipart/form-data', data=data)
 
@@ -285,7 +285,7 @@ def test_import_data_wrong_file_type(client):
 def test_import_data_service_failure(client):
     # Test when DataService.import_data itself raises an unexpected exception
     with patch('app.services.data_service.DataService.import_data', side_effect=Exception("Unexpected service error")) as mock_import:
-        csv_data = b"EQUIPMENT,MODEL,MFG_SERIAL\nDeviceFail,ModelFail,SNFAIL"
+        csv_data = b"EQUIPMENT,MODEL,SERIAL\nDeviceFail,ModelFail,SNFAIL"
         data = {'file': (io.BytesIO(csv_data), 'test.csv')}
         response = client.post('/api/import/ppm', content_type='multipart/form-data', data=data)
         assert response.status_code == 500

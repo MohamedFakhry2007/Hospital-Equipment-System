@@ -13,12 +13,12 @@ from app.config import Config # To be patched
 
 
 # Helper functions to create valid data dictionaries
-def create_valid_ppm_dict(mfg_serial="PPM_SN001", equipment="PPM Device", model="PPM1000", **kwargs):
+def create_valid_ppm_dict(SERIAL="PPM_SN001", equipment="PPM Device", model="PPM1000", **kwargs):
     base_data = {
         "EQUIPMENT": equipment,
         "MODEL": model,
         "Name": f"{equipment} {model}",
-        "MFG_SERIAL": mfg_serial,
+        "SERIAL": SERIAL,
         "MANUFACTURER": "PPM Manufacturer",
         "Department": "PPM Department",
         "LOG_NO": "PPM_LOG001",
@@ -41,12 +41,12 @@ def create_valid_ppm_dict(mfg_serial="PPM_SN001", equipment="PPM Device", model=
             base_data[key] = value
     return base_data
 
-def create_valid_ocm_dict(mfg_serial="OCM_SN001", equipment="OCM Device", model="OCM1000", **kwargs):
+def create_valid_ocm_dict(SERIAL="OCM_SN001", equipment="OCM Device", model="OCM1000", **kwargs):
     base_data = {
         "EQUIPMENT": equipment,
         "MODEL": model,
         "Name": f"{equipment} {model}",
-        "MFG_SERIAL": mfg_serial,
+        "SERIAL": SERIAL,
         "MANUFACTURER": "OCM Manufacturer",
         "Department": "OCM Department",
         "LOG_NO": "OCM_LOG001",
@@ -88,10 +88,10 @@ def mock_data_service(tmp_path, mocker):
 
 def test_add_ppm_entry(mock_data_service):
     """Test adding a new PPM entry."""
-    data = create_valid_ppm_dict(MFG_SERIAL="PPM_S001")
+    data = create_valid_ppm_dict(SERIAL="PPM_S001")
     added_entry = mock_data_service.add_entry("ppm", data)
 
-    assert added_entry["MFG_SERIAL"] == "PPM_S001"
+    assert added_entry["SERIAL"] == "PPM_S001"
     assert added_entry["NO"] == 1
     # Status calculation will now depend on quarter_dates and engineers.
     # _calculate_ppm_quarter_dates will run, using today if Installation_Date is problematic.
@@ -109,22 +109,22 @@ def test_add_ppm_entry(mock_data_service):
 
 def test_add_ocm_entry(mock_data_service):
     """Test adding a new OCM entry."""
-    data = create_valid_ocm_dict(MFG_SERIAL="OCM_S001", Next_Maintenance="01/01/2025") # Future date
+    data = create_valid_ocm_dict(SERIAL="OCM_S001", Next_Maintenance="01/01/2025") # Future date
     added_entry = mock_data_service.add_entry("ocm", data)
-    assert added_entry["MFG_SERIAL"] == "OCM_S001"
+    assert added_entry["SERIAL"] == "OCM_S001"
     assert added_entry["NO"] == 1
     assert added_entry["Status"] == "Upcoming" # Based on Next_Maintenance being in future
     all_entries = mock_data_service.get_all_entries("ocm")
     assert len(all_entries) == 1
 
 
-def test_add_duplicate_mfg_serial(mock_data_service):
-    """Test adding an entry with a duplicate MFG_SERIAL."""
-    data1 = create_valid_ppm_dict(MFG_SERIAL="DUP001")
+def test_add_duplicate_SERIAL(mock_data_service):
+    """Test adding an entry with a duplicate SERIAL."""
+    data1 = create_valid_ppm_dict(SERIAL="DUP001")
     mock_data_service.add_entry("ppm", data1)
 
-    data2 = create_valid_ppm_dict(MFG_SERIAL="DUP001", EQUIPMENT="Another Device")
-    with pytest.raises(ValueError, match="Duplicate MFG_SERIAL detected: DUP001"):
+    data2 = create_valid_ppm_dict(SERIAL="DUP001", EQUIPMENT="Another Device")
+    with pytest.raises(ValueError, match="Duplicate SERIAL detected: DUP001"):
         mock_data_service.add_entry("ppm", data2)
 
 
@@ -136,7 +136,7 @@ def test_update_ppm_entry(mock_data_service, mocker):
     mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
 
     original_data_input = create_valid_ppm_dict(
-        MFG_SERIAL="PPM_U001",
+        SERIAL="PPM_U001",
         Installation_Date="01/01/2023", # Q1 will be 01/04/2023
         PPM_Q_I={"engineer": "Eng Q1 Orig"}
     )
@@ -193,7 +193,7 @@ def test_update_ocm_next_maintenance_to_overdue(mock_data_service, mocker):
     fixed_now = datetime(2024, 3, 15) # March 15, 2024
     mocker.patch('app.services.data_service.datetime', now=lambda: fixed_now)
 
-    original_data = create_valid_ocm_dict(MFG_SERIAL="OCM_U002", Next_Maintenance="01/04/2024") # Upcoming
+    original_data = create_valid_ocm_dict(SERIAL="OCM_U002", Next_Maintenance="01/04/2024") # Upcoming
     mock_data_service.add_entry("ocm", original_data)
     assert mock_data_service.get_entry("ocm", "OCM_U002")["Status"] == "Upcoming"
 
@@ -208,27 +208,27 @@ def test_update_ocm_next_maintenance_to_overdue(mock_data_service, mocker):
 
 def test_update_nonexistent_entry(mock_data_service):
     """Test updating a non-existent entry."""
-    update_data = create_valid_ppm_dict(MFG_SERIAL="NONEXISTENT")
-    with pytest.raises(KeyError, match="Entry with MFG_SERIAL 'NONEXISTENT' not found for update."):
+    update_data = create_valid_ppm_dict(SERIAL="NONEXISTENT")
+    with pytest.raises(KeyError, match="Entry with SERIAL 'NONEXISTENT' not found for update."):
         mock_data_service.update_entry("ppm", "NONEXISTENT", update_data)
 
 
-def test_update_mfg_serial_not_allowed(mock_data_service):
-    """Test attempting to update MFG_SERIAL."""
-    original_data = create_valid_ppm_dict(MFG_SERIAL="SERIAL_ORIG")
+def test_update_SERIAL_not_allowed(mock_data_service):
+    """Test attempting to update SERIAL."""
+    original_data = create_valid_ppm_dict(SERIAL="SERIAL_ORIG")
     mock_data_service.add_entry("ppm", original_data)
 
     update_data = original_data.copy()
-    update_data["MFG_SERIAL"] = "SERIAL_NEW" # Attempting to change MFG_SERIAL
+    update_data["SERIAL"] = "SERIAL_NEW" # Attempting to change SERIAL
 
-    with pytest.raises(ValueError, match="Cannot change MFG_SERIAL"):
+    with pytest.raises(ValueError, match="Cannot change SERIAL"):
         mock_data_service.update_entry("ppm", "SERIAL_ORIG", update_data)
 
 
 def test_delete_entry(mock_data_service):
     """Test deleting an existing entry and reindexing."""
-    data1 = create_valid_ppm_dict(MFG_SERIAL="DEL_S001")
-    data2 = create_valid_ppm_dict(MFG_SERIAL="DEL_S002")
+    data1 = create_valid_ppm_dict(SERIAL="DEL_S001")
+    data2 = create_valid_ppm_dict(SERIAL="DEL_S002")
     mock_data_service.add_entry("ppm", data1) # NO=1
     mock_data_service.add_entry("ppm", data2) # NO=2
 
@@ -249,23 +249,23 @@ def test_delete_nonexistent_entry(mock_data_service):
 
 def test_get_all_entries(mock_data_service):
     """Test getting all entries."""
-    data1 = create_valid_ppm_dict(MFG_SERIAL="GETALL_S001")
-    data2 = create_valid_ppm_dict(MFG_SERIAL="GETALL_S002")
+    data1 = create_valid_ppm_dict(SERIAL="GETALL_S001")
+    data2 = create_valid_ppm_dict(SERIAL="GETALL_S002")
     mock_data_service.add_entry("ppm", data1)
     mock_data_service.add_entry("ppm", data2)
 
     all_entries = mock_data_service.get_all_entries("ppm")
     assert len(all_entries) == 2
     # Entries in all_entries will have 'NO' and calculated 'Status'
-    # We need to compare based on a common key like MFG_SERIAL
-    mfg_serials_retrieved = {e["MFG_SERIAL"] for e in all_entries}
-    assert "GETALL_S001" in mfg_serials_retrieved
-    assert "GETALL_S002" in mfg_serials_retrieved
+    # We need to compare based on a common key like SERIAL
+    SERIALs_retrieved = {e["SERIAL"] for e in all_entries}
+    assert "GETALL_S001" in SERIALs_retrieved
+    assert "GETALL_S002" in SERIALs_retrieved
 
 
 def test_get_entry(mock_data_service):
-    """Test getting a specific entry by MFG_SERIAL."""
-    data = create_valid_ocm_dict(MFG_SERIAL="GET_S001")
+    """Test getting a specific entry by SERIAL."""
+    data = create_valid_ocm_dict(SERIAL="GET_S001")
     mock_data_service.add_entry("ocm", data)
 
     retrieved_entry = mock_data_service.get_entry("ocm", "GET_S001")
@@ -279,34 +279,34 @@ def test_get_nonexistent_entry(mock_data_service):
     assert mock_data_service.get_entry("ppm", "NONEXISTENT_GET") is None
 
 
-# Tests for ensure_unique_mfg_serial and reindex are implicitly covered by add/delete tests.
+# Tests for ensure_unique_SERIAL and reindex are implicitly covered by add/delete tests.
 
 # --- New tests for load_data ---
 def test_load_data_valid_ppm(mock_data_service, tmp_path):
     ppm_file = tmp_path / "test_ppm.json"
-    valid_entry_dict = create_valid_ppm_dict(MFG_SERIAL="LD_PPM01")
+    valid_entry_dict = create_valid_ppm_dict(SERIAL="LD_PPM01")
     # Manually save data to simulate existing file
     with open(ppm_file, 'w') as f:
         json.dump([valid_entry_dict], f)
 
     loaded_data = mock_data_service.load_data("ppm")
     assert len(loaded_data) == 1
-    assert loaded_data[0]["MFG_SERIAL"] == "LD_PPM01"
+    assert loaded_data[0]["SERIAL"] == "LD_PPM01"
 
 def test_load_data_valid_ocm(mock_data_service, tmp_path):
     ocm_file = tmp_path / "test_ocm.json"
-    valid_entry_dict = create_valid_ocm_dict(MFG_SERIAL="LD_OCM01")
+    valid_entry_dict = create_valid_ocm_dict(SERIAL="LD_OCM01")
     with open(ocm_file, 'w') as f:
         json.dump([valid_entry_dict], f)
 
     loaded_data = mock_data_service.load_data("ocm")
     assert len(loaded_data) == 1
-    assert loaded_data[0]["MFG_SERIAL"] == "LD_OCM01"
+    assert loaded_data[0]["SERIAL"] == "LD_OCM01"
 
 def test_load_data_skips_invalid_entries(mock_data_service, tmp_path, caplog):
     ppm_file = tmp_path / "test_ppm.json"
-    valid_entry = create_valid_ppm_dict(MFG_SERIAL="VALID01")
-    invalid_entry_dict = create_valid_ppm_dict(MFG_SERIAL="INVALID01")
+    valid_entry = create_valid_ppm_dict(SERIAL="VALID01")
+    invalid_entry_dict = create_valid_ppm_dict(SERIAL="INVALID01")
     invalid_entry_dict["Installation_Date"] = "invalid-date-format" # Invalid data
 
     with open(ppm_file, 'w') as f:
@@ -314,7 +314,7 @@ def test_load_data_skips_invalid_entries(mock_data_service, tmp_path, caplog):
 
     loaded_data = mock_data_service.load_data("ppm")
     assert len(loaded_data) == 1 # Should skip the invalid one
-    assert loaded_data[0]["MFG_SERIAL"] == "VALID01"
+    assert loaded_data[0]["SERIAL"] == "VALID01"
     assert "Data validation error loading ppm entry INVALID01" in caplog.text
     assert "Skipping this entry." in caplog.text
 
@@ -329,7 +329,7 @@ def test_load_data_empty_json_file(mock_data_service, tmp_path):
 def test_load_data_malformed_json_file(mock_data_service, tmp_path, caplog):
     ppm_file = tmp_path / "test_ppm.json"
     with open(ppm_file, 'w') as f:
-        f.write("[{'MFG_SERIAL': 'MALFORMED'}]") # Malformed JSON (single quotes)
+        f.write("[{'SERIAL': 'MALFORMED'}]") # Malformed JSON (single quotes)
 
     loaded_data = mock_data_service.load_data("ppm")
     assert len(loaded_data) == 0
@@ -365,8 +365,8 @@ def test_load_data_file_not_found(mock_data_service, tmp_path, mocker, caplog):
 # --- New tests for save_data ---
 def test_save_data_ppm(mock_data_service, tmp_path):
     ppm_file = tmp_path / "test_ppm.json"
-    entry1 = create_valid_ppm_dict(MFG_SERIAL="SAVE_PPM01")
-    entry2 = create_valid_ppm_dict(MFG_SERIAL="SAVE_PPM02")
+    entry1 = create_valid_ppm_dict(SERIAL="SAVE_PPM01")
+    entry2 = create_valid_ppm_dict(SERIAL="SAVE_PPM02")
     data_to_save = [entry1, entry2]
 
     mock_data_service.save_data(data_to_save, "ppm")
@@ -375,12 +375,12 @@ def test_save_data_ppm(mock_data_service, tmp_path):
         saved_data_on_disk = json.load(f)
 
     assert len(saved_data_on_disk) == 2
-    assert saved_data_on_disk[0]["MFG_SERIAL"] == "SAVE_PPM01"
-    assert saved_data_on_disk[1]["MFG_SERIAL"] == "SAVE_PPM02"
+    assert saved_data_on_disk[0]["SERIAL"] == "SAVE_PPM01"
+    assert saved_data_on_disk[1]["SERIAL"] == "SAVE_PPM02"
 
 def test_save_data_ocm(mock_data_service, tmp_path):
     ocm_file = tmp_path / "test_ocm.json"
-    entry1 = create_valid_ocm_dict(MFG_SERIAL="SAVE_OCM01")
+    entry1 = create_valid_ocm_dict(SERIAL="SAVE_OCM01")
     data_to_save = [entry1]
 
     mock_data_service.save_data(data_to_save, "ocm")
@@ -388,7 +388,7 @@ def test_save_data_ocm(mock_data_service, tmp_path):
     with open(ocm_file, 'r') as f:
         saved_data_on_disk = json.load(f)
     assert len(saved_data_on_disk) == 1
-    assert saved_data_on_disk[0]["MFG_SERIAL"] == "SAVE_OCM01"
+    assert saved_data_on_disk[0]["SERIAL"] == "SAVE_OCM01"
 
 
 # --- New tests for calculate_status ---
@@ -425,7 +425,7 @@ def test_calculate_status_ocm(mock_data_service, mocker, service_date_str, next_
         "Service_Date": service_date_str,
         "Next_Maintenance": next_maintenance_str,
         # Other fields are not strictly needed for this status calculation
-        "MFG_SERIAL": "TestOCMStatus"
+        "SERIAL": "TestOCMStatus"
     }
     status = mock_data_service.calculate_status(ocm_entry_data, "ocm")
     assert status == expected_status
@@ -530,7 +530,7 @@ def test_calculate_status_ppm_new_logic(mock_data_service, mocker, ppm_quarters_
     fixed_today = datetime.strptime(today_str, "%d/%m/%Y").date()
     mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
 
-    ppm_entry_data = {"MFG_SERIAL": "TestPPMStatus"}
+    ppm_entry_data = {"SERIAL": "TestPPMStatus"}
     ppm_entry_data.update(ppm_quarters_data) # Add PPM_Q_X data
 
     status = mock_data_service.calculate_status(ppm_entry_data, "ppm")
@@ -547,7 +547,7 @@ def test_add_ppm_entry_calculates_status_new(mock_data_service, mocker):
     # Example: Q1_date = 10/04/2023, Q2_date = 10/07/2023 etc.
     # Since all dates are future, status should be Upcoming.
     data_no_status = create_valid_ppm_dict(
-        MFG_SERIAL="PPM_ADD_S001",
+        SERIAL="PPM_ADD_S001",
         Installation_Date=None, # Will use fixed_today for quarter calculation base
         PPM_Q_I={"engineer": "EngTest"} # Only engineer provided
     )
@@ -563,12 +563,12 @@ def test_add_ocm_entry_calculates_status(mock_data_service, mocker):
     fixed_today = date(2024, 3, 15)
     mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
 
-    data_overdue = create_valid_ocm_dict(MFG_SERIAL="OCM_ADD_S001", Next_Maintenance="01/01/2024", Service_Date=None)
+    data_overdue = create_valid_ocm_dict(SERIAL="OCM_ADD_S001", Next_Maintenance="01/01/2024", Service_Date=None)
     if "Status" in data_overdue: del data_overdue["Status"]
     added_entry = mock_data_service.add_entry("ocm", data_overdue)
     assert added_entry["Status"] == "Overdue"
 
-    data_upcoming = create_valid_ocm_dict(MFG_SERIAL="OCM_ADD_S002", Next_Maintenance="01/06/2024", Service_Date=None)
+    data_upcoming = create_valid_ocm_dict(SERIAL="OCM_ADD_S002", Next_Maintenance="01/06/2024", Service_Date=None)
     if "Status" in data_upcoming: del data_upcoming["Status"]
     added_entry_2 = mock_data_service.add_entry("ocm", data_upcoming)
     assert added_entry_2["Status"] == "Upcoming"
@@ -581,7 +581,7 @@ def test_update_ppm_entry_recalculates_status_new(mock_data_service, mocker):
 
     # Initial entry: Q1 is past & no engineer -> Overdue
     ppm_data_initial = create_valid_ppm_dict(
-        MFG_SERIAL="PPM_UPD_S001",
+        SERIAL="PPM_UPD_S001",
         Installation_Date="01/09/2023", # Q1=01/12/2023 (past), Q2=01/03/2024 (past)
         PPM_Q_I={"engineer": None},
         PPM_Q_II={"engineer": "EngB"}
@@ -628,7 +628,7 @@ OCM_CSV_IMPORT_HEADERS = [h for h in OCM_MODEL_FIELDS if h != 'NO']
 def test_import_data_new_ppm_entries(mock_data_service):
 # Define new PPM CSV headers for import tests
 PPM_CSV_IMPORT_HEADERS_NEW = [
-    'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER', 'Department',
+    'EQUIPMENT', 'MODEL', 'Name', 'SERIAL', 'MANUFACTURER', 'Department',
     'LOG_NO', 'Installation_Date', 'Warranty_End', 'Status', 'OCM',
     'Q1_Engineer', 'Q2_Engineer', 'Q3_Engineer', 'Q4_Engineer'
 ]
@@ -639,14 +639,14 @@ def test_import_data_new_ppm_entries_updated_format(mock_data_service, mocker):
 
     csv_rows = [
         { # Entry 1: All info, explicit status
-            "EQUIPMENT": "PPM Device 1", "MODEL": "P1000", "Name": "PPM Alpha", "MFG_SERIAL": "IMP_PPM01_NEW",
+            "EQUIPMENT": "PPM Device 1", "MODEL": "P1000", "Name": "PPM Alpha", "SERIAL": "IMP_PPM01_NEW",
             "MANUFACTURER": "Manuf", "Department": "DeptX", "LOG_NO": "L001",
             "Installation_Date": "01/10/2022", "Warranty_End": "01/10/2024",
             "Status": "Upcoming", "OCM": "",
             "Q1_Engineer": "EngA", "Q2_Engineer": "EngB", "Q3_Engineer": "", "Q4_Engineer": ""
         },
         { # Entry 2: Minimal info, let status and quarter dates be calculated
-            "EQUIPMENT": "PPM Device 2", "MODEL": "P2000", "Name": "", "MFG_SERIAL": "IMP_PPM02_NEW",
+            "EQUIPMENT": "PPM Device 2", "MODEL": "P2000", "Name": "", "SERIAL": "IMP_PPM02_NEW",
             "MANUFACTURER": "Manuf", "Department": "DeptY", "LOG_NO": "L002",
             "Installation_Date": "", "Warranty_End": "", # Optional dates empty
             "Status": "", "OCM": "",
@@ -682,8 +682,8 @@ def test_import_data_new_ocm_entries(mock_data_service, mocker): # Keep OCM test
     fixed_today = date(2024, 3, 15)
     mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
 
-    ocm_entry_1 = create_valid_ocm_dict(MFG_SERIAL="IMP_OCM01", Next_Maintenance="01/01/2024") # Overdue
-    ocm_entry_2 = create_valid_ocm_dict(MFG_SERIAL="IMP_OCM02", Next_Maintenance="01/06/2024") # Upcoming
+    ocm_entry_1 = create_valid_ocm_dict(SERIAL="IMP_OCM01", Next_Maintenance="01/01/2024") # Overdue
+    ocm_entry_2 = create_valid_ocm_dict(SERIAL="IMP_OCM02", Next_Maintenance="01/06/2024") # Upcoming
     # Remove status so it's calculated by import_data
     del ocm_entry_1["Status"]
     del ocm_entry_2["Status"]
@@ -710,7 +710,7 @@ def test_import_data_new_ocm_entries(mock_data_service, mocker): # Keep OCM test
 def test_import_data_updates_existing_entries(mock_data_service):
     # Pre-populate data
     existing_ppm_data = create_valid_ppm_dict(
-        MFG_SERIAL="EXIST_PPM01_NEW",
+        SERIAL="EXIST_PPM01_NEW",
         MODEL="OldModel",
         Installation_Date="01/01/2023", # Q1=01/04/2023
         PPM_Q_I={"engineer": "OldEng"}
@@ -725,7 +725,7 @@ def test_import_data_updates_existing_entries(mock_data_service):
     # CSV data to update the existing entry
     update_csv_row = {
         "EQUIPMENT": entry_before_update["EQUIPMENT"], "MODEL": "NewModelPPM_NEW", "Name": entry_before_update["Name"],
-        "MFG_SERIAL": "EXIST_PPM01_NEW", "MANUFACTURER": entry_before_update["MANUFACTURER"],
+        "SERIAL": "EXIST_PPM01_NEW", "MANUFACTURER": entry_before_update["MANUFACTURER"],
         "Department": entry_before_update["Department"], "LOG_NO": entry_before_update["LOG_NO"],
         "Installation_Date": "01/02/2023", # New Install Date -> new quarter dates
         "Warranty_End": entry_before_update["Warranty_End"], "Status": "", "OCM": "",
@@ -751,7 +751,7 @@ def test_import_data_updates_existing_entries(mock_data_service):
 def test_import_data_invalid_rows_ppm_new_format(mock_data_service):
     # Valid entry, entry with bad date (optional, so should be None), entry with missing required field
     valid_row = {
-        "EQUIPMENT": "PPM Valid", "MODEL": "V1", "MFG_SERIAL": "VALID_IMP01_NEW", "MANUFACTURER": "M",
+        "EQUIPMENT": "PPM Valid", "MODEL": "V1", "SERIAL": "VALID_IMP01_NEW", "MANUFACTURER": "M",
         "Department": "D", "LOG_NO": "L1", "Installation_Date": "01/01/2023",
         "Q1_Engineer": "E"
     }
@@ -759,9 +759,9 @@ def test_import_data_invalid_rows_ppm_new_format(mock_data_service):
     # If empty, it's None. If "invalid-date", the model's validator will raise error.
     # DataService import logic for PPM now sets empty optional dates to None *before* Pydantic.
     # So, a "bad date" means an *invalidly formatted non-empty* date.
-    ppm_bad_date_row = {**valid_row, "MFG_SERIAL": "BAD_DATE01_NEW", "Installation_Date": "32/13/2023"}
+    ppm_bad_date_row = {**valid_row, "SERIAL": "BAD_DATE01_NEW", "Installation_Date": "32/13/2023"}
 
-    ppm_missing_req_field_row = {**valid_row, "MFG_SERIAL": "MISSING01_NEW"}
+    ppm_missing_req_field_row = {**valid_row, "SERIAL": "MISSING01_NEW"}
     del ppm_missing_req_field_row["EQUIPMENT"]
 
     csv_rows = [valid_row, ppm_bad_date_row, ppm_missing_req_field_row]
@@ -773,8 +773,8 @@ def test_import_data_invalid_rows_ppm_new_format(mock_data_service):
     assert result["skipped_count"] == 2, f"Errors: {result['errors']}"
     assert len(result["errors"]) == 2
     # Error for bad_date_row: Pydantic validation error on Installation_Date
-    assert "VALID_IMP01_NEW" == mock_data_service.get_entry("ppm", "VALID_IMP01_NEW")["MFG_SERIAL"]
-    assert "BAD_DATE01_NEW" in result["errors"][0] # Error message includes MFG_SERIAL
+    assert "VALID_IMP01_NEW" == mock_data_service.get_entry("ppm", "VALID_IMP01_NEW")["SERIAL"]
+    assert "BAD_DATE01_NEW" in result["errors"][0] # Error message includes SERIAL
     assert "Invalid date format for Installation_Date" in result["errors"][0] # Model validation error
 
     # Error for missing_req_field_row: Pydantic validation error on EQUIPMENT
@@ -801,8 +801,8 @@ def test_import_data_empty_csv_ppm_new_format(mock_data_service):
 
 
 def test_import_data_bad_headers_ppm_new_format(mock_data_service):
-    bad_headers = ["MFG_SERIAL", "MODEL", "Q1_Engineer_WRONG_NAME"] # Missing required EQUIPMENT, wrong Q eng name
-    row_data = [{"MFG_SERIAL": "TestBadHeader", "MODEL": "TestModel", "Q1_Engineer_WRONG_NAME": "EngX"}]
+    bad_headers = ["SERIAL", "MODEL", "Q1_Engineer_WRONG_NAME"] # Missing required EQUIPMENT, wrong Q eng name
+    row_data = [{"SERIAL": "TestBadHeader", "MODEL": "TestModel", "Q1_Engineer_WRONG_NAME": "EngX"}]
     csv_content = create_csv_string(bad_headers, row_data)
 
     result = mock_data_service.import_data("ppm", io.StringIO(csv_content))
@@ -819,13 +819,13 @@ def test_export_data_ppm_new_format(mock_data_service, mocker):
 
     # Prepare data that would be in the system (i.e., with quarter_dates calculated)
     ppm1_input = create_valid_ppm_dict(
-        MFG_SERIAL="EXP_PPM01_NEW",
+        SERIAL="EXP_PPM01_NEW",
         Installation_Date="01/10/2022", # Q1=01/01/2023
         PPM_Q_I={"engineer": "EngExportQ1"},
         PPM_Q_II={"engineer": "EngExportQ2"}
     )
     ppm2_input = create_valid_ppm_dict(
-        MFG_SERIAL="EXP_PPM02_NEW",
+        SERIAL="EXP_PPM02_NEW",
         Name=None, # Optional name not provided
         Installation_Date=None, # Q1 from fixed_today = 10/04/2023
         PPM_Q_IV={"engineer": "EngExportQ4"}
@@ -841,7 +841,7 @@ def test_export_data_ppm_new_format(mock_data_service, mocker):
 
     # Expected headers for new PPM export format
     PPM_EXPORT_HEADERS_NEW = [
-        'NO', 'EQUIPMENT', 'MODEL', 'Name', 'MFG_SERIAL', 'MANUFACTURER',
+        'NO', 'EQUIPMENT', 'MODEL', 'Name', 'SERIAL', 'MANUFACTURER',
         'Department', 'LOG_NO', 'Installation_Date', 'Warranty_End', 'OCM', 'Status',
         'Q1_Date', 'Q1_Engineer', 'Q2_Date', 'Q2_Engineer',
         'Q3_Date', 'Q3_Engineer', 'Q4_Date', 'Q4_Engineer'
@@ -849,7 +849,7 @@ def test_export_data_ppm_new_format(mock_data_service, mocker):
     assert csv_reader.fieldnames == PPM_EXPORT_HEADERS_NEW
 
     # Verify row 1 (EXP_PPM01_NEW)
-    row1 = next(r for r in exported_rows if r["MFG_SERIAL"] == "EXP_PPM01_NEW")
+    row1 = next(r for r in exported_rows if r["SERIAL"] == "EXP_PPM01_NEW")
     assert row1["Installation_Date"] == "01/10/2022"
     assert row1["Q1_Date"] == "01/01/2023"
     assert row1["Q1_Engineer"] == "EngExportQ1"
@@ -858,7 +858,7 @@ def test_export_data_ppm_new_format(mock_data_service, mocker):
     assert row1["Q3_Engineer"] == "" # Default from create_valid_ppm_dict
 
     # Verify row 2 (EXP_PPM02_NEW)
-    row2 = next(r for r in exported_rows if r["MFG_SERIAL"] == "EXP_PPM02_NEW")
+    row2 = next(r for r in exported_rows if r["SERIAL"] == "EXP_PPM02_NEW")
     assert row2["Name"] == "" # Optional None field exported as empty
     assert row2["Installation_Date"] == "" # Was None, exported as empty
     assert row2["Q1_Date"] == "10/04/2023" # Calculated from fixed_today
@@ -867,14 +867,14 @@ def test_export_data_ppm_new_format(mock_data_service, mocker):
 
 
 def test_export_data_ocm(mock_data_service): # Keep OCM test as is
-    ocm1 = create_valid_ocm_dict(MFG_SERIAL="EXP_OCM01")
+    ocm1 = create_valid_ocm_dict(SERIAL="EXP_OCM01")
     mock_data_service.add_entry("ocm", ocm1)
     csv_output_string = mock_data_service.export_data("ocm")
     csv_reader = csv.DictReader(io.StringIO(csv_output_string))
     exported_rows = list(csv_reader)
 
     assert len(exported_rows) == 1
-    assert exported_rows[0]["MFG_SERIAL"] == "EXP_OCM01"
+    assert exported_rows[0]["SERIAL"] == "EXP_OCM01"
     assert exported_rows[0]["Installation_Date"] == ocm1["Installation_Date"]
     expected_headers = ['NO'] + [h for h in OCM_MODEL_FIELDS if h != 'NO']
     assert csv_reader.fieldnames == expected_headers

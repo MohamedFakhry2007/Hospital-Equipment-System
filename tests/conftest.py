@@ -29,7 +29,7 @@ def sample_data():
     sample_ppm = {
         "EQUIPMENT": "Test Equipment",
         "MODEL": "Test Model",
-        "MFG_SERIAL": "TEST_SERIAL",
+        "SERIAL": "TEST_SERIAL",
         "MANUFACTURER": "Test Manufacturer",
         "LOG_NO": "123456",
         "PPM": "Yes"}

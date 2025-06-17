@@ -15,6 +15,10 @@ from app.services.training_service import TrainingService
 
 api_bp = Blueprint('api', __name__)
 logger = logging.getLogger(__name__)
+if not logger.hasHandlers():
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        logger.addHandler(handler)
 
 @api_bp.route('/equipment/<data_type>', methods=['GET'])
 def get_equipment(data_type):
@@ -29,20 +33,20 @@ def get_equipment(data_type):
         logger.error(f"Error getting {data_type} entries: {str(e)}")
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
-@api_bp.route('/equipment/<data_type>/<mfg_serial>', methods=['GET'])
-def get_equipment_by_serial(data_type, mfg_serial):
-    """Get a specific equipment entry by MFG_SERIAL."""
+@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['GET'])
+def get_equipment_by_serial(data_type, SERIAL):
+    """Get a specific equipment entry by SERIAL."""
     if data_type not in ('ppm', 'ocm'):
         return jsonify({"error": "Invalid data type"}), 400
 
     try:
-        entry = DataService.get_entry(data_type, mfg_serial)
+        entry = DataService.get_entry(data_type, SERIAL)
         if entry:
             return jsonify(entry), 200
         else:
-            return jsonify({"error": f"Equipment with serial '{mfg_serial}' not found"}), 404
+            return jsonify({"error": f"Equipment with serial '{SERIAL}' not found"}), 404
     except Exception as e:
-        logger.error(f"Error getting {data_type} entry {mfg_serial}: {str(e)}")
+        logger.error(f"Error getting {data_type} entry {SERIAL}: {str(e)}")
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
 @api_bp.route('/equipment/<data_type>', methods=['POST'])
@@ -57,8 +61,8 @@ def add_equipment(data_type):
     data = request.get_json()
 
     # Basic validation (more thorough validation in service layer)
-    # if 'MFG_SERIAL' not in data: # This will be caught by DataService Pydantic validation
-    #      return jsonify({"error": "MFG_SERIAL is required"}), 400
+    # if 'SERIAL' not in data: # This will be caught by DataService Pydantic validation
+    #      return jsonify({"error": "SERIAL is required"}), 400
 
     try:
         # Data is passed directly; Pydantic validation happens in DataService.add_entry
@@ -72,8 +76,8 @@ def add_equipment(data_type):
         return jsonify({"error": "Failed to add equipment"}), 500
 
 
-@api_bp.route('/equipment/<data_type>/<mfg_serial>', methods=['PUT'])
-def update_equipment(data_type, mfg_serial):
+@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['PUT'])
+def update_equipment(data_type, SERIAL):
     """Update an existing equipment entry."""
     if data_type not in ('ppm', 'ocm'):
         return jsonify({"error": "Invalid data type"}), 400
@@ -83,38 +87,38 @@ def update_equipment(data_type, mfg_serial):
 
     data = request.get_json()
 
-    # Ensure MFG_SERIAL in payload matches the URL parameter
-    if data.get('MFG_SERIAL') != mfg_serial:
-         return jsonify({"error": "MFG_SERIAL in payload must match URL parameter"}), 400
+    # Ensure SERIAL in payload matches the URL parameter
+    if data.get('SERIAL') != SERIAL:
+         return jsonify({"error": "SERIAL in payload must match URL parameter"}), 400
 
     try:
         # Convert JSON data if needed before validation/update
-        updated_entry = DataService.update_entry(data_type, mfg_serial, data)
+        updated_entry = DataService.update_entry(data_type, SERIAL, data)
         return jsonify(updated_entry), 200
     except ValueError as e:
-        logger.warning(f"Validation error updating {data_type} entry {mfg_serial}: {str(e)}")
+        logger.warning(f"Validation error updating {data_type} entry {SERIAL}: {str(e)}")
         return jsonify({"error": str(e)}), 400
     except KeyError:
-         return jsonify({"error": f"Equipment with serial '{mfg_serial}' not found"}), 404
+         return jsonify({"error": f"Equipment with serial '{SERIAL}' not found"}), 404
     except Exception as e:
-        logger.error(f"Error updating {data_type} entry {mfg_serial}: {str(e)}")
+        logger.error(f"Error updating {data_type} entry {SERIAL}: {str(e)}")
         return jsonify({"error": "Failed to update equipment"}), 500
 
 
-@api_bp.route('/equipment/<data_type>/<mfg_serial>', methods=['DELETE'])
-def delete_equipment(data_type, mfg_serial):
+@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['DELETE'])
+def delete_equipment(data_type, SERIAL):
     """Delete an equipment entry."""
     if data_type not in ('ppm', 'ocm'):
         return jsonify({"error": "Invalid data type"}), 400
 
     try:
-        deleted = DataService.delete_entry(data_type, mfg_serial)
+        deleted = DataService.delete_entry(data_type, SERIAL)
         if deleted:
-            return jsonify({"message": f"Equipment with serial '{mfg_serial}' deleted successfully"}), 200
+            return jsonify({"message": f"Equipment with serial '{SERIAL}' deleted successfully"}), 200
         else:
-            return jsonify({"error": f"Equipment with serial '{mfg_serial}' not found"}), 404
+            return jsonify({"error": f"Equipment with serial '{SERIAL}' not found"}), 404
     except Exception as e:
-        logger.error(f"Error deleting {data_type} entry {mfg_serial}: {str(e)}")
+        logger.error(f"Error deleting {data_type} entry {SERIAL}: {str(e)}")
         return jsonify({"error": "Failed to delete equipment"}), 500
 
 

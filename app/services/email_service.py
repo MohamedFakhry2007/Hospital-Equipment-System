@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 class EmailService:
     """Service for sending email notifications."""
     
+    logger.debug("Initializing EmailService")
+    
     @staticmethod
     async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
         """Get upcoming maintenance within specified days.
@@ -26,7 +28,7 @@ class EmailService:
             days_ahead: Days ahead to check (default: from config)
             
         Returns:
-            List of upcoming maintenance as (equipment, mfg_serial, quarter, date, engineer)
+            List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
         """
         if days_ahead is None:
             days_ahead = Config.REMINDER_DAYS
@@ -50,13 +52,13 @@ class EmailService:
                     if 0 <= days_until <= days_ahead:
                         upcoming.append((
                             entry['EQUIPMENT'],
-                            entry['MFG_SERIAL'],
+                            entry['SERIAL'],
                             q.replace('PPM_Q_', 'Quarter '),
                             q_data['date'],
                             q_data['engineer']
                         ))
                 except (ValueError, KeyError) as e:
-                    logger.error(f"Error parsing date for {entry.get('MFG_SERIAL', 'unknown')}: {str(e)}")
+                    logger.error(f"Error parsing date for {entry.get('SERIAL', 'unknown')}: {str(e)}")
         
         # Sort by date
         upcoming.sort(key=lambda x: datetime.strptime(x[3], '%d/%m/%Y'))
@@ -67,7 +69,7 @@ class EmailService:
         """Send reminder email for upcoming maintenance.
         
         Args:
-            upcoming: List of upcoming maintenance as (equipment, mfg_serial, quarter, date, engineer)
+            upcoming: List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
             
         Returns:
             True if email was sent successfully, False otherwise
