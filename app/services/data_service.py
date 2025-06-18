@@ -285,7 +285,7 @@ class DataService:
         for i, entry in enumerate(data, start=1):
             entry['NO'] = i
             logger.debug(f"Set NO={i} for entry with Serial/SERIAL: {entry.get('Serial', entry.get('SERIAL'))}")
-        return data    @staticmethod
+        return data
     def _reindex_entries(entries):
         """Reindex entries after import or deletion."""
         for idx, entry in enumerate(entries, start=1):
