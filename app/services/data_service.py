@@ -285,7 +285,12 @@ class DataService:
         for i, entry in enumerate(data, start=1):
             entry['NO'] = i
             logger.debug(f"Set NO={i} for entry with Serial/SERIAL: {entry.get('Serial', entry.get('SERIAL'))}")
-        return data
+        return data    @staticmethod
+    def _reindex_entries(entries):
+        """Reindex entries after import or deletion."""
+        for idx, entry in enumerate(entries, start=1):
+            entry['NO'] = idx
+        return entries
 
     @staticmethod
     def add_entry(data_type: Literal['ppm', 'ocm'], entry: Dict[str, Any]) -> Dict[str, Any]:

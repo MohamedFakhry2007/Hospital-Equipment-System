@@ -56,38 +56,81 @@
             </div>
         </div>
         <hr>
-        <h5 class="mt-4 mb-3">Quarterly Engineer Assignments</h5>
+        <h5 class="mt-4 mb-3">Quarterly Engineer Assignments</h5>        <div class="row">
+            <div class="col-md-6">
+                <h6>Quarter I</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_I_date" class="form-label">Q1 Date (DD/MM/YYYY)</label>
+                        <input type="text" class="form-control" id="PPM_Q_I_date" name="PPM_Q_I_date" 
+                               value="{{ form_data.PPM_Q_I.quarter_date if form_data.get('PPM_Q_I') else '' }}" 
+                               pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_I_engineer" class="form-label">Q1 Engineer</label>
+                        <input type="text" class="form-control" id="PPM_Q_I_engineer" name="PPM_Q_I_engineer" 
+                               value="{{ form_data.PPM_Q_I.engineer if form_data.get('PPM_Q_I') else '' }}">
+                    </div>
+                </div>
+            </div>            <div class="col-md-6">
+                <h6>Quarter II</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_II_date" class="form-label">Q2 Date (Auto-calculated)</label>
+                        <input type="text" class="form-control" id="PPM_Q_II_date" 
+                               value="{{ form_data.PPM_Q_II.quarter_date if form_data.get('PPM_Q_II') else '' }}" 
+                               readonly disabled>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_II_engineer" class="form-label">Q2 Engineer</label>
+                        <input type="text" class="form-control" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" 
+                               value="{{ form_data.PPM_Q_II.engineer if form_data.get('PPM_Q_II') else '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="row">
-            <div class="col-md-3 mb-3">
-                <label for="PPM_Q_I" class="form-label">Q1 Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_I" name="PPM_Q_I" value="{{ form_data.PPM_Q_I or '' }}">
+            <div class="col-md-6">
+                <h6>Quarter III</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_III_date" class="form-label">Q3 Date (Auto-calculated)</label>
+                        <input type="text" class="form-control" id="PPM_Q_III_date"
+                               value="{{ form_data.PPM_Q_III.quarter_date if form_data.get('PPM_Q_III') else '' }}" 
+                               readonly disabled>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_III_engineer" class="form-label">Q3 Engineer</label>
+                        <input type="text" class="form-control" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" 
+                               value="{{ form_data.PPM_Q_III.engineer if form_data.get('PPM_Q_III') else '' }}">
+                    </div>
+                </div>
             </div>
-            <div class="col-md-3 mb-3">
-                <label for="PPM_Q_II" class="form-label">Q2 Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_II" name="PPM_Q_II" value="{{ form_data.PPM_Q_II or '' }}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="PPM_Q_III" class="form-label">Q3 Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_III" name="PPM_Q_III" value="{{ form_data.PPM_Q_III or '' }}">
-            </div>
-            <div class="col-md-3 mb-3">
-                <label for="PPM_Q_IV" class="form-label">Q4 Engineer</label>
-                <input type="text" class="form-control" id="PPM_Q_IV" name="PPM_Q_IV" value="{{ form_data.PPM_Q_IV or '' }}">
+            <div class="col-md-6">
+                <h6>Quarter IV</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_IV_date" class="form-label">Q4 Date (Auto-calculated)</label>
+                        <input type="text" class="form-control" id="PPM_Q_IV_date"
+                               value="{{ form_data.PPM_Q_IV.quarter_date if form_data.get('PPM_Q_IV') else '' }}" 
+                               readonly disabled>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="PPM_Q_IV_engineer" class="form-label">Q4 Engineer</label>
+                        <input type="text" class="form-control" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" 
+                               value="{{ form_data.PPM_Q_IV.engineer if form_data.get('PPM_Q_IV') else '' }}">
+                    </div>
+                </div>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Status" class="form-label">Status (Optional, auto-calculated if blank)</label>
+                <label for="Status" class="form-label">Status</label>
                 <select class="form-select" id="Status" name="Status">
-                    <option value="" {% if not form_data.Status %}selected{% endif %}>Auto-calculate</option>
-                    <option value="Upcoming" {% if form_data.Status == 'Upcoming' %}selected{% endif %}>Upcoming</option>
+                    <option value="Upcoming" {% if form_data.Status == 'Upcoming' or not form_data.Status %}selected{% endif %}>Upcoming</option>
                     <option value="Overdue" {% if form_data.Status == 'Overdue' %}selected{% endif %}>Overdue</option>
                     <option value="Maintained" {% if form_data.Status == 'Maintained' %}selected{% endif %}>Maintained</option>
                 </select>
-            </div>
-            <div class="col-md-6 mb-3">
-                <label for="Q1 Date:" class="form-label">Q1 Date (DD/MM/YYYY)</label>
-                <input type="text" class="form-control" id="Q1_Date" name="Q1_Date" value="{{ form_data['PPM_Q_I']['date'] if form_data.get('PPM_Q_I') else '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
             </div>
         </div>
 
@@ -95,4 +138,51 @@
         <a href="{{ url_for('views.list_equipment', data_type='ppm') }}" class="btn btn-secondary mt-3">Cancel</a>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const q1DateInput = document.getElementById('PPM_Q_I_date');
+    const q2DateInput = document.getElementById('PPM_Q_II_date');
+    const q3DateInput = document.getElementById('PPM_Q_III_date');
+    const q4DateInput = document.getElementById('PPM_Q_IV_date');
+
+    function calculateNextQuarterDate(dateStr) {
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return '';
+        
+        const date = new Date(parts[2], parts[1] - 1, parts[0]); // DD/MM/YYYY to Date
+        date.setMonth(date.getMonth() + 3); // Add 3 months
+        
+        // Format back to DD/MM/YYYY
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    }
+
+    q1DateInput.addEventListener('change', function() {
+        const q1Date = this.value;
+        if (!q1Date) {
+            q2DateInput.value = '';
+            q3DateInput.value = '';
+            q4DateInput.value = '';
+            return;
+        }
+
+        // Calculate Q2 date (3 months after Q1)
+        const q2Date = calculateNextQuarterDate(q1Date);
+        q2DateInput.value = q2Date;
+
+        // Calculate Q3 date (3 months after Q2)
+        const q3Date = calculateNextQuarterDate(q2Date);
+        q3DateInput.value = q3Date;
+
+        // Calculate Q4 date (3 months after Q3)
+        const q4Date = calculateNextQuarterDate(q3Date);
+        q4DateInput.value = q4Date;
+    });
+});
+</script>
 {% endblock %}

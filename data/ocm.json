@@ -1,0 +1,47 @@
+[
+  {
+    "NO": 1,
+    "Department": "dep1",
+    "Name": "name1",
+    "Model": "model1",
+    "Serial": "serial1",
+    "Manufacturer": "man1",
+    "Log_Number": "logn1",
+    "Installation_Date": "1/1/2024",
+    "Warranty_End": "1/6/2024",
+    "Service_Date": "1/9/2025",
+    "Engineer": "eng1",
+    "Next_Maintenance": "2/3/2025",
+    "Status": "Upcoming"
+  },
+  {
+    "NO": 2,
+    "Department": "dep2",
+    "Name": "name2",
+    "Model": "model2",
+    "Serial": "serial2",
+    "Manufacturer": "man2",
+    "Log_Number": "logn2",
+    "Installation_Date": "1/2/2024",
+    "Warranty_End": "1/7/2024",
+    "Service_Date": "1/10/2025",
+    "Engineer": "eng2",
+    "Next_Maintenance": "2/4/2025",
+    "Status": "Scheduled"
+  },
+  {
+    "NO": 3,
+    "Department": "dep3",
+    "Name": "name3",
+    "Model": "model3",
+    "Serial": "serial3",
+    "Manufacturer": "man3",
+    "Log_Number": "logn3",
+    "Installation_Date": "1/3/2024",
+    "Warranty_End": "1/8/2024",
+    "Service_Date": "1/11/2025",
+    "Engineer": "eng3",
+    "Next_Maintenance": "2/5/2025",
+    "Status": "Completed"
+  }
+]

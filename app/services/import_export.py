@@ -6,11 +6,12 @@ import os
 from io import StringIO
 from typing import List, Dict, Any, Literal, Tuple
 import json
+from datetime import datetime, timedelta
 
 import pandas as pd
 from pydantic import ValidationError
 
-from app.models.ppm import PPMImportEntry
+from app.models.ppm import PPMImportEntry, PPMEntry
 from app.models.ocm import OCMEntry
 from app.services.data_service import DataService
 
@@ -206,8 +207,7 @@ class ImportExportService:
             current_data = DataService.load_data(data_type)
             serial_key = 'SERIAL' if data_type == 'ppm' else 'Serial'
             existing_serials = {entry.get(serial_key) for entry in current_data}
-            
-            # Process rows
+              # Process rows
             new_entries = []
             skipped_entries = []
             error_entries = []
@@ -227,8 +227,11 @@ class ImportExportService:
                         continue
                     
                     if data_type == 'ppm':
-                        # Handle PPM data
-                        entry = PPMImportEntry(**row_dict)
+                        # First validate the import format
+                        import_entry = PPMImportEntry(**row_dict)
+                        # Then transform to the proper nested structure
+                        transformed_dict = ImportExportService.transform_ppm_entry(row_dict)
+                        entry = PPMEntry(**transformed_dict)
                     else:
                         # Add NO field for OCM entries
                         row_dict['NO'] = idx + 1
@@ -279,3 +282,39 @@ class ImportExportService:
                 "errors": 1,
                 "error_details": [str(e)]
             }
+    
+    @staticmethod
+    def transform_ppm_entry(flat_entry: dict) -> dict:
+        """Transform flat PPM entry to nested structure."""
+        result = {
+            "Department": flat_entry.get("Department"),
+            "Name": flat_entry.get("Name"),
+            "MODEL": flat_entry.get("MODEL"),
+            "SERIAL": flat_entry.get("SERIAL"),
+            "MANUFACTURER": flat_entry.get("MANUFACTURER"),
+            "LOG_Number": flat_entry.get("LOG_Number"),
+            "Installation_Date": flat_entry.get("Installation_Date"),
+            "Warranty_End": flat_entry.get("Warranty_End"),
+        }
+
+        # Convert flat quarter fields to nested QuarterData objects
+        for quarter in ["I", "II", "III", "IV"]:
+            date_key = f"PPM_Q_{quarter}_date"
+            eng_key = f"PPM_Q_{quarter}_engineer"
+            result[f"PPM_Q_{quarter}"] = {
+                "quarter_date": flat_entry.get(date_key),
+                "engineer": flat_entry.get(eng_key)
+            }
+
+        # Calculate missing quarter dates if Q1 is provided
+        if flat_entry.get("PPM_Q_I_date"):
+            q1_date = datetime.strptime(flat_entry["PPM_Q_I_date"], "%d/%m/%Y")
+            for i, quarter in enumerate(["II", "III", "IV"], start=1):
+                if not flat_entry.get(f"PPM_Q_{quarter}_date"):
+                    next_date = q1_date + timedelta(days=90 * i)
+                    result[f"PPM_Q_{quarter}"]["quarter_date"] = next_date.strftime("%d/%m/%Y")
+
+        # Add initial status
+        result["Status"] = "Upcoming"
+        
+        return result

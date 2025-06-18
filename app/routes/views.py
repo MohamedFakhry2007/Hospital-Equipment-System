@@ -128,16 +128,25 @@ def add_ppm_equipment():
             "SERIAL": form_data.get("SERIAL"),
             "MANUFACTURER": form_data.get("MANUFACTURER"),
             "Department": form_data.get("Department"),
-            "LOG_Number": form_data.get("LOG_Number"),
-            "Installation_Date": form_data.get("Installation_Date", "").strip() or None,
+            "LOG_Number": form_data.get("LOG_Number"),            "Installation_Date": form_data.get("Installation_Date", "").strip() or None,
             "Warranty_End": form_data.get("Warranty_End", "").strip() or None,
-            # Eng1-Eng4 removed
-            "Status": form_data.get("Status", "").strip() or None, # Let DataService calculate if empty or None
-            "PPM_Q_I": form_data.get("PPM_Q_I"),
-            "PPM_Q_II": form_data.get("PPM_Q_II"),
-            "PPM_Q_III": form_data.get("PPM_Q_III"),
-            "PPM_Q_IV": form_data.get("PPM_Q_IV"),
-            "PPM_Q_I_date": form_data.get("PPM_Q_I_date")
+            "Status": "Upcoming",  # Default status for new equipment
+            "PPM_Q_I": {
+                "quarter_date": form_data.get("PPM_Q_I_date", "").strip() or None,
+                "engineer": form_data.get("PPM_Q_I_engineer", "").strip() or None
+            },
+            "PPM_Q_II": {
+                "quarter_date": form_data.get("PPM_Q_II_date", "").strip() or None,
+                "engineer": form_data.get("PPM_Q_II_engineer", "").strip() or None
+            },
+            "PPM_Q_III": {
+                "quarter_date": form_data.get("PPM_Q_III_date", "").strip() or None,
+                "engineer": form_data.get("PPM_Q_III_engineer", "").strip() or None
+            },
+            "PPM_Q_IV": {
+                "quarter_date": form_data.get("PPM_Q_IV_date", "").strip() or None,
+                "engineer": form_data.get("PPM_Q_IV_engineer", "").strip() or None
+            }
         }
         # Ensure Name is None if empty, not just for "if not ppm_data['Name']" which might fail if key missing
         if ppm_data.get("Name") == "":

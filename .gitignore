@@ -97,10 +97,6 @@ Thumbs.db
 # Poetry
 poetry.lock
 
-# Data
-*.csv
-*.json
-
 # Logs
 logs/
 *.log
