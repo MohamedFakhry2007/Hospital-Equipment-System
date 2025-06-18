@@ -1,6 +1,7 @@
 """
 Main entry point for the Hospital Equipment Maintenance Management System.
 """
+
 import logging
 import threading
 
@@ -9,16 +10,19 @@ from app.config import Config
 
 logger = logging.getLogger(__name__)
 
-app = create_app()
-logger.debug("Application created successfully")
 
+def main():
+    app = create_app()
+    logger.debug("Application created successfully")
 
-# Start email scheduler in a separate thread if enabled
-if Config.SCHEDULER_ENABLED:
-    scheduler_thread = threading.Thread(target=start_email_scheduler, daemon=True)
-    scheduler_thread.start()
-    app.logger.info("Email scheduler started in background thread")
+    # Start email scheduler in a separate thread if enabled
+    if Config.SCHEDULER_ENABLED:
+        scheduler_thread = threading.Thread(target=start_email_scheduler, daemon=True)
+        scheduler_thread.start()
+        app.logger.info("Email scheduler started in background thread")
+
+    app.run(debug=Config.DEBUG, host='0.0.0.0', port=5000)
 
 
 if __name__ == '__main__':
-    app.run(debug=Config.DEBUG, host='0.0.0.0', port=5000)
+    main()
