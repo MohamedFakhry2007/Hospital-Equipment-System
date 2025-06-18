@@ -420,6 +420,10 @@ class DataService:
                     logger.debug(f"Validating updated data for {data_type}: {updated_data}")
                     try:
                         if data_type == 'ppm':
+                            # If 'Status' is not in updated_data and 'Status' is in the original entry,
+                            # preserve the original 'Status'.
+                            if 'Status' not in updated_data and 'Status' in entry:
+                                updated_data['Status'] = entry['Status']
                             PPMEntry(**updated_data)
                         else:
                             OCMEntry(**updated_data)

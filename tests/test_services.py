@@ -894,5 +894,95 @@ def test_export_data_empty(mock_data_service):
     # assert len(list(csv_reader)) == 0 # No data rows
 
 
+def test_update_ppm_entry_status_handling(mock_data_service, mocker):
+    """Test PPM entry Status field handling during updates."""
+    # Mock today for consistent quarter date calculation if any status recalculation occurs
+    # Although for this specific test, we are checking preservation/direct update.
+    fixed_today = date(2023, 6, 15)
+    mocker.patch('app.services.data_service.datetime').today.return_value = fixed_today
+    mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+
+    # Scenario 1: Status Preservation
+    initial_serial_preserve = "PPM_STATUS_PRESERVE"
+    initial_status_preserve = "Upcoming"
+    ppm_data_preserve = create_valid_ppm_dict(
+        SERIAL=initial_serial_preserve,
+        Status=initial_status_preserve,
+        Installation_Date="01/01/2023" # Q1: 01/04/2023, Q2: 01/07/2023 ... all should be upcoming relative to fixed_today
+    )
+    # Ensure 'Status' is not in the base dict if we want DataService to calculate it.
+    # For this test, we provide it explicitly.
+
+    added_entry_preserve = mock_data_service.add_entry("ppm", ppm_data_preserve)
+    # Verify initial status is as set, or calculated if we didn't provide it.
+    # Since create_valid_ppm_dict sets it, and add_entry uses it if present:
+    assert added_entry_preserve["Status"] == initial_status_preserve, "Initial status not set as expected."
+
+    update_payload_preserve = {
+        "MODEL": "PPM_Updated_Model_Preserve",
+        # 'Status' field is intentionally omitted
+    }
+
+    # The update_entry method expects a full dictionary.
+    # We need to provide the existing 'NO' and other required fields.
+    # Get the current entry and update it with the payload.
+    current_entry_for_update_preserve = mock_data_service.get_entry("ppm", initial_serial_preserve)
+    full_update_data_preserve = current_entry_for_update_preserve.copy()
+    full_update_data_preserve.update(update_payload_preserve)
+    # Remove status from the payload to ensure it's not part of the update dict directly
+    if 'Status' in full_update_data_preserve and 'Status' not in update_payload_preserve:
+        # This is a bit tricky. The goal is that `updated_data` in `service.update_entry`
+        # does not have 'Status'.
+        # Our modification in data_service.py checks `if 'Status' not in updated_data`.
+        # So, `full_update_data_preserve` here is the `updated_data` arg to the service method.
+        # We must ensure 'Status' is NOT in this dict if we are testing preservation.
+        del full_update_data_preserve['Status']
+
+
+    updated_entry_preserve = mock_data_service.update_entry("ppm", initial_serial_preserve, full_update_data_preserve)
+    assert updated_entry_preserve is not None, "Update failed for status preservation test."
+    assert updated_entry_preserve["MODEL"] == "PPM_Updated_Model_Preserve"
+    assert updated_entry_preserve["Status"] == initial_status_preserve, "Status was not preserved."
+
+    fetched_entry_preserve = mock_data_service.get_entry("ppm", initial_serial_preserve)
+    assert fetched_entry_preserve is not None
+    assert fetched_entry_preserve["Status"] == initial_status_preserve, "Status not preserved after fetching again."
+
+    # Scenario 2: Status Update
+    initial_serial_update = "PPM_STATUS_UPDATE"
+    initial_status_update = "Upcoming"
+    new_status_update = "Maintained"
+    ppm_data_update = create_valid_ppm_dict(
+        SERIAL=initial_serial_update,
+        Status=initial_status_update,
+        Installation_Date="01/01/2023",
+        PPM_Q_I={"engineer": "EngQ1", "quarter_date": "01/04/2023"}, # Past, maintained for this test
+        PPM_Q_II={"engineer": "EngQ2", "quarter_date": "01/07/2023"} # Future
+    )
+    # To make it "Maintained" if status was auto-calculated (past Q1 is done)
+    # For this test, we explicitly set it, then update it.
+
+    added_entry_update = mock_data_service.add_entry("ppm", ppm_data_update)
+    assert added_entry_update["Status"] == initial_status_update
+
+    update_payload_update = {
+        "MODEL": "PPM_Updated_Model_Update",
+        "Status": new_status_update  # 'Status' IS provided
+    }
+    current_entry_for_update_update = mock_data_service.get_entry("ppm", initial_serial_update)
+    full_update_data_update = current_entry_for_update_update.copy()
+    full_update_data_update.update(update_payload_update)
+    # Here, full_update_data_update *will* contain 'Status': new_status_update
+
+    updated_entry_update = mock_data_service.update_entry("ppm", initial_serial_update, full_update_data_update)
+    assert updated_entry_update is not None, "Update failed for status update test."
+    assert updated_entry_update["MODEL"] == "PPM_Updated_Model_Update"
+    assert updated_entry_update["Status"] == new_status_update, "Status was not updated."
+
+    fetched_entry_update = mock_data_service.get_entry("ppm", initial_serial_update)
+    assert fetched_entry_update is not None
+    assert fetched_entry_update["Status"] == new_status_update, "Status not updated after fetching again."
+
+
 # Need to import csv for helper
 import csv
