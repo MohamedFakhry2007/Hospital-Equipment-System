@@ -77,7 +77,7 @@ class EmailService:
                     if not next_maintenance_str:
                         continue
 
-                    due_date = datetime.strptime(next_maintenance_str, '%m/%d/%Y')
+                    due_date = datetime.strptime(next_maintenance_str, '%d/%m/%Y')
                     days_until = (due_date - now).days
                     
                     if 0 <= days_until <= days_ahead:
@@ -100,7 +100,7 @@ class EmailService:
             logger.error(f"Error sorting PPM tasks: {str(e)}")
 
         try:
-            results["ocm_tasks"].sort(key=lambda x: datetime.strptime(x[2], '%m/%d/%Y'))
+            results["ocm_tasks"].sort(key=lambda x: datetime.strptime(x[2], '%d/%m/%Y'))
         except ValueError as e:
             logger.error(f"Error sorting OCM tasks: {str(e)}")
 
