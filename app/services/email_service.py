@@ -20,69 +20,116 @@ class EmailService:
     logger.debug("Initializing EmailService")
     
     @staticmethod
-    async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
-        """Get upcoming maintenance within specified days.
+    async def get_upcoming_maintenance(
+        ppm_data: List[Dict[str, Any]],
+        ocm_data: List[Dict[str, Any]],
+        days_ahead: int = None
+    ) -> Dict[str, list]:
+        """Get upcoming PPM and OCM maintenance within specified days.
         
         Args:
-            data: List of PPM entries
-            days_ahead: Days ahead to check (default: from config)
+            ppm_data: List of PPM entries.
+            ocm_data: List of OCM entries.
+            days_ahead: Days ahead to check (default: from config).
             
         Returns:
-            List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
+            A dictionary with "ppm_tasks" and "ocm_tasks" lists.
+            PPM tasks: (equipment, SERIAL, quarter, date, engineer)
+            OCM tasks: (equipment_name, serial_number, next_maintenance_date, engineer, department)
         """
         if days_ahead is None:
             days_ahead = Config.REMINDER_DAYS
             
         now = datetime.now()
-        upcoming = []
+        results = {"ppm_tasks": [], "ocm_tasks": []}
         
-        for entry in data:
-            if entry.get('PPM', '').lower() != 'yes':
-                continue
-                
-            for q in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
-                q_data = entry.get(q, {})
-                if not q_data or not q_data.get('date'):
+        # Process PPM data
+        if ppm_data:
+            for entry in ppm_data:
+                if entry.get('PPM', '').lower() != 'yes':
                     continue
                     
+                for q in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+                    q_data = entry.get(q, {})
+                    if not q_data or not q_data.get('date'):
+                        continue
+
+                    try:
+                        due_date = datetime.strptime(q_data['date'], '%d/%m/%Y')
+                        days_until = (due_date - now).days
+
+                        if 0 <= days_until <= days_ahead:
+                            results["ppm_tasks"].append((
+                                entry['EQUIPMENT'],
+                                entry['SERIAL'],
+                                q.replace('PPM_Q_', 'Quarter '),
+                                q_data['date'],
+                                q_data['engineer']
+                            ))
+                    except (ValueError, KeyError) as e:
+                        logger.error(f"Error parsing PPM date for {entry.get('SERIAL', 'unknown')}, quarter {q}: {str(e)}")
+
+        # Process OCM data
+        if ocm_data:
+            for entry in ocm_data:
                 try:
-                    due_date = datetime.strptime(q_data['date'], '%d/%m/%Y')
+                    next_maintenance_str = entry.get('Next_Maintenance')
+                    if not next_maintenance_str:
+                        continue
+
+                    due_date = datetime.strptime(next_maintenance_str, '%m/%d/%Y')
                     days_until = (due_date - now).days
                     
                     if 0 <= days_until <= days_ahead:
-                        upcoming.append((
-                            entry['EQUIPMENT'],
-                            entry['SERIAL'],
-                            q.replace('PPM_Q_', 'Quarter '),
-                            q_data['date'],
-                            q_data['engineer']
+                        results["ocm_tasks"].append((
+                            entry['Name'],
+                            entry['Serial'],
+                            next_maintenance_str,
+                            entry['Engineer'],
+                            entry.get('Department', 'N/A')
                         ))
-                except (ValueError, KeyError) as e:
-                    logger.error(f"Error parsing date for {entry.get('SERIAL', 'unknown')}: {str(e)}")
-        
-        # Sort by date
-        upcoming.sort(key=lambda x: datetime.strptime(x[3], '%d/%m/%Y'))
-        return upcoming
+                except ValueError as e:
+                    logger.error(f"Error parsing OCM date for {entry.get('Serial', 'unknown')}: {str(e)}. Date string: '{next_maintenance_str}'")
+                except KeyError as e:
+                    logger.error(f"Missing key for OCM entry {entry.get('Serial', 'unknown')}: {str(e)}")
+
+        # Sort results
+        try:
+            results["ppm_tasks"].sort(key=lambda x: datetime.strptime(x[3], '%d/%m/%Y'))
+        except ValueError as e:
+            logger.error(f"Error sorting PPM tasks: {str(e)}")
+
+        try:
+            results["ocm_tasks"].sort(key=lambda x: datetime.strptime(x[2], '%m/%d/%Y'))
+        except ValueError as e:
+            logger.error(f"Error sorting OCM tasks: {str(e)}")
+
+        return results
 
     @staticmethod
-    async def send_reminder_email(upcoming: List[Tuple[str, str, str, str, str]]) -> bool:
+    async def send_reminder_email(upcoming_tasks: Dict[str, list]) -> bool:
         """Send reminder email for upcoming maintenance.
         
         Args:
-            upcoming: List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
+            upcoming_tasks: Dictionary with "ppm_tasks" and "ocm_tasks".
+            upcoming_tasks: Dictionary with "ppm_tasks" and "ocm_tasks".
             
         Returns:
             True if email was sent successfully, False otherwise
         """
-        if not upcoming:
+        ppm_tasks = upcoming_tasks.get("ppm_tasks", [])
+        ocm_tasks = upcoming_tasks.get("ocm_tasks", [])
+
+        if not ppm_tasks and not ocm_tasks:
             logger.info("No upcoming maintenance to send reminders for")
             return True
             
+        total_tasks = len(ppm_tasks) + len(ocm_tasks)
         try:
             msg = EmailMessage()
             
             # Email content
-            subject = f"Hospital Equipment Maintenance Reminder - {len(upcoming)} upcoming tasks"
+            subject = f"Hospital Equipment Maintenance Reminder - {total_tasks} upcoming tasks"
             
             # Create HTML content
             html_content = f"""
@@ -102,6 +149,11 @@ class EmailService:
                     <h2>Upcoming Equipment Maintenance</h2>
                     <p>The following equipment requires maintenance in the next {Config.REMINDER_DAYS} days:</p>
                 </div>
+            """
+
+            if ppm_tasks:
+                html_content += """
+                <h3>PPM Tasks</h3>
                 <table>
                     <tr>
                         <th>Equipment</th>
@@ -110,21 +162,44 @@ class EmailService:
                         <th>Due Date</th>
                         <th>Engineer</th>
                     </tr>
-            """
-            
-            for equipment, serial, quarter, date, engineer in upcoming:
-                html_content += f"""
+                """
+                for equipment, serial, quarter, date, engineer in ppm_tasks:
+                    html_content += f"""
+                        <tr>
+                            <td>{equipment}</td>
+                            <td>{serial}</td>
+                            <td>{quarter}</td>
+                            <td>{date}</td>
+                            <td>{engineer}</td>
+                        </tr>
+                    """
+                html_content += "</table>"
+
+            if ocm_tasks:
+                html_content += """
+                <h3>OCM Tasks</h3>
+                <table>
                     <tr>
-                        <td>{equipment}</td>
-                        <td>{serial}</td>
-                        <td>{quarter}</td>
-                        <td>{date}</td>
-                        <td>{engineer}</td>
+                        <th>Equipment Name</th>
+                        <th>Serial Number</th>
+                        <th>Next Maintenance Date</th>
+                        <th>Engineer</th>
+                        <th>Department</th>
                     </tr>
                 """
+                for name, serial, next_date, engineer, department in ocm_tasks:
+                    html_content += f"""
+                        <tr>
+                            <td>{name}</td>
+                            <td>{serial}</td>
+                            <td>{next_date}</td>
+                            <td>{engineer}</td>
+                            <td>{department}</td>
+                        </tr>
+                    """
+                html_content += "</table>"
                 
             html_content += """
-                </table>
                 <p>Please ensure these maintenance tasks are completed on time.</p>
                 <p>This is an automated reminder from the Hospital Equipment Maintenance System.</p>
             </body>
@@ -145,7 +220,7 @@ class EmailService:
                 server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
                 server.send_message(msg)
                 
-            logger.info(f"Reminder email sent for {len(upcoming)} upcoming maintenance tasks")
+            logger.info(f"Reminder email sent for {total_tasks} upcoming maintenance tasks")
             return True
             
         except Exception as e:
@@ -158,17 +233,18 @@ class EmailService:
         from app.services.data_service import DataService
         
         try:
-            # Load PPM data
+            # Load PPM and OCM data
             ppm_data = DataService.load_data('ppm')
+            ocm_data = DataService.load_data('ocm') # Assuming DataService can load OCM data
             
             # Get upcoming maintenance
-            upcoming = await EmailService.get_upcoming_maintenance(ppm_data)
+            upcoming_tasks = await EmailService.get_upcoming_maintenance(ppm_data, ocm_data)
             
             # Send reminder if there are upcoming maintenance tasks
-            if upcoming:
-                await EmailService.send_reminder_email(upcoming)
+            if upcoming_tasks.get("ppm_tasks") or upcoming_tasks.get("ocm_tasks"):
+                await EmailService.send_reminder_email(upcoming_tasks)
             else:
-                logger.info("No upcoming maintenance tasks found")
+                logger.info("No upcoming maintenance tasks found for PPM or OCM")
                 
         except Exception as e:
             logger.error(f"Error processing reminders: {str(e)}")

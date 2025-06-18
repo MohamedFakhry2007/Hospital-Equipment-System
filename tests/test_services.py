@@ -1,7 +1,8 @@
 import json
-from datetime import datetime, date
-from unittest.mock import patch
+from datetime import datetime, date, timedelta
+from unittest.mock import patch, AsyncMock, MagicMock, call
 import io
+import logging # Added for logger testing
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +11,7 @@ from app.services.data_service import DataService
 from app.models.ppm import PPMEntry, QuarterData
 from app.models.ocm import OCMEntry
 from app.config import Config # To be patched
+from app.services.email_service import EmailService # Added
 
 
 # Helper functions to create valid data dictionaries
@@ -54,7 +56,7 @@ def create_valid_ocm_dict(SERIAL="OCM_SN001", equipment="OCM Device", model="OCM
         "Warranty_End": "01/02/2025",
         "Service_Date": "15/01/2024",
         "Next_Maintenance": "15/01/2025", # Upcoming by default
-        "ENGINEER": "OCM Engineer X",
+        "ENGINEER": "OCM Engineer X", # Note: Key is 'ENGINEER' in create_valid_ocm_dict, but 'Engineer' in OCM data processing for EmailService
         "Status": "Upcoming", # Will be recalculated by add/update unless specified
         "PPM": "Optional PPM Link", # Optional field
     }
@@ -986,3 +988,462 @@ def test_update_ppm_entry_status_handling(mock_data_service, mocker):
 
 # Need to import csv for helper
 import csv
+
+# asyncio import for EmailService tests
+import asyncio
+
+# --- EmailService Tests ---
+
+# Helper to get a fixed date for 'now'
+FIXED_NOW = datetime(2024, 7, 15) # July 15, 2024
+
+@pytest.fixture
+def mock_datetime_now(mocker):
+    return mocker.patch('app.services.email_service.datetime', now=lambda: FIXED_NOW)
+
+@pytest.fixture
+def sample_ppm_data():
+    # Dates relative to FIXED_NOW (2024-07-15)
+    # PPM dates are 'dd/mm/yyyy'
+    return [
+        {
+            "EQUIPMENT": "PPM Device 1", "SERIAL": "PPM001", "PPM": "yes",
+            "PPM_Q_I": {"date": "10/07/2024", "engineer": "Eng PPM1"}, # Due (5 days ago, but within 0-30 days if today is 15/07) -> should be filtered by 0 <= days_until
+            # Corrected: days_until = (due_date - now).days. If due_date is 10/07 and now is 15/07, days_until = -5. Not included.
+        },
+        {
+            "EQUIPMENT": "PPM Device 2", "SERIAL": "PPM002", "PPM": "yes",
+            "PPM_Q_II": {"date": "20/07/2024", "engineer": "Eng PPM2"}, # Due in 5 days
+        },
+        {
+            "EQUIPMENT": "PPM Device 3", "SERIAL": "PPM003", "PPM": "yes",
+            "PPM_Q_III": {"date": "10/08/2024", "engineer": "Eng PPM3"}, # Due in 26 days
+        },
+        {
+            "EQUIPMENT": "PPM Device 4", "SERIAL": "PPM004", "PPM": "yes",
+            "PPM_Q_IV": {"date": "20/08/2024", "engineer": "Eng PPM4"}, # Due in 36 days (outside 30 day window)
+        },
+        {
+            "EQUIPMENT": "PPM Device 5", "SERIAL": "PPM005", "PPM": "yes",
+            "PPM_Q_I": {"date": "01/01/2023", "engineer": "Eng PPM5"}, # Past due
+        },
+        {
+            "EQUIPMENT": "PPM Device 6", "SERIAL": "PPM006", "PPM": "no", # Not a PPM task
+            "PPM_Q_I": {"date": "25/07/2024", "engineer": "Eng PPM6"},
+        },
+         { # Task for sorting check, due in 15 days
+            "EQUIPMENT": "PPM Device 7", "SERIAL": "PPM007", "PPM": "yes",
+            "PPM_Q_I": {"date": "30/07/2024", "engineer": "Eng PPM7"},
+        },
+
+    ]
+
+@pytest.fixture
+def sample_ocm_data():
+    # Dates relative to FIXED_NOW (2024-07-15)
+    # OCM dates are 'mm/dd/yyyy'
+    return [
+        {
+            "Name": "OCM Device 1", "Serial": "OCM001", "Next_Maintenance": "07/10/2024", # Due (5 days ago, not included)
+            "Engineer": "Eng OCM1", "Department": "Cardiology"
+        },
+        {
+            "Name": "OCM Device 2", "Serial": "OCM002", "Next_Maintenance": "07/20/2024", # Due in 5 days
+            "Engineer": "Eng OCM2", "Department": "Radiology"
+        },
+        {
+            "Name": "OCM Device 3", "Serial": "OCM003", "Next_Maintenance": "08/10/2024", # Due in 26 days
+            "Engineer": "Eng OCM3", "Department": "Surgery"
+        },
+        {
+            "Name": "OCM Device 4", "Serial": "OCM004", "Next_Maintenance": "08/20/2024", # Due in 36 days (outside 30 day window)
+            "Engineer": "Eng OCM4" # No department
+        },
+        {
+            "Name": "OCM Device 5", "Serial": "OCM005", "Next_Maintenance": "01/01/2023", # Past due
+            "Engineer": "Eng OCM5", "Department": "ICU"
+        },
+        { # Task for sorting check, due in 15 days
+            "Name": "OCM Device 6", "Serial": "OCM006", "Next_Maintenance": "07/30/2024",
+            "Engineer": "Eng OCM6", "Department": "Lab"
+        },
+        { # Missing Next_Maintenance
+            "Name": "OCM Device 7", "Serial": "OCM007",
+            "Engineer": "Eng OCM7", "Department": "Admin"
+        },
+        { # Invalid date format for Next_Maintenance
+            "Name": "OCM Device 8", "Serial": "OCM008", "Next_Maintenance": "2024-07-25",
+            "Engineer": "Eng OCM8", "Department": "Ortho"
+        }
+    ]
+
+@pytest.mark.asyncio
+class TestEmailServiceGetUpcomingMaintenance:
+
+    @patch.object(Config, 'REMINDER_DAYS', 30)
+    async def test_get_upcoming_ppm_only(self, mock_datetime_now, sample_ppm_data):
+        result = await EmailService.get_upcoming_maintenance(ppm_data=sample_ppm_data, ocm_data=[])
+
+        assert not result["ocm_tasks"]
+        assert len(result["ppm_tasks"]) == 3 # PPM002, PPM003, PPM007
+
+        ppm_serials = [task[1] for task in result["ppm_tasks"]]
+        assert "PPM002" in ppm_serials # Due 20/07/2024 (5 days)
+        assert "PPM007" in ppm_serials # Due 30/07/2024 (15 days)
+        assert "PPM003" in ppm_serials # Due 10/08/2024 (26 days)
+
+        # Check sorting (by date, which is index 3)
+        assert ppm_serials == ["PPM002", "PPM007", "PPM003"]
+
+        task_ppm002 = next(t for t in result["ppm_tasks"] if t[1] == "PPM002")
+        assert task_ppm002 == ("PPM Device 2", "PPM002", "Quarter II", "20/07/2024", "Eng PPM2")
+
+    @patch.object(Config, 'REMINDER_DAYS', 30)
+    async def test_get_upcoming_ocm_only(self, mock_datetime_now, sample_ocm_data):
+        result = await EmailService.get_upcoming_maintenance(ppm_data=[], ocm_data=sample_ocm_data)
+
+        assert not result["ppm_tasks"]
+        assert len(result["ocm_tasks"]) == 3 # OCM002, OCM006, OCM003
+
+        ocm_serials = [task[1] for task in result["ocm_tasks"]]
+        assert "OCM002" in ocm_serials # Due 07/20/2024 (5 days)
+        assert "OCM006" in ocm_serials # Due 07/30/2024 (15 days)
+        assert "OCM003" in ocm_serials # Due 08/10/2024 (26 days)
+
+        # Check sorting (by date, index 2, format %m/%d/%Y)
+        assert ocm_serials == ["OCM002", "OCM006", "OCM003"]
+
+        task_ocm002 = next(t for t in result["ocm_tasks"] if t[1] == "OCM002")
+        assert task_ocm002 == ("OCM Device 2", "OCM002", "07/20/2024", "Eng OCM2", "Radiology")
+
+        task_ocm004 = next((t for t in result["ocm_tasks"] if t[1] == "OCM004"), None) # OCM004 is outside window
+        assert task_ocm004 is None
+
+        # Check default department for OCM004 if it were included (it's not, but logic test)
+        # For an entry like OCM004 (if it were in range)
+        # original_ocm004 = next(d for d in sample_ocm_data if d["Serial"] == "OCM004")
+        # assert original_ocm004.get('Department') is None -> so 'N/A' would be used.
+
+    @patch.object(Config, 'REMINDER_DAYS', 30)
+    async def test_get_upcoming_ppm_and_ocm(self, mock_datetime_now, sample_ppm_data, sample_ocm_data):
+        result = await EmailService.get_upcoming_maintenance(ppm_data=sample_ppm_data, ocm_data=sample_ocm_data)
+
+        assert len(result["ppm_tasks"]) == 3
+        assert len(result["ocm_tasks"]) == 3
+
+        assert result["ppm_tasks"][0][1] == "PPM002" # Sorted correctly
+        assert result["ocm_tasks"][0][1] == "OCM002" # Sorted correctly
+
+    @patch.object(Config, 'REMINDER_DAYS', 30)
+    async def test_get_upcoming_no_tasks(self, mock_datetime_now):
+        ppm_data_none = [{"EQUIPMENT": "PPM Far Future", "SERIAL": "PPM999", "PPM": "yes", "PPM_Q_I": {"date": "01/01/2025", "engineer": "Eng PPM9"}}]
+        ocm_data_none = [{"Name": "OCM Far Future", "Serial": "OCM999", "Next_Maintenance": "01/01/2025", "Engineer": "Eng OCM9"}]
+        result = await EmailService.get_upcoming_maintenance(ppm_data=ppm_data_none, ocm_data=ocm_data_none)
+
+        assert not result["ppm_tasks"]
+        assert not result["ocm_tasks"]
+
+    @patch.object(Config, 'REMINDER_DAYS', 30)
+    @patch('app.services.email_service.logger')
+    async def test_get_upcoming_date_format_handling_and_errors(self, mock_logger, mock_datetime_now, sample_ppm_data, sample_ocm_data):
+        # This test reuses sample_ppm_data and sample_ocm_data which include various date formats and potential errors
+
+        # PPM001 has date 10/07/2024 (dd/mm/yyyy), now is 15/07/2024. days_until = -5. Filtered out.
+        # OCM001 has date 07/10/2024 (mm/dd/yyyy), now is 15/07/2024. days_until = -5. Filtered out.
+        # OCM008 has invalid date "2024-07-25"
+
+        result = await EmailService.get_upcoming_maintenance(ppm_data=sample_ppm_data, ocm_data=sample_ocm_data)
+
+        assert len(result["ppm_tasks"]) == 3 # PPM002, PPM003, PPM007
+        assert "PPM001" not in [t[1] for t in result["ppm_tasks"]]
+
+        assert len(result["ocm_tasks"]) == 3 # OCM002, OCM003, OCM006
+        assert "OCM001" not in [t[1] for t in result["ocm_tasks"]]
+        assert "OCM008" not in [t[1] for t in result["ocm_tasks"]] # Invalid date format
+
+        # Check logger calls for OCM errors
+        # OCM007: Missing Next_Maintenance (should be skipped silently by `if not next_maintenance_str: continue`)
+        # OCM008: ValueError for date parsing
+        error_logs = [call_args[0][0] for call_args in mock_logger.error.call_args_list]
+        assert any(f"Error parsing OCM date for OCM008" in msg for msg in error_logs)
+        assert any(f"Date string: '2024-07-25'" in msg for msg in error_logs)
+
+    @patch.object(Config, 'REMINDER_DAYS', 5) # Reduce reminder days
+    async def test_get_upcoming_custom_days_ahead(self, mock_datetime_now, sample_ppm_data, sample_ocm_data):
+        result = await EmailService.get_upcoming_maintenance(ppm_data=sample_ppm_data, ocm_data=sample_ocm_data, days_ahead=5)
+        # PPM002 (20/07/2024) is 5 days from 15/07/2024. Included.
+        # PPM003 (10/08/2024) is 26 days. Not included.
+        # PPM007 (30/07/2024) is 15 days. Not included.
+        assert len(result["ppm_tasks"]) == 1
+        assert result["ppm_tasks"][0][1] == "PPM002"
+
+        # OCM002 (07/20/2024) is 5 days. Included.
+        # OCM003 (08/10/2024) is 26 days. Not included.
+        # OCM006 (07/30/2024) is 15 days. Not included.
+        assert len(result["ocm_tasks"]) == 1
+        assert result["ocm_tasks"][0][1] == "OCM002"
+
+    async def test_empty_data_inputs(self, mock_datetime_now):
+        result = await EmailService.get_upcoming_maintenance(ppm_data=[], ocm_data=[])
+        assert not result["ppm_tasks"]
+        assert not result["ocm_tasks"]
+
+        result_none = await EmailService.get_upcoming_maintenance(ppm_data=None, ocm_data=None)
+        assert not result_none["ppm_tasks"]
+        assert not result_none["ocm_tasks"]
+
+
+@pytest.mark.asyncio
+@patch.object(Config, 'EMAIL_SENDER', "sender@example.com")
+@patch.object(Config, 'EMAIL_RECEIVER', "receiver@example.com")
+@patch.object(Config, 'SMTP_SERVER', "smtp.example.com")
+@patch.object(Config, 'SMTP_PORT', 587)
+@patch.object(Config, 'SMTP_USERNAME', "user")
+@patch.object(Config, 'SMTP_PASSWORD', "pass")
+@patch.object(Config, 'REMINDER_DAYS', 10) # For email subject line consistency
+class TestEmailServiceSendReminderEmail:
+
+    def _get_sample_ppm_task(self):
+        # date relative to FIXED_NOW (15/07/2024) for consistency, e.g. 5 days from now
+        return ("Test PPM Equipment", "PPM_SERIAL_01", "Quarter III", "20/07/2024", "Test PPM Engineer")
+
+    def _get_sample_ocm_task(self):
+        # date relative to FIXED_NOW (15/07/2024), e.g. 8 days from now
+        return ("Test OCM Equipment", "OCM_SERIAL_01", "07/23/2024", "Test OCM Engineer", "Test OCM Department")
+
+    @patch('smtplib.SMTP')
+    async def test_send_email_with_ppm_only(self, mock_smtp_constructor, *_): # Ignore Config patches for now
+        mock_smtp_server = MagicMock()
+        mock_smtp_constructor.return_value.__enter__.return_value = mock_smtp_server
+
+        ppm_task = self._get_sample_ppm_task()
+        upcoming_tasks = {"ppm_tasks": [ppm_task], "ocm_tasks": []}
+
+        success = await EmailService.send_reminder_email(upcoming_tasks)
+        assert success is True
+
+        mock_smtp_constructor.assert_called_once_with("smtp.example.com", 587)
+        mock_smtp_server.starttls.assert_called_once()
+        mock_smtp_server.login.assert_called_once_with("user", "pass")
+        mock_smtp_server.send_message.assert_called_once()
+
+        sent_msg = mock_smtp_server.send_message.call_args[0][0]
+        assert sent_msg['Subject'] == f"Hospital Equipment Maintenance Reminder - 1 upcoming tasks"
+        assert sent_msg['From'] == "sender@example.com"
+        assert sent_msg['To'] == "receiver@example.com"
+
+        html_content = ""
+        for part in sent_msg.walk():
+            if part.get_content_type() == "text/html":
+                html_content = part.get_payload(decode=True).decode()
+                break
+        assert "<h3>PPM Tasks</h3>" in html_content
+        assert "Test PPM Equipment" in html_content
+        assert "PPM_SERIAL_01" in html_content
+        assert "<h3>OCM Tasks</h3>" not in html_content
+        assert f"next {Config.REMINDER_DAYS} days" in html_content
+
+
+    @patch('smtplib.SMTP')
+    async def test_send_email_with_ocm_only(self, mock_smtp_constructor, *_):
+        mock_smtp_server = MagicMock()
+        mock_smtp_constructor.return_value.__enter__.return_value = mock_smtp_server
+
+        ocm_task = self._get_sample_ocm_task()
+        upcoming_tasks = {"ppm_tasks": [], "ocm_tasks": [ocm_task]}
+
+        success = await EmailService.send_reminder_email(upcoming_tasks)
+        assert success is True
+        mock_smtp_server.send_message.assert_called_once()
+        sent_msg = mock_smtp_server.send_message.call_args[0][0]
+        assert sent_msg['Subject'] == f"Hospital Equipment Maintenance Reminder - 1 upcoming tasks"
+
+        html_content = ""
+        for part in sent_msg.walk():
+            if part.get_content_type() == "text/html":
+                html_content = part.get_payload(decode=True).decode()
+                break
+        assert "<h3>OCM Tasks</h3>" in html_content
+        assert "Test OCM Equipment" in html_content
+        assert "OCM_SERIAL_01" in html_content
+        assert "<h3>PPM Tasks</h3>" not in html_content
+
+    @patch('smtplib.SMTP')
+    async def test_send_email_with_ppm_and_ocm(self, mock_smtp_constructor, *_):
+        mock_smtp_server = MagicMock()
+        mock_smtp_constructor.return_value.__enter__.return_value = mock_smtp_server
+
+        ppm_task = self._get_sample_ppm_task()
+        ocm_task = self._get_sample_ocm_task()
+        upcoming_tasks = {"ppm_tasks": [ppm_task], "ocm_tasks": [ocm_task]}
+
+        success = await EmailService.send_reminder_email(upcoming_tasks)
+        assert success is True
+        mock_smtp_server.send_message.assert_called_once()
+        sent_msg = mock_smtp_server.send_message.call_args[0][0]
+        assert sent_msg['Subject'] == f"Hospital Equipment Maintenance Reminder - 2 upcoming tasks"
+
+        html_content = ""
+        for part in sent_msg.walk():
+            if part.get_content_type() == "text/html":
+                html_content = part.get_payload(decode=True).decode()
+                break
+        assert "<h3>PPM Tasks</h3>" in html_content
+        assert "Test PPM Equipment" in html_content
+        assert "<h3>OCM Tasks</h3>" in html_content
+        assert "Test OCM Equipment" in html_content
+
+    @patch('smtplib.SMTP')
+    @patch('app.services.email_service.logger')
+    async def test_send_email_no_tasks(self, mock_logger, mock_smtp_constructor, *_):
+        upcoming_tasks = {"ppm_tasks": [], "ocm_tasks": []}
+        success = await EmailService.send_reminder_email(upcoming_tasks)
+
+        assert success is True
+        mock_smtp_constructor.assert_not_called()
+        mock_logger.info.assert_called_with("No upcoming maintenance to send reminders for")
+
+    @patch('smtplib.SMTP')
+    @patch('app.services.email_service.logger')
+    async def test_send_email_smtp_failure(self, mock_logger, mock_smtp_constructor, *_):
+        mock_smtp_server = MagicMock()
+        mock_smtp_constructor.return_value.__enter__.return_value = mock_smtp_server
+        mock_smtp_server.send_message.side_effect = Exception("SMTP Connection Error")
+
+        ppm_task = self._get_sample_ppm_task()
+        upcoming_tasks = {"ppm_tasks": [ppm_task], "ocm_tasks": []}
+
+        success = await EmailService.send_reminder_email(upcoming_tasks)
+        assert success is False
+        mock_logger.error.assert_called_once_with("Failed to send reminder email: SMTP Connection Error")
+
+
+@pytest.mark.asyncio
+class TestEmailServiceProcessReminders:
+
+    @patch('app.services.data_service.DataService.load_data')
+    @patch('app.services.email_service.EmailService.get_upcoming_maintenance', new_callable=AsyncMock)
+    @patch('app.services.email_service.EmailService.send_reminder_email', new_callable=AsyncMock)
+    async def test_process_reminders_sends_email_if_tasks_found(
+        self, mock_send_email, mock_get_upcoming, mock_load_data,
+        sample_ppm_data, sample_ocm_data # Use fixtures
+    ):
+        mock_load_data.side_effect = [sample_ppm_data, sample_ocm_data]
+        upcoming_mock_data = {"ppm_tasks": [("ppm_task_details",)], "ocm_tasks": [("ocm_task_details",)]}
+        mock_get_upcoming.return_value = upcoming_mock_data
+
+        await EmailService.process_reminders()
+
+        assert mock_load_data.call_count == 2
+        mock_load_data.assert_any_call('ppm')
+        mock_load_data.assert_any_call('ocm')
+
+        mock_get_upcoming.assert_called_once_with(sample_ppm_data, sample_ocm_data)
+        mock_send_email.assert_called_once_with(upcoming_mock_data)
+
+    @patch('app.services.data_service.DataService.load_data')
+    @patch('app.services.email_service.EmailService.get_upcoming_maintenance', new_callable=AsyncMock)
+    @patch('app.services.email_service.EmailService.send_reminder_email', new_callable=AsyncMock)
+    @patch('app.services.email_service.logger')
+    async def test_process_reminders_no_email_if_no_tasks(
+        self, mock_logger, mock_send_email, mock_get_upcoming, mock_load_data,
+        sample_ppm_data, sample_ocm_data
+    ):
+        mock_load_data.side_effect = [sample_ppm_data, sample_ocm_data]
+        mock_get_upcoming.return_value = {"ppm_tasks": [], "ocm_tasks": []} # No tasks
+
+        await EmailService.process_reminders()
+
+        mock_get_upcoming.assert_called_once_with(sample_ppm_data, sample_ocm_data)
+        mock_send_email.assert_not_called()
+        mock_logger.info.assert_called_with("No upcoming maintenance tasks found for PPM or OCM")
+
+
+    @patch('app.services.data_service.DataService.load_data')
+    @patch('app.services.email_service.EmailService.get_upcoming_maintenance', new_callable=AsyncMock)
+    @patch('app.services.email_service.EmailService.send_reminder_email', new_callable=AsyncMock)
+    @patch('app.services.email_service.logger')
+    async def test_process_reminders_handles_load_data_exception(
+        self, mock_logger, mock_send_email, mock_get_upcoming, mock_load_data
+    ):
+        mock_load_data.side_effect = Exception("Failed to load data")
+
+        await EmailService.process_reminders()
+
+        mock_logger.error.assert_called_with("Error processing reminders: Failed to load data")
+        mock_get_upcoming.assert_not_called()
+        mock_send_email.assert_not_called()
+
+    @patch('app.services.data_service.DataService.load_data')
+    @patch('app.services.email_service.EmailService.get_upcoming_maintenance', new_callable=AsyncMock)
+    @patch('app.services.email_service.EmailService.send_reminder_email', new_callable=AsyncMock)
+    @patch('app.services.email_service.logger')
+    async def test_process_reminders_handles_get_upcoming_exception(
+        self, mock_logger, mock_send_email, mock_get_upcoming, mock_load_data,
+        sample_ppm_data, sample_ocm_data
+    ):
+        mock_load_data.side_effect = [sample_ppm_data, sample_ocm_data]
+        mock_get_upcoming.side_effect = Exception("Failed to get upcoming tasks")
+
+        await EmailService.process_reminders()
+
+        mock_logger.error.assert_called_with("Error processing reminders: Failed to get upcoming tasks")
+        mock_send_email.assert_not_called()
+
+    @patch('app.services.data_service.DataService.load_data')
+    @patch('app.services.email_service.EmailService.get_upcoming_maintenance', new_callable=AsyncMock)
+    @patch('app.services.email_service.EmailService.send_reminder_email', new_callable=AsyncMock)
+    @patch('app.services.email_service.logger')
+    async def test_process_reminders_handles_send_email_exception(
+        self, mock_logger, mock_send_email, mock_get_upcoming, mock_load_data,
+        sample_ppm_data, sample_ocm_data
+    ):
+        mock_load_data.side_effect = [sample_ppm_data, sample_ocm_data]
+        upcoming_mock_data = {"ppm_tasks": [("ppm_task_details",)], "ocm_tasks": []}
+        mock_get_upcoming.return_value = upcoming_mock_data
+        mock_send_email.side_effect = Exception("Failed to send email")
+
+        await EmailService.process_reminders()
+        # The exception in send_reminder_email is caught within send_reminder_email itself and logged.
+        # process_reminders catches exceptions from get_upcoming_maintenance or load_data.
+        # If send_reminder_email fails, it logs its own error and returns False,
+        # but process_reminders doesn't treat this as an exception to log again.
+        # So, we check that send_reminder_email was called. Its internal error handling is tested elsewhere.
+        mock_send_email.assert_called_once_with(upcoming_mock_data)
+        # Ensure no *additional* error log from process_reminders for this specific case
+        # (unless send_reminder_email re-raises, which it doesn't)
+        # Check that the *specific* error for process_reminders is not called for this path.
+        process_reminders_error_calls = [
+            c for c in mock_logger.error.call_args_list
+            if "Error processing reminders:" in c[0][0]
+        ]
+        assert not any("Failed to send email" in call[0][0] for call in process_reminders_error_calls)
+
+# Minimal test for run_scheduler - just that it starts and respects SCHEDULER_ENABLED
+@patch.object(Config, 'SCHEDULER_ENABLED', True)
+@patch.object(Config, 'SCHEDULER_INTERVAL', 0.001) # very small interval for test
+@patch('app.services.email_service.EmailService.process_reminders', new_callable=AsyncMock)
+@patch('asyncio.sleep', new_callable=AsyncMock) # Mock asyncio.sleep
+@patch('app.services.email_service.logger')
+@pytest.mark.asyncio
+async def test_run_scheduler_runs_periodically(mock_logger, mock_asyncio_sleep, mock_process_reminders):
+    # Let it "run" for a couple of cycles
+    mock_asyncio_sleep.side_effect = [None, asyncio.CancelledError] # Run once, then stop loop
+
+    with pytest.raises(asyncio.CancelledError): # Expect loop to break due to this
+        await EmailService.run_scheduler()
+
+    mock_logger.info.assert_any_call(f"Starting reminder scheduler (interval: {Config.SCHEDULER_INTERVAL} hours)")
+    assert mock_process_reminders.call_count >= 1 # Should be called at least once
+    assert mock_asyncio_sleep.call_count >=1
+    mock_asyncio_sleep.assert_any_call(Config.SCHEDULER_INTERVAL * 3600)
+
+
+@patch.object(Config, 'SCHEDULER_ENABLED', False)
+@patch('app.services.email_service.EmailService.process_reminders', new_callable=AsyncMock)
+@patch('app.services.email_service.logger')
+@pytest.mark.asyncio
+async def test_run_scheduler_disabled(mock_logger, mock_process_reminders):
+    await EmailService.run_scheduler()
+    mock_logger.info.assert_called_with("Reminder scheduler is disabled")
+    mock_process_reminders.assert_not_called()
