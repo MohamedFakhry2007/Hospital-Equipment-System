@@ -18,6 +18,26 @@ logger = logging.getLogger('app')
 # Allowed file extension
 ALLOWED_EXTENSIONS = {'csv'}
 
+def calculate_next_quarter_date(base_date_str, months_to_add):
+    """
+    Calculates the date for the next quarter.
+
+    Args:
+        base_date_str (str): The base date string in "DD/MM/YYYY" format.
+        months_to_add (int): Number of months to add.
+
+    Returns:
+        str: The new date string in "DD/MM/YYYY" format, or None if input is invalid.
+    """
+    if not base_date_str:
+        return None
+    try:
+        base_date = datetime.strptime(base_date_str, "%d/%m/%Y")
+        next_date = base_date + relativedelta(months=months_to_add)
+        return next_date.strftime("%d/%m/%Y")
+    except ValueError:
+        return None
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -120,6 +140,21 @@ def add_ppm_equipment():
     """Handle adding new PPM equipment."""
     if request.method == 'POST':
         form_data = request.form.to_dict()
+
+        ppm_q_i_date_str = form_data.get("PPM_Q_I_date", "").strip()
+
+        q1_date_to_store = ppm_q_i_date_str if ppm_q_i_date_str else None
+        q2_date_str = None
+        q3_date_str = None
+        q4_date_str = None
+
+        if q1_date_to_store:
+            q2_date_str = calculate_next_quarter_date(q1_date_to_store, 3)
+            if q2_date_str:
+                q3_date_str = calculate_next_quarter_date(q2_date_str, 3)
+                if q3_date_str:
+                    q4_date_str = calculate_next_quarter_date(q3_date_str, 3)
+
         # Structure data for PPMEntry model
         # PPM_Q_X fields expect {"engineer": "name"}
         ppm_data = {
@@ -132,19 +167,19 @@ def add_ppm_equipment():
             "Warranty_End": form_data.get("Warranty_End", "").strip() or None,
             "Status": "Upcoming",  # Default status for new equipment
             "PPM_Q_I": {
-                "quarter_date": form_data.get("PPM_Q_I_date", "").strip() or None,
+                "quarter_date": q1_date_to_store,
                 "engineer": form_data.get("PPM_Q_I_engineer", "").strip() or None
             },
             "PPM_Q_II": {
-                "quarter_date": form_data.get("PPM_Q_II_date", "").strip() or None,
+                "quarter_date": q2_date_str,
                 "engineer": form_data.get("PPM_Q_II_engineer", "").strip() or None
             },
             "PPM_Q_III": {
-                "quarter_date": form_data.get("PPM_Q_III_date", "").strip() or None,
+                "quarter_date": q3_date_str,
                 "engineer": form_data.get("PPM_Q_III_engineer", "").strip() or None
             },
             "PPM_Q_IV": {
-                "quarter_date": form_data.get("PPM_Q_IV_date", "").strip() or None,
+                "quarter_date": q4_date_str,
                 "engineer": form_data.get("PPM_Q_IV_engineer", "").strip() or None
             }
         }
