@@ -132,12 +132,12 @@ class ImportExportService:
                         'Model': entry.get('Model'),
                         'Serial': entry.get('Serial'),
                         'Manufacturer': entry.get('Manufacturer'),
-                        'Log Number': entry.get('Log Number'),
-                        'Installation Date': entry.get('Installation Date'),
-                        'Warranty End': entry.get('Warranty End'),
-                        'Service Date': entry.get('Service Date'),
+                        'Log Number': entry.get('Log_Number'),
+                        'Installation Date': entry.get('Installation_Date'),
+                        'Warranty End': entry.get('Warranty_End'),
+                        'Service Date': entry.get('Service_Date'),
                         'Engineer': entry.get('Engineer'),
-                        'Next Maintenance': entry.get('Next Maintenance'),
+                        'Next Maintenance': entry.get('Next_Maintenance'),
                         'Status': entry.get('Status')
                     }
                 
