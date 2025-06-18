@@ -56,14 +56,14 @@
                 <p class="form-control-plaintext">{{ entry.Q1_Date or 'N/A' }}</p>
             </div>            <div class="col-md-3 mb-3">
                 <label for="Q1_Engineer" class="form-label">Q1 Engineer</label>
-                <input type="text" class="form-control" id="Q1_Engineer" name="Q1_Engineer" value="{{ entry.PPM_Q_I.engineer if entry.PPM_Q_I and entry.PPM_Q_I.engineer else request.form.Q1_Engineer or '' }}">
+                <input type="text" class="form-control" id="Q1_Engineer" name="Q1_Engineer" value="{{ entry.Q1_Engineer if entry.Q1_Engineer is defined else request.form.Q1_Engineer or '' }}">
             </div>
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q2 Target Date</label>
                 <p class="form-control-plaintext">{{ entry.Q2_Date or 'N/A' }}</p>
             </div>            <div class="col-md-3 mb-3">
                 <label for="Q2_Engineer" class="form-label">Q2 Engineer</label>
-                <input type="text" class="form-control" id="Q2_Engineer" name="Q2_Engineer" value="{{ entry.PPM_Q_II.engineer if entry.PPM_Q_II and entry.PPM_Q_II.engineer else request.form.Q2_Engineer or '' }}">
+                <input type="text" class="form-control" id="Q2_Engineer" name="Q2_Engineer" value="{{ entry.Q2_Engineer if entry.Q2_Engineer is defined else request.form.Q2_Engineer or '' }}">
             </div>
         </div>
         <div class="row align-items-end"> {# Q3 and Q4 #}
@@ -72,14 +72,14 @@
                 <p class="form-control-plaintext">{{ entry.Q3_Date or 'N/A' }}</p>
             </div>            <div class="col-md-3 mb-3">
                 <label for="Q3_Engineer" class="form-label">Q3 Engineer</label>
-                <input type="text" class="form-control" id="Q3_Engineer" name="Q3_Engineer" value="{{ entry.PPM_Q_III.engineer if entry.PPM_Q_III and entry.PPM_Q_III.engineer else request.form.Q3_Engineer or '' }}">
+                <input type="text" class="form-control" id="Q3_Engineer" name="Q3_Engineer" value="{{ entry.Q3_Engineer if entry.Q3_Engineer is defined else request.form.Q3_Engineer or '' }}">
             </div>
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q4 Target Date</label>
                 <p class="form-control-plaintext">{{ entry.Q4_Date or 'N/A' }}</p>
             </div>            <div class="col-md-3 mb-3">
                 <label for="Q4_Engineer" class="form-label">Q4 Engineer</label>
-                <input type="text" class="form-control" id="Q4_Engineer" name="Q4_Engineer" value="{{ entry.PPM_Q_IV.engineer if entry.PPM_Q_IV and entry.PPM_Q_IV.engineer else request.form.Q4_Engineer or '' }}">
+                <input type="text" class="form-control" id="Q4_Engineer" name="Q4_Engineer" value="{{ entry.Q4_Engineer if entry.Q4_Engineer is defined else request.form.Q4_Engineer or '' }}">
             </div>
         </div>
         <hr>

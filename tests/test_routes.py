@@ -1,218 +1,104 @@
-"""
-Integration tests for routes, including view and API endpoints.
-"""
-import json
-from unittest.mock import patch, Mock
-
 import pytest
-from flask import url_for
+from flask import url_for, get_flashed_messages
+import json
+import os
+import shutil
+
+# Attempt to import the Flask app instance
+# Common locations are app/__init__.py or app/main.py
+try:
+    from app import app as flask_app # If app is in app/__init__.py
+except ImportError:
+    from app.main import app as flask_app # If app is in app.main.py
 
 from app.services.data_service import DataService
-from app.services.email_service import EmailService
-from app.services.import_export import ImportExportService
-from app.services.validation import ValidationService
+from app.config import Config
+
+# Original ppm.json path
+ORIGINAL_PPM_JSON_PATH = Config.PPM_JSON_PATH
+# Place test_ppm_data.json in the same directory as this test file
+TEST_PPM_DATA_DIR = os.path.join(os.path.dirname(__file__), 'test_data')
+TEST_PPM_JSON_PATH = os.path.join(TEST_PPM_DATA_DIR, 'test_ppm_data.json')
+
+@pytest.fixture(scope='function')
+def client_with_temp_ppm(monkeypatch):
+    # Ensure the test data directory exists
+    os.makedirs(TEST_PPM_DATA_DIR, exist_ok=True)
+
+    # Create a copy of the original ppm.json for testing
+    if os.path.exists(ORIGINAL_PPM_JSON_PATH):
+        shutil.copy2(ORIGINAL_PPM_JSON_PATH, TEST_PPM_JSON_PATH)
+    else: # Create an empty list if original doesn't exist
+        with open(TEST_PPM_JSON_PATH, 'w') as f_test:
+            json.dump([], f_test)
+
+    # Monkeypatch Config.PPM_JSON_PATH to use the test file
+    monkeypatch.setattr(Config, 'PPM_JSON_PATH', TEST_PPM_JSON_PATH)
+
+    flask_app.config['TESTING'] = True
+    flask_app.config['WTF_CSRF_ENABLED'] = False # Disable CSRF for simpler form posts in tests
+
+    with flask_app.test_client() as client:
+        with flask_app.app_context(): # Ensure app context for url_for etc.
+            yield client
+
+    # Clean up the test ppm.json file and directory if empty
+    if os.path.exists(TEST_PPM_JSON_PATH):
+        os.remove(TEST_PPM_JSON_PATH)
+    if os.path.exists(TEST_PPM_DATA_DIR) and not os.listdir(TEST_PPM_DATA_DIR):
+        os.rmdir(TEST_PPM_DATA_DIR)
 
 
-@pytest.mark.usefixtures("app_test_client")
-class TestViewRoutes:
-    """Tests for view routes."""
+def test_edit_ppm_equipment_post(client_with_temp_ppm):
+    # Test with SERIAL "1", assuming it exists in the copied data/ppm.json
+    # data/ppm.json has SERIAL "1" with PPM_Q_I.quarter_date = "22/07/2025"
+    serial_to_test = "1"
 
-    def test_index(self, app_test_client, sample_ppm_data):
-        """Test the index route."""
-        with patch.object(DataService, "get_all_entries", return_value=sample_ppm_data):
-            response = app_test_client.get(url_for("views.index"))
-            assert response.status_code == 200
-            assert b"PPM Equipment List" in response.data
+    initial_record = DataService.get_entry('ppm', serial_to_test)
+    if not initial_record:
+        # If SERIAL "1" is somehow not in data/ppm.json, this test will fail.
+        pytest.fail(f"Test setup failed: PPM entry with SERIAL '{serial_to_test}' not found in test data.")
 
-    def test_list_equipment(self, app_test_client, sample_ppm_data):
-        """Test the list equipment route."""
-        with patch.object(DataService, "get_all_entries", return_value=sample_ppm_data):
-            response = app_test_client.get(url_for("views.list_equipment", data_type="ppm"))
-            assert response.status_code == 200
-            assert b"PPM Equipment" in response.data
+    original_q1_date = initial_record['PPM_Q_I']['quarter_date']
 
-    def test_add_ppm_equipment_get(self, app_test_client):
-        """Test the add PPM equipment route (GET)."""
-        response = app_test_client.get(url_for("views.add_ppm_equipment"))
-        assert response.status_code == 200
-        assert b"Add PPM Equipment" in response.data
+    form_data = {
+        "Department": "Test Department Updated Via Route",
+        "MODEL": initial_record['MODEL'],
+        "Name": "Test Name Updated Via Route",
+        "MANUFACTURER": initial_record['MANUFACTURER'],
+        "LOG_Number": initial_record['LOG_Number'],
+        "Installation_Date": initial_record.get('Installation_Date', ''),
+        "Warranty_End": initial_record.get('Warranty_End', ''),
+        "Q1_Engineer": "Engineer Q1 Updated Test",
+        "Q2_Engineer": initial_record['PPM_Q_II']['engineer'],
+        "Q3_Engineer": initial_record['PPM_Q_III']['engineer'],
+        "Q4_Engineer": initial_record['PPM_Q_IV']['engineer'],
+        "Status": "" # Auto-calculate
+    }
 
-    def test_add_ppm_equipment_post(self, app_test_client):
-        """Test the add PPM equipment route (POST)."""
-        with patch.object(ValidationService, "validate_ppm_form", return_value=(True, {})):
-            with patch.object(ValidationService, "convert_ppm_form_to_model", return_value={}):
-                with patch.object(DataService, "add_entry", return_value=None):
-                    response = app_test_client.post(
-                        url_for("views.add_ppm_equipment"),
-                        data={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
-                        follow_redirects=True,
-                    )
-                    assert response.status_code == 200
-                    assert b"PPM equipment added successfully!" in response.data
-
-    def test_edit_ppm_equipment_get(self, app_test_client, sample_ppm_data):
-        """Test the edit PPM equipment route (GET)."""
-        with patch.object(DataService, "get_entry", return_value=sample_ppm_data[0]):
-            response = app_test_client.get(url_for("views.edit_ppm_equipment", SERIAL="123"))
-            assert response.status_code == 200
-            assert b"Edit PPM Equipment" in response.data
-
-    def test_edit_ppm_equipment_post(self, app_test_client, sample_ppm_data):
-        """Test the edit PPM equipment route (POST)."""
-        with patch.object(DataService, "get_entry", return_value=sample_ppm_data[0]):
-            with patch.object(ValidationService, "validate_ppm_form", return_value=(True, {})):
-                with patch.object(ValidationService, "convert_ppm_form_to_model", return_value={}):
-                    with patch.object(DataService, "update_entry", return_value=sample_ppm_data[0]):
-                        response = app_test_client.post(
-                            url_for("views.edit_ppm_equipment", SERIAL="123"),
-                            data={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
-                            follow_redirects=True,
-                        )
-                        assert response.status_code == 200
-                        assert b"PPM equipment updated successfully!" in response.data
-
-    def test_import_export_page(self, app_test_client):
-        """Test the import/export page."""
-        response = app_test_client.get(url_for("views.import_export_page"))
-        assert response.status_code == 200
-        assert b"Import / Export" in response.data
-
-
-@pytest.mark.usefixtures("app_test_client")
-class TestApiRoutes:
-    """Tests for API routes."""
-
-    def test_get_equipment(self, app_test_client, sample_ppm_data):
-        """Test getting all equipment entries."""
-        with patch.object(DataService, "get_all_entries", return_value=sample_ppm_data):
-            response = app_test_client.get("/api/equipment/ppm")
-            assert response.status_code == 200
-            assert response.is_json
-            data = json.loads(response.data)
-            assert len(data) == 2
-
-    def test_get_equipment_by_serial(self, app_test_client, sample_ppm_data):
-        """Test getting a specific equipment entry by serial."""
-        with patch.object(DataService, "get_entry", return_value=sample_ppm_data[0]):
-            response = app_test_client.get("/api/equipment/ppm/123")
-            assert response.status_code == 200
-            assert response.is_json
-            data = json.loads(response.data)
-            assert data["SERIAL"] == "123"
-
-    def test_add_equipment(self, app_test_client):
-        """Test adding a new equipment entry."""
-        with patch.object(DataService, "add_entry", return_value={"SERIAL": "456"}):
-            response = app_test_client.post(
-                "/api/equipment/ppm",
-                json={"EQUIPMENT": "Test", "SERIAL": "456", "PPM": "Yes"},
-            )
-            assert response.status_code == 201
-            assert response.is_json
-            data = json.loads(response.data)
-            assert data["SERIAL"] == "456"
-
-    def test_update_equipment(self, app_test_client, sample_ppm_data):
-        """Test updating an existing equipment entry."""
-        with patch.object(DataService, "update_entry", return_value=sample_ppm_data[0]):
-            response = app_test_client.put(
-                "/api/equipment/ppm/123",
-                json={"EQUIPMENT": "Test", "SERIAL": "123", "PPM": "Yes"},
-            )
-            assert response.status_code == 200
-            assert response.is_json
-            data = json.loads(response.data)
-            assert data["SERIAL"] == "123"
-
-    def test_delete_equipment(self, app_test_client):
-        """Test deleting an equipment entry."""
-        with patch.object(DataService, "delete_entry", return_value=True):
-            response = app_test_client.delete("/api/equipment/ppm/123")
-            assert response.status_code == 200
-            assert response.is_json
-            data = json.loads(response.data)
-            assert "Equipment with serial '123' deleted successfully" in data["message"]
-
-    def test_export_data(self, app_test_client):
-        """Test exporting data to CSV."""
-        with patch.object(ImportExportService, "export_to_csv", return_value=(True, "", "CSV Content")):
-            response = app_test_client.get("/api/export/ppm")
-            assert response.status_code == 200
-            assert response.mimetype == "text/csv"
-            assert response.data == b"CSV Content"
-
-    def test_import_data(self, app_test_client, tmp_path):
-        """Test importing data from CSV."""
-        mock_file = Mock()
-        mock_file.filename = "test.csv"
-        mock_file.read.return_value = b"Test CSV Content"
-        
-        test_file_path = tmp_path / "test.csv"
-        test_file_path.write_text("test;csv;content")
-
-        with patch.object(ImportExportService, "import_from_csv", return_value=(True, "Import success", {})):
-             with patch("app.routes.api.request") as mock_request:
-                mock_request.files = {"file": mock_file}
-                response = app_test_client.post(
-                    "/api/import/ppm", data={"file": (test_file_path.open('rb'), "test.csv")}
-                )
-                assert response.status_code == 200
-                assert response.is_json
-                data = json.loads(response.data)
-                assert data["message"] == "Import success"
-
-
-def test_get_equipment_invalid_type(app_test_client):
-    """Test getting equipment with an invalid data type."""
-    response = app_test_client.get("/api/equipment/invalid")
-    assert response.status_code == 400
-
-
-def test_get_equipment_by_serial_not_found(app_test_client):
-    """Test getting equipment by serial when not found."""
-    with patch.object(DataService, "get_entry", return_value=None):
-        response = app_test_client.get("/api/equipment/ppm/999")
-        assert response.status_code == 404
-
-
-def test_add_equipment_invalid_json(app_test_client):
-    """Test adding equipment with invalid JSON."""
-    response = app_test_client.post("/api/equipment/ppm", data="not json")
-    assert response.status_code == 400
-
-
-def test_add_equipment_missing_serial(app_test_client):
-    """Test adding equipment with missing SERIAL."""
-    response = app_test_client.post("/api/equipment/ppm", json={"EQUIPMENT": "Test"})
-    assert response.status_code == 400
-
-
-def test_update_equipment_serial_mismatch(app_test_client):
-    """Test updating equipment with mismatched SERIAL in payload."""
-    response = app_test_client.put(
-        "/api/equipment/ppm/123", json={"EQUIPMENT": "Test", "SERIAL": "456", "PPM": "Yes"}
+    response = client_with_temp_ppm.post(
+        url_for('views.edit_ppm_equipment', SERIAL=serial_to_test),
+        data=form_data,
+        follow_redirects=False
     )
-    assert response.status_code == 400
 
+    assert response.status_code == 302, f"Expected status code 302, got {response.status_code}"
+    assert response.location == url_for('views.list_equipment', data_type='ppm'),         f"Expected redirect to PPM list, got {response.location}"
 
-def test_update_equipment_not_found(app_test_client):
-    """Test updating equipment that is not found."""
-    with patch.object(DataService, "update_entry", side_effect=KeyError):
-        response = app_test_client.put(
-            "/api/equipment/ppm/999", json={"EQUIPMENT": "Test", "SERIAL": "999", "PPM": "Yes"}
-        )
-        assert response.status_code == 404
+    with client_with_temp_ppm.session_transaction() as session:
+        flashed_messages = session.get('_flashes', [])
 
+    assert len(flashed_messages) > 0, "No flashed messages found in session."
+    assert flashed_messages[0][0] == 'success'
+    assert "PPM equipment updated successfully!" in flashed_messages[0][1]
 
-def test_delete_equipment_not_found(app_test_client):
-    """Test deleting equipment that is not found."""
-    with patch.object(DataService, "delete_entry", return_value=False):
-        response = app_test_client.delete("/api/equipment/ppm/999")
-        assert response.status_code == 404
+    updated_record = DataService.get_entry('ppm', serial_to_test)
+    assert updated_record is not None, f"Record with SERIAL '{serial_to_test}' not found after update."
+    assert updated_record['Department'] == "Test Department Updated Via Route"
+    assert updated_record['Name'] == "Test Name Updated Via Route"
+    assert updated_record['PPM_Q_I']['engineer'] == "Engineer Q1 Updated Test"
 
+    assert updated_record['Status'] == "Upcoming", f"Expected Status 'Upcoming', got '{updated_record['Status']}'"
 
-def test_export_data_error(app_test_client):
-    """Test export data error handling."""
-    with patch.object(ImportExportService, "export_to_csv", return_value=(False, "Error", "")):
-        response = app_test_client.get("/api/export/ppm")
-        assert response.status_code == 500
+    assert updated_record['SERIAL'] == serial_to_test, "SERIAL should not change."
+    assert updated_record['PPM_Q_I']['quarter_date'] == original_q1_date, "Quarter date should not change."

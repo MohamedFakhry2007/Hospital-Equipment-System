@@ -249,7 +249,6 @@ def edit_ppm_equipment(SERIAL):
     if request.method == 'POST':
         form_data = request.form.to_dict()
         ppm_data_update = {
-            "EQUIPMENT": form_data.get("EQUIPMENT"),
             "MODEL": form_data.get("MODEL"),
             "Name": form_data.get("Name"),
             "SERIAL": SERIAL, # Should not change
@@ -277,6 +276,21 @@ def edit_ppm_equipment(SERIAL):
         }
         if ppm_data_update.get("Name") == "":
             ppm_data_update["Name"] = None
+
+        # Calculate status if not provided or empty in the form
+        if not form_data.get("Status"):  # Checks for empty string or None
+            # If Status was explicitly set to None by the form processing,
+            # remove it before calculation if calculate_status prefers no key.
+            # Based on current ppm_data_update construction, Status would be None here.
+            if "Status" in ppm_data_update and ppm_data_update["Status"] is None:
+                ppm_data_update.pop("Status", None) # Safely pop
+
+            # Ensure all other fields are set in ppm_data_update before this call
+            calculated_status = DataService.calculate_status(ppm_data_update, 'ppm')
+            ppm_data_update['Status'] = calculated_status
+        # If Status *is* provided in the form, it would have been set from:
+        # "Status": form_data.get("Status", "").strip() or None,
+        # No special handling needed here, it will be used directly.
 
         try:
             DataService.update_entry('ppm', SERIAL, ppm_data_update)
