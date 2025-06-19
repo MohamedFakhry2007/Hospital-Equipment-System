@@ -52,15 +52,16 @@ class EmailService:
             logger.info("Email reminder processing finished.")
 
     @staticmethod
-    async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
-        """Get upcoming maintenance within specified days.
+    async def get_upcoming_maintenance(data: List[Dict[str, Any]], data_type: str, days_ahead: int = None) -> List[Tuple[str, str, str, str, str, str]]:
+        """Get upcoming maintenance within specified days for OCM or PPM data.
         
         Args:
-            data: List of PPM entries
-            days_ahead: Days ahead to check (default: from config)
+            data: List of OCM or PPM entries.
+            data_type: String indicating the type of data ('ocm' or 'ppm').
+            days_ahead: Days ahead to check (default: from config).
             
         Returns:
-            List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
+            List of upcoming maintenance as (type, department, serial, description, due_date_str, engineer).
         """
         if days_ahead is None:
             days_ahead = Config.REMINDER_DAYS
@@ -69,39 +70,83 @@ class EmailService:
         upcoming = []
         
         for entry in data:
-            for q in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
-                q_data = entry.get(q, {})
-                if not q_data or not q_data.get('quarter_date'):
+            try:
+                due_date_str = None
+                engineer = None
+                description = None
+                department = entry.get('Department', 'N/A')
+                serial = entry.get('Serial', entry.get('SERIAL', 'N/A')) # OCM uses 'Serial', PPM uses 'SERIAL'
+
+                if data_type == 'ocm':
+                    due_date_str = entry.get('Next_Maintenance')
+                    engineer = entry.get('Engineer', 'N/A')
+                    description = 'Next Maintenance'
+                    if not due_date_str:
+                        logger.warning(f"OCM entry {serial} missing 'Next_Maintenance' date.")
+                        continue
+
+                elif data_type == 'ppm':
+                    # PPM data has multiple potential dates per entry
+                    for q_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+                        q_data = entry.get(q_key, {})
+                        if not q_data or not q_data.get('quarter_date'):
+                            continue
+
+                        ppm_due_date_str = q_data['quarter_date']
+                        ppm_engineer = q_data.get('engineer', 'N/A')
+                        ppm_description = q_key.replace('PPM_Q_', 'Quarter ')
+
+                        due_date_obj = datetime.strptime(ppm_due_date_str, '%d/%m/%Y')
+                        days_until = (due_date_obj - now).days
+
+                        if 0 <= days_until <= days_ahead:
+                            upcoming.append((
+                                'PPM',
+                                department,
+                                serial,
+                                ppm_description,
+                                ppm_due_date_str,
+                                ppm_engineer
+                            ))
+                    continue # Continue to next entry after processing all quarters for PPM
+
+                else:
+                    logger.error(f"Unknown data_type: {data_type} for entry {serial}")
                     continue
-                    
-                try:
-                    due_date = datetime.strptime(q_data['quarter_date'], '%d/%m/%Y')
-                    days_until = (due_date - now).days
+
+                # Common date processing for OCM (PPM dates are handled within its loop)
+                if data_type == 'ocm': # This block is now only for OCM
+                    due_date_obj = datetime.strptime(due_date_str, '%d/%m/%Y')
+                    days_until = (due_date_obj - now).days
                     
                     if 0 <= days_until <= days_ahead:
                         upcoming.append((
-                            entry['Department'],
-                            entry['SERIAL'],
-                            q.replace('PPM_Q_', 'Quarter '),
-                            q_data['quarter_date'],
-                            q_data['engineer']
+                            'OCM',
+                            department,
+                            serial,
+                            description,
+                            due_date_str,
+                            engineer
                         ))
-                except (ValueError, KeyError) as e:
-                    logger.error(f"Error parsing date for {entry.get('SERIAL', 'unknown')}: {str(e)}")
+
+            except ValueError as e:
+                logger.error(f"Error parsing date for {serial} (type: {data_type}): {str(e)}. Date string was: '{due_date_str}'.")
+            except KeyError as e:
+                logger.error(f"Missing key for {serial} (type: {data_type}): {str(e)}")
         
-        # Sort by date
-        upcoming.sort(key=lambda x: datetime.strptime(x[3], '%d/%m/%Y'))
+        # Sort by date - index 4 is due_date_str
+        upcoming.sort(key=lambda x: datetime.strptime(x[4], '%d/%m/%Y'))
         return upcoming
 
     @staticmethod
-    async def send_reminder_email(upcoming: List[Tuple[str, str, str, str, str]]) -> bool:
+    async def send_reminder_email(upcoming: List[Tuple[str, str, str, str, str, str]]) -> bool:
         """Send reminder email for upcoming maintenance.
         
         Args:
-            upcoming: List of upcoming maintenance as (equipment, SERIAL, quarter, date, engineer)
+            upcoming: List of upcoming maintenance as (type, department, serial, description, due_date_str, engineer).
             
         Returns:
-            True if email was sent successfully, False otherwise
+            True if email was sent successfully, False otherwise.
         """
         if not upcoming:
             logger.info("No upcoming maintenance to send reminders for")
@@ -135,21 +180,23 @@ class EmailService:
                 </div>
                 <table>
                     <tr>
-                        <th>Equipment</th>
+                        <th>Type</th>
+                        <th>Department</th>
                         <th>Serial Number</th>
-                        <th>Quarter</th>
+                        <th>Description</th>
                         <th>Due Date</th>
                         <th>Engineer</th>
                     </tr>
             """
             
-            for equipment, serial, quarter, date, engineer in upcoming:
+            for task_type, department, serial, description, due_date_str, engineer in upcoming:
                 html_content += f"""
                     <tr>
-                        <td>{equipment}</td>
+                        <td>{task_type}</td>
+                        <td>{department}</td>
                         <td>{serial}</td>
-                        <td>{quarter}</td>
-                        <td>{date}</td>
+                        <td>{description}</td>
+                        <td>{due_date_str}</td>
                         <td>{engineer}</td>
                     </tr>
                 """
@@ -203,13 +250,16 @@ class EmailService:
             ocm_data = DataService.load_data('ocm')
 
             # Get upcoming maintenance for PPM
-            upcoming_ppm = await EmailService.get_upcoming_maintenance(ppm_data)
+            upcoming_ppm = await EmailService.get_upcoming_maintenance(ppm_data, data_type='ppm')
 
             # Get upcoming maintenance for OCM
-            upcoming_ocm = await EmailService.get_upcoming_maintenance(ocm_data)
+            upcoming_ocm = await EmailService.get_upcoming_maintenance(ocm_data, data_type='ocm')
 
             # Combine upcoming maintenance tasks
             upcoming = upcoming_ppm + upcoming_ocm
+
+            # Sort the combined list by date (index 4 is due_date_str)
+            upcoming.sort(key=lambda x: datetime.strptime(x[4], '%d/%m/%Y'))
 
             # Send reminder if there are upcoming maintenance tasks
             if upcoming:
