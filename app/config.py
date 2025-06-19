@@ -31,6 +31,7 @@ class Config:
     EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER", "")
 
     # Reminder configuration
-    REMINDER_DAYS = int(os.getenv("REMINDER_DAYS", "60"))
-    SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "True").lower() == "true"
-    SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "24"))  # hours
+    REMINDER_DAYS = int(os.getenv("REMINDER_DAYS", "60")) # Days ahead to look for maintenance tasks
+    SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "True").lower() == "true" # Global switch for the email scheduler thread
+    # SCHEDULER_INTERVAL (previously here) has been removed as the interval is now managed dynamically
+    # via 'email_reminder_interval_minutes' in settings.json

@@ -25,31 +25,70 @@ class EmailService:
 
     @staticmethod
     async def run_scheduler_async_loop():
-        """The actual asynchronous scheduler loop."""
+        """The actual asynchronous scheduler loop that runs periodically."""
+        # Import DataService here to avoid circular import issues at module level
+        from app.services.data_service import DataService
+
         if EmailService._scheduler_running:
             logger.info("Scheduler loop already running in this process.")
             return
 
-        # Acquire lock before checking and setting _scheduler_running
         with EmailService._scheduler_lock:
             if EmailService._scheduler_running:
-                logger.info("Scheduler loop already running in this process (checked after lock).")
+                logger.info("Scheduler loop already running (checked after lock).")
                 return
             EmailService._scheduler_running = True
             logger.info("Email reminder scheduler async loop started in process ID: %s.", os.getpid())
             logger.warning("If running multiple application instances (e.g., Gunicorn workers), ensure this scheduler is enabled in only ONE instance to avoid duplicate emails.")
-        
+
         try:
-            # Removed the while True loop to run reminders only once
-            try:
-                await EmailService.process_reminders()
-            except Exception as e: # Catch specific errors if possible, e.g. related to email sending
-                logger.error(f"Error processing reminders: {str(e)}")
+            while True:
+                logger.debug("Scheduler loop iteration started.")
+                settings = {}
+                try:
+                    settings = DataService.load_settings()
+                    logger.debug(f"Loaded settings: {settings}")
+                except Exception as e:
+                    logger.error(f"Error loading settings in scheduler loop: {str(e)}. Will use defaults and retry.", exc_info=True)
+                    # Use defaults to allow the loop to continue and retry loading settings next time
+                    settings = {
+                        "email_notifications_enabled": False, # Default to false if settings can't be loaded
+                        "email_reminder_interval_minutes": 60 # Default interval
+                    }
+
+                email_enabled = settings.get("email_notifications_enabled", False) # Default to False if key is missing
+                interval_minutes = settings.get("email_reminder_interval_minutes", 60) # Default to 60 if key is missing
+
+                if not isinstance(interval_minutes, int) or interval_minutes <= 0:
+                    logger.warning(f"Invalid email_reminder_interval_minutes: {interval_minutes}. Defaulting to 60 minutes.")
+                    interval_minutes = 60
+
+                interval_seconds = interval_minutes * 60
+
+                if email_enabled:
+                    logger.info("Email notifications are ENABLED in settings. Processing reminders.")
+                    try:
+                        await EmailService.process_reminders()
+                        logger.debug("Finished processing reminders.")
+                    except Exception as e:
+                        logger.error(f"Error during process_reminders call in scheduler loop: {str(e)}", exc_info=True)
+                else:
+                    logger.info("Email notifications are DISABLED in settings. Skipping reminder processing.")
+
+                logger.info(f"Scheduler sleeping for {interval_minutes} minutes ({interval_seconds} seconds).")
+                await asyncio.sleep(interval_seconds)
+                logger.debug("Scheduler awake after sleep.")
+
+        except asyncio.CancelledError:
+            logger.info("Scheduler loop was cancelled.")
+        except Exception as e:
+            logger.error(f"Unhandled error in scheduler loop: {str(e)}", exc_info=True)
+            # This part of the code might not be reached if the loop itself is the source of an unhandled exception.
+            # Consider how to restart or gracefully handle such a scenario if needed.
         finally:
-            # Ensure the flag is reset after the single execution
             with EmailService._scheduler_lock:
                 EmailService._scheduler_running = False
-            logger.info("Email reminder processing finished.")
+            logger.info("Email reminder scheduler async loop has stopped.")
 
     @staticmethod
     async def get_upcoming_maintenance(data: List[Dict[str, Any]], data_type: str, days_ahead: int = None) -> List[Tuple[str, str, str, str, str, str]]:
@@ -240,40 +279,63 @@ class EmailService:
     @staticmethod
     async def process_reminders():
         """Process and send reminders for upcoming maintenance."""
-        from app.services.data_service import DataService
+        from app.services.data_service import DataService # Keep import here for clarity within this static method
+        logger.info("Starting process_reminders.")
 
+        settings = {}
         try:
             # Load application settings
             settings = DataService.load_settings()
-            email_enabled = settings.get("email_notifications_enabled", True) # Default to True if missing
+            logger.debug(f"Loaded settings in process_reminders: {settings}")
+        except Exception as e:
+            logger.error(f"Error loading settings in process_reminders: {str(e)}. Aborting reminder processing for this cycle.", exc_info=True)
+            return # Stop processing if settings can't be loaded
 
-            if not email_enabled:
-                logger.info("Email notifications are disabled in settings. Skipping reminder process.")
-                return
+        email_enabled = settings.get("email_notifications_enabled", False) # Default to False if key is missing or settings are malformed
 
+        if not email_enabled:
+            logger.info("Email notifications are disabled in settings (checked within process_reminders). Skipping actual reminder sending.")
+            logger.info("Finished process_reminders (email disabled).")
+            return
+
+        logger.info("Email notifications are ENABLED in settings (checked within process_reminders). Proceeding to gather data.")
+        try:
             # Load PPM data
+            logger.debug("Loading PPM data for reminders.")
             ppm_data = DataService.load_data('ppm')
+            logger.debug(f"Loaded {len(ppm_data)} PPM entries.")
 
             # Load OCM data
             ocm_data = DataService.load_data('ocm')
 
             # Get upcoming maintenance for PPM
+            logger.debug("Getting upcoming PPM maintenance tasks.")
             upcoming_ppm = await EmailService.get_upcoming_maintenance(ppm_data, data_type='ppm')
+            logger.debug(f"Found {len(upcoming_ppm)} upcoming PPM tasks.")
 
             # Get upcoming maintenance for OCM
+            logger.debug("Getting upcoming OCM maintenance tasks.")
             upcoming_ocm = await EmailService.get_upcoming_maintenance(ocm_data, data_type='ocm')
+            logger.debug(f"Found {len(upcoming_ocm)} upcoming OCM tasks.")
 
             # Combine upcoming maintenance tasks
             upcoming = upcoming_ppm + upcoming_ocm
+            logger.debug(f"Total upcoming tasks combined: {len(upcoming)}.")
 
             # Sort the combined list by date (index 4 is due_date_str)
-            upcoming.sort(key=lambda x: datetime.strptime(x[4], '%d/%m/%Y'))
+            if upcoming:
+                upcoming.sort(key=lambda x: datetime.strptime(x[4], '%d/%m/%Y'))
+                logger.debug("Sorted upcoming tasks by due date.")
 
             # Send reminder if there are upcoming maintenance tasks
             if upcoming:
+                logger.info(f"Found {len(upcoming)} tasks. Attempting to send reminder email.")
                 await EmailService.send_reminder_email(upcoming)
             else:
-                logger.info("No upcoming maintenance tasks found")
+                logger.info("No upcoming maintenance tasks found to send email for.")
+
+            logger.info("Finished process_reminders (email enabled path).")
 
         except Exception as e:
-            logger.error(f"Error processing reminders: {str(e)}")
+            logger.error(f"Error during reminder data processing or email sending in process_reminders: {str(e)}", exc_info=True)
+        logger.info("Finished process_reminders.")

@@ -314,10 +314,11 @@ def get_settings():
 def save_settings():
     """Save application settings."""
     if not request.is_json:
+        logger.warning("Save settings request is not JSON.")
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.get_json()
-    logger.info(f"Received settings to save: {data}")
+    logger.info(f"Received settings data for saving: {data}")
 
     # Basic validation for expected keys and types
     email_notifications_enabled = data.get("email_notifications_enabled")

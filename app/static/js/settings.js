@@ -17,16 +17,20 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Load current settings
+    console.log('Attempting to load current settings...');
     fetch('/api/settings')
         .then(response => {
             if (!response.ok) {
+                console.error('Failed to fetch settings, status:', response.status);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
         })
         .then(settings => {
+            console.log('Received settings:', settings);
             emailNotificationsToggle.checked = settings.email_notifications_enabled === true;
-            emailIntervalInput.value = settings.email_reminder_interval_minutes || 60;
+            emailIntervalInput.value = settings.email_reminder_interval_minutes || 60; // Default to 60 if undefined
+            console.log('Applied settings to form elements. Toggle checked:', emailNotificationsToggle.checked, 'Interval value:', emailIntervalInput.value);
         })
         .catch(error => {
             console.error('Error loading settings:', error);
@@ -38,17 +42,24 @@ document.addEventListener('DOMContentLoaded', function () {
         settingsForm.addEventListener('submit', function (event) {
             event.preventDefault();
             alertContainer.innerHTML = ''; // Clear previous alerts
+            console.log('Settings form submitted.');
+
+            const intervalValue = parseInt(emailIntervalInput.value, 10);
+            console.log('Raw interval input value:', emailIntervalInput.value, 'Parsed interval value:', intervalValue);
 
             const settingsData = {
                 email_notifications_enabled: emailNotificationsToggle.checked,
-                email_reminder_interval_minutes: parseInt(emailIntervalInput.value, 10)
+                email_reminder_interval_minutes: intervalValue
             };
+            console.log('Data to be sent:', settingsData);
 
             // Basic client-side validation
             if (isNaN(settingsData.email_reminder_interval_minutes) || settingsData.email_reminder_interval_minutes <= 0) {
+                console.warn('Validation failed: Email interval must be a positive number. Value:', settingsData.email_reminder_interval_minutes);
                 showAlert('Email interval must be a positive number.', 'danger');
                 return;
             }
+            console.log('Client-side validation passed.');
 
             fetch('/api/settings', {
                 method: 'POST',
