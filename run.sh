@@ -15,4 +15,5 @@ echo "Ensuring data directory exists..."
 mkdir -p data
 
 echo "Starting Flask application..."
+echo "PORT is: ${PORT}"
 poetry run start-app
