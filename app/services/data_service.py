@@ -52,8 +52,9 @@ class DataService:
     def ensure_settings_file_exists():
         """Ensure settings.json file exists with default values."""
         settings_path = Path(Config.SETTINGS_JSON_PATH)
+        logger.debug(f"Checking existence of settings file: {settings_path}")
         if not settings_path.exists():
-            logger.info(f"Creating new settings file: {settings_path}")
+            logger.info(f"Settings file not found. Creating new settings file: {settings_path}")
             default_settings = {
                 "email_notifications_enabled": True,
                 "email_reminder_interval_minutes": 60
@@ -61,48 +62,54 @@ class DataService:
             try:
                 with open(settings_path, 'w') as f:
                     json.dump(default_settings, f, indent=2)
+                logger.info(f"Successfully created settings file {settings_path} with defaults: {default_settings}")
             except IOError as e:
-                logger.error(f"Could not create settings file {settings_path}: {e}")
+                logger.error(f"IOError creating settings file {settings_path}: {e}", exc_info=True)
                 # Depending on recovery strategy, you might want to raise this
             except Exception as e:
-                logger.error(f"Unexpected error creating settings file {settings_path}: {e}")
+                logger.error(f"Unexpected error creating settings file {settings_path}: {e}", exc_info=True)
+        else:
+            logger.debug(f"Settings file {settings_path} already exists.")
 
     @staticmethod
     def load_settings() -> Dict[str, Any]:
         """Load settings from settings.json file."""
+        logger.debug("Attempting to load settings.")
         DataService.ensure_settings_file_exists() # Make sure it exists before loading
-        settings_path = Config.SETTINGS_JSON_PATH
+
+        settings_path = Path(Config.SETTINGS_JSON_PATH)
+        default_settings = {
+            "email_notifications_enabled": True,
+            "email_reminder_interval_minutes": 60
+        }
+
         try:
+            logger.debug(f"Reading settings from file: {settings_path}")
             with open(settings_path, 'r') as f:
                 content = f.read()
-                if not content:
-                    logger.warning(f"Settings file {settings_path} is empty. Returning default settings.")
-                    return {
-                        "email_notifications_enabled": True,
-                        "email_reminder_interval_minutes": 60
-                    }
+                if not content.strip(): # Check if content is empty or just whitespace
+                    logger.warning(f"Settings file {settings_path} is empty. Returning default settings: {default_settings}")
+                    return default_settings.copy()
+
                 settings = json.loads(content)
-                return settings
+                logger.info(f"Successfully loaded settings from {settings_path}: {settings}")
+                # Ensure essential keys are present, otherwise merge with defaults
+                # This handles cases where the file might exist but be partially corrupted or missing keys
+                final_settings = default_settings.copy()
+                final_settings.update(settings) # Overwrite defaults with loaded settings
+                if final_settings != settings:
+                    logger.warning(f"Loaded settings were missing some keys. Merged with defaults: {final_settings}")
+                return final_settings
         except FileNotFoundError:
-            logger.error(f"Settings file {settings_path} not found. Returning default settings.")
-            # This case should ideally be handled by ensure_settings_file_exists,
-            # but as a fallback:
-            return {
-                "email_notifications_enabled": True,
-                "email_reminder_interval_minutes": 60
-            }
+            # This should ideally be caught by ensure_settings_file_exists, but as a robust fallback:
+            logger.error(f"Settings file {settings_path} not found despite check. Returning default settings: {default_settings}", exc_info=True)
+            return default_settings.copy()
         except json.JSONDecodeError:
-            logger.error(f"Error decoding JSON from {settings_path}. Returning default settings.")
-            return {
-                "email_notifications_enabled": True,
-                "email_reminder_interval_minutes": 60
-            }
+            logger.error(f"Error decoding JSON from {settings_path}. File content might be corrupted. Returning default settings: {default_settings}", exc_info=True)
+            return default_settings.copy()
         except Exception as e:
-            logger.error(f"Unexpected error loading settings from {settings_path}: {e}. Returning default settings.")
-            return {
-                "email_notifications_enabled": True,
-                "email_reminder_interval_minutes": 60
-            }
+            logger.error(f"Unexpected error loading settings from {settings_path}: {e}. Returning default settings: {default_settings}", exc_info=True)
+            return default_settings.copy()
 
     @staticmethod
     def save_settings(settings_data: Dict[str, Any]):
@@ -111,16 +118,18 @@ class DataService:
         Args:
             settings_data: Dictionary containing settings to save.
         """
-        settings_path = Config.SETTINGS_JSON_PATH
+        settings_path = Path(Config.SETTINGS_JSON_PATH)
+        logger.info(f"Attempting to save settings to {settings_path}. Data: {settings_data}")
         try:
+            DataService.ensure_settings_file_exists() # Ensure directory exists and file can be created if needed
             with open(settings_path, 'w') as f:
                 json.dump(settings_data, f, indent=2)
-            logger.info(f"Settings saved successfully to {settings_path}")
+            logger.info(f"Settings saved successfully to {settings_path}.")
         except IOError as e:
-            logger.error(f"IOError saving settings to {settings_path}: {e}")
+            logger.error(f"IOError saving settings to {settings_path}: {e}", exc_info=True)
             raise ValueError("Failed to save settings due to IO error.") from e
         except Exception as e:
-            logger.error(f"Unexpected error saving settings to {settings_path}: {e}")
+            logger.error(f"Unexpected error saving settings to {settings_path}: {e}", exc_info=True)
             raise ValueError("Failed to save settings due to an unexpected error.") from e
 
     @staticmethod
