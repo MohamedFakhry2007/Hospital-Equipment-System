@@ -57,7 +57,8 @@ class DataService:
             logger.info(f"Settings file not found. Creating new settings file: {settings_path}")
             default_settings = {
                 "email_notifications_enabled": True,
-                "email_reminder_interval_minutes": 60
+                "email_reminder_interval_minutes": 60,
+                "recipient_email": ""
             }
             try:
                 with open(settings_path, 'w') as f:
@@ -80,7 +81,8 @@ class DataService:
         settings_path = Path(Config.SETTINGS_JSON_PATH)
         default_settings = {
             "email_notifications_enabled": True,
-            "email_reminder_interval_minutes": 60
+            "email_reminder_interval_minutes": 60,
+            "recipient_email": ""
         }
 
         try:

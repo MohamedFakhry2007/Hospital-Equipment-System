@@ -583,10 +583,13 @@ def save_settings_page():
         settings = DataService.load_settings()
         return render_template('settings.html', settings=settings)
 
+    recipient_email = request.form.get('recipient_email', '').strip()
+
     current_settings = DataService.load_settings()
     # Update only the settings from the form
     current_settings['email_notifications_enabled'] = email_notifications_enabled
     current_settings['email_reminder_interval_minutes'] = email_reminder_interval_minutes
+    current_settings['recipient_email'] = recipient_email
 
     try:
         DataService.save_settings(current_settings)

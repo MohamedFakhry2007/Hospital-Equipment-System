@@ -323,6 +323,7 @@ def save_settings():
     # Basic validation for expected keys and types
     email_notifications_enabled = data.get("email_notifications_enabled")
     email_reminder_interval_minutes = data.get("email_reminder_interval_minutes")
+    recipient_email = data.get("recipient_email", "") # Default to empty string if not provided
 
     if not isinstance(email_notifications_enabled, bool):
         return jsonify({"error": "Invalid type for email_notifications_enabled, boolean expected."}), 400
@@ -331,10 +332,14 @@ def save_settings():
         err_msg = "Invalid value for email_reminder_interval_minutes, positive integer expected."
         return jsonify({"error": err_msg}), 400
 
+    if not isinstance(recipient_email, str):
+        return jsonify({"error": "Invalid type for recipient_email, string expected."}), 400
+
     # Construct settings object to save only known settings
     settings_to_save = {
         "email_notifications_enabled": email_notifications_enabled,
-        "email_reminder_interval_minutes": email_reminder_interval_minutes
+        "email_reminder_interval_minutes": email_reminder_interval_minutes,
+        "recipient_email": recipient_email.strip()
     }
 
     try:
