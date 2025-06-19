@@ -47,15 +47,24 @@ def create_app():
 
 
 def start_email_scheduler():
-    """Start the email scheduler in a background thread."""
+    """Start the email scheduler."""
+    # This function is intended to be run in a separate thread by app/main.py
     from app.services.email_service import EmailService
     
+    logger = logging.getLogger(__name__) # Get a logger instance
+
+    # Create a new event loop for this thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
     try:
-        loop.run_until_complete(EmailService.run_scheduler())
+        logger.info("Background thread for scheduler is starting.")
+        # EmailService.run_scheduler_async_loop will now handle the singleton check
+        loop.run_until_complete(EmailService.run_scheduler_async_loop())
     except Exception as e:
-        logging.error(f"Error in email scheduler: {str(e)}")
+        logger.error(f"Exception in the email scheduler thread: {str(e)}", exc_info=True)
     finally:
+        if loop.is_running():
+            loop.stop() # Stop the loop if it's still running
         loop.close()
+        logger.info("Background thread for scheduler has finished.")

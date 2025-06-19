@@ -20,25 +20,42 @@ class EmailService:
     """Service for sending email notifications."""
     
     logger.debug("Initializing EmailService")
-    
+    _scheduler_running = False
+    _scheduler_lock = threading.Lock()
+
     @staticmethod
-    def run_scheduler():
-        """Starts the reminder scheduler loop."""
+    async def run_scheduler_async_loop():
+        """The actual asynchronous scheduler loop."""
+        if EmailService._scheduler_running:
+            logger.info("Scheduler loop already running in this process.")
+            return
+
+        # Acquire lock before checking and setting _scheduler_running
+        with EmailService._scheduler_lock:
+            if EmailService._scheduler_running:
+                logger.info("Scheduler loop already running in this process (checked after lock).")
+                return
+            EmailService._scheduler_running = True
+            logger.info("Email reminder scheduler async loop started in process ID: %s.", os.getpid())
+            logger.warning("If running multiple application instances (e.g., Gunicorn workers), ensure this scheduler is enabled in only ONE instance to avoid duplicate emails.")
         
-        async def scheduler_loop():
+        try:
             while True:
                 try:
                     await EmailService.process_reminders()
                     await asyncio.sleep(Config.SCHEDULER_INTERVAL)  # configurable interval
+                except asyncio.CancelledError:
+                    logger.info("Scheduler loop was cancelled.")
+                    break
                 except Exception as e:
                     logger.error(f"Error in email scheduler loop: {str(e)}")
-                    await asyncio.sleep(60)  # retry after delay on error
-
-        def start_loop():
-            asyncio.run(scheduler_loop())
-
-        threading.Thread(target=start_loop, daemon=True).start()
-        logger.info("Email reminder scheduler started.")
+                    # In case of error, wait a bit before retrying to avoid tight loops
+                    await asyncio.sleep(60)
+        finally:
+            # Ensure the flag is reset if the loop exits
+            with EmailService._scheduler_lock:
+                EmailService._scheduler_running = False
+            logger.info("Email reminder scheduler async loop stopped.")
 
     @staticmethod
     async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
