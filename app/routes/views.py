@@ -564,4 +564,35 @@ def export_equipment_ocm():
 @views_bp.route('/settings')
 def settings_page():
     """Display the settings page."""
-    return render_template('settings.html')
+    settings = DataService.load_settings()
+    return render_template('settings.html', settings=settings)
+
+@views_bp.route('/settings', methods=['POST'])
+def save_settings_page():
+    """Handle saving settings."""
+    email_notifications_enabled_str = request.form.get('email_notifications_enabled')
+    email_notifications_enabled = email_notifications_enabled_str == 'on' # HTML checkbox sends 'on' or nothing
+
+    email_reminder_interval_minutes_str = request.form.get('email_reminder_interval_minutes')
+    try:
+        email_reminder_interval_minutes = int(email_reminder_interval_minutes_str)
+    except (ValueError, TypeError):
+        # Handle cases where conversion might fail or input is None
+        flash('Invalid value for email reminder interval. Please enter a number.', 'danger')
+        # Load current settings to display the page correctly even after error
+        settings = DataService.load_settings()
+        return render_template('settings.html', settings=settings)
+
+    current_settings = DataService.load_settings()
+    # Update only the settings from the form
+    current_settings['email_notifications_enabled'] = email_notifications_enabled
+    current_settings['email_reminder_interval_minutes'] = email_reminder_interval_minutes
+
+    try:
+        DataService.save_settings(current_settings)
+        flash('Settings saved successfully!', 'success')
+    except Exception as e:
+        logger.error(f"Error saving settings: {str(e)}")
+        flash('An error occurred while saving settings.', 'danger')
+
+    return redirect(url_for('views.settings_page'))
