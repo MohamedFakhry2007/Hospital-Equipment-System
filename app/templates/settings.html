@@ -22,6 +22,13 @@
             <small class="form-text text-muted">This setting might be used by the system scheduler to determine how often to check for and send reminder emails. The exact behavior depends on the backend scheduler's implementation.</small>
         </div>
 
+        <!-- Recipient Email -->
+        <div class="mb-3">
+            <label for="recipientEmailInput" class="form-label">Recipient Email Address</label>
+            <input type="email" class="form-control" id="recipientEmailInput" name="recipient_email" value="{{ settings.recipient_email | default('') }}" placeholder="e.g., manager@example.com">
+            <small class="form-text text-muted">If set, reminder emails will be sent to this address. If left blank, the system default recipient will be used.</small>
+        </div>
+
         <!-- Desktop Push Notifications Toggle (Keep for future use, but not implemented in this task) -->
         <div class="mb-3 form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="desktopNotificationsToggle" name="desktop_notifications" disabled>

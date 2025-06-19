@@ -192,6 +192,18 @@ class EmailService:
             return True
             
         try:
+            # Import DataService here to avoid circular import issues at module level
+            # and ensure it's available in this static method's scope.
+            from app.services.data_service import DataService
+            settings = DataService.load_settings()
+            recipient_email_override = settings.get("recipient_email", "").strip()
+
+            target_email_receiver = recipient_email_override if recipient_email_override else Config.EMAIL_RECEIVER
+
+            if not target_email_receiver:
+                logger.error("Email recipient is not configured. Cannot send email. Check settings (recipient_email) or .env (EMAIL_RECEIVER).")
+                return False
+
             api_key = Config.MAILJET_API_KEY
             api_secret = Config.MAILJET_SECRET_KEY
             mailjet = Client(auth=(api_key, api_secret), version='v3.1')
@@ -253,7 +265,7 @@ class EmailService:
                 "Messages": [
                     {
                     "From": { "Email": Config.EMAIL_SENDER, "Name": "Hospital Equipment Maintenance System" },
-                    "To":   [ { "Email": Config.EMAIL_RECEIVER, "Name": "Recipient" } ],
+                    "To":   [ { "Email": target_email_receiver, "Name": "Recipient" } ],
                     "Subject": subject,
                     "HTMLPart": html_content,
                     "CustomID": "ReminderEmail"
@@ -261,7 +273,7 @@ class EmailService:
                 ]
             }
 
-            logger.debug(f"Sending email from: {Config.EMAIL_SENDER} to: {Config.EMAIL_RECEIVER} with data: {json.dumps(data)}")
+            logger.debug(f"Sending email from: {Config.EMAIL_SENDER} to: {target_email_receiver} with data: {json.dumps(data)}")
             result = mailjet.send.create(data=data)
             logger.debug(f"Mailjet API response: {result.status_code}, {result.json()}")
 

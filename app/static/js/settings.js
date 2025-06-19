@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const settingsForm = document.getElementById('settingsForm');
     const emailNotificationsToggle = document.getElementById('emailNotificationsToggle');
     const emailIntervalInput = document.getElementById('emailInterval');
+    const recipientEmailInput = document.getElementById('recipientEmailInput'); // Added
     const alertContainer = document.getElementById('alertContainer'); // Assuming an alert container is added to HTML
 
     // Function to display alerts
@@ -30,7 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
             console.log('Received settings:', settings);
             emailNotificationsToggle.checked = settings.email_notifications_enabled === true;
             emailIntervalInput.value = settings.email_reminder_interval_minutes || 60; // Default to 60 if undefined
-            console.log('Applied settings to form elements. Toggle checked:', emailNotificationsToggle.checked, 'Interval value:', emailIntervalInput.value);
+            recipientEmailInput.value = settings.recipient_email || ''; // Default to empty string
+            console.log('Applied settings to form elements. Toggle checked:', emailNotificationsToggle.checked, 'Interval value:', emailIntervalInput.value, 'Recipient Email:', recipientEmailInput.value);
         })
         .catch(error => {
             console.error('Error loading settings:', error);
@@ -49,7 +51,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const settingsData = {
                 email_notifications_enabled: emailNotificationsToggle.checked,
-                email_reminder_interval_minutes: intervalValue
+                email_reminder_interval_minutes: intervalValue,
+                recipient_email: recipientEmailInput.value.trim() // Added
             };
             console.log('Data to be sent:', settingsData);
 
