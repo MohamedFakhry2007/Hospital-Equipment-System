@@ -42,6 +42,11 @@ class EmailService:
             logger.warning("If running multiple application instances (e.g., Gunicorn workers), ensure this scheduler is enabled in only ONE instance to avoid duplicate emails.")
 
         try:
+            # Add an initial delay before the first run
+            initial_delay_seconds = 30  # e.g., 30 seconds
+            logger.info(f"Scheduler starting. Initial delay of {initial_delay_seconds} seconds before first run.")
+            await asyncio.sleep(initial_delay_seconds)
+
             while True:
                 logger.debug("Scheduler loop iteration started.")
                 settings = {}
