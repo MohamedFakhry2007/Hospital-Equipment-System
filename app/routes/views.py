@@ -560,3 +560,8 @@ def export_equipment_ocm():
         logger.exception("Error exporting OCM data.")
         flash(f"An error occurred during OCM export: {str(e)}", 'danger')
         return redirect(url_for('views.import_export_page'))
+
+@views_bp.route('/settings')
+def settings_page():
+    """Display the settings page."""
+    return render_template('settings.html')
