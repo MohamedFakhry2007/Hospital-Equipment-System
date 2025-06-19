@@ -243,6 +243,14 @@ class EmailService:
         from app.services.data_service import DataService
 
         try:
+            # Load application settings
+            settings = DataService.load_settings()
+            email_enabled = settings.get("email_notifications_enabled", True) # Default to True if missing
+
+            if not email_enabled:
+                logger.info("Email notifications are disabled in settings. Skipping reminder process.")
+                return
+
             # Load PPM data
             ppm_data = DataService.load_data('ppm')
 

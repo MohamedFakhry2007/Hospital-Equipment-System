@@ -297,3 +297,52 @@ def delete_training_record_route(record_id):
     except Exception as e:
         logger.error(f"Error deleting training record {record_id}: {str(e)}")
         return jsonify({"error": "Failed to delete training record"}), 500
+
+# --- Application Settings API Routes ---
+
+@api_bp.route('/settings', methods=['GET'])
+def get_settings():
+    """Get current application settings."""
+    try:
+        settings = DataService.load_settings()
+        return jsonify(settings), 200
+    except Exception as e:
+        logger.error(f"Error loading settings: {str(e)}")
+        return jsonify({"error": "Failed to load settings"}), 500
+
+@api_bp.route('/settings', methods=['POST'])
+def save_settings():
+    """Save application settings."""
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    logger.info(f"Received settings to save: {data}")
+
+    # Basic validation for expected keys and types
+    email_notifications_enabled = data.get("email_notifications_enabled")
+    email_reminder_interval_minutes = data.get("email_reminder_interval_minutes")
+
+    if not isinstance(email_notifications_enabled, bool):
+        return jsonify({"error": "Invalid type for email_notifications_enabled, boolean expected."}), 400
+
+    if not isinstance(email_reminder_interval_minutes, int) or email_reminder_interval_minutes <= 0:
+        err_msg = "Invalid value for email_reminder_interval_minutes, positive integer expected."
+        return jsonify({"error": err_msg}), 400
+
+    # Construct settings object to save only known settings
+    settings_to_save = {
+        "email_notifications_enabled": email_notifications_enabled,
+        "email_reminder_interval_minutes": email_reminder_interval_minutes
+    }
+
+    try:
+        DataService.save_settings(settings_to_save)
+        logger.info(f"Settings saved successfully: {settings_to_save}")
+        return jsonify({"message": "Settings saved successfully", "settings": settings_to_save}), 200
+    except ValueError as e: # Catch specific error from save_settings for IO issues
+        logger.error(f"Error saving settings (ValueError): {str(e)}")
+        return jsonify({"error": f"Failed to save settings: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error saving settings: {str(e)}")
+        return jsonify({"error": "Failed to save settings due to an unexpected error"}), 500

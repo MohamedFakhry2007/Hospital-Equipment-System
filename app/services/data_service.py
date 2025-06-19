@@ -46,6 +46,83 @@ class DataService:
             with open(ocm_path, 'w') as f:
                 json.dump([], f)
 
+        DataService.ensure_settings_file_exists() # Ensure settings file also exists
+
+    @staticmethod
+    def ensure_settings_file_exists():
+        """Ensure settings.json file exists with default values."""
+        settings_path = Path(Config.SETTINGS_JSON_PATH)
+        if not settings_path.exists():
+            logger.info(f"Creating new settings file: {settings_path}")
+            default_settings = {
+                "email_notifications_enabled": True,
+                "email_reminder_interval_minutes": 60
+            }
+            try:
+                with open(settings_path, 'w') as f:
+                    json.dump(default_settings, f, indent=2)
+            except IOError as e:
+                logger.error(f"Could not create settings file {settings_path}: {e}")
+                # Depending on recovery strategy, you might want to raise this
+            except Exception as e:
+                logger.error(f"Unexpected error creating settings file {settings_path}: {e}")
+
+    @staticmethod
+    def load_settings() -> Dict[str, Any]:
+        """Load settings from settings.json file."""
+        DataService.ensure_settings_file_exists() # Make sure it exists before loading
+        settings_path = Config.SETTINGS_JSON_PATH
+        try:
+            with open(settings_path, 'r') as f:
+                content = f.read()
+                if not content:
+                    logger.warning(f"Settings file {settings_path} is empty. Returning default settings.")
+                    return {
+                        "email_notifications_enabled": True,
+                        "email_reminder_interval_minutes": 60
+                    }
+                settings = json.loads(content)
+                return settings
+        except FileNotFoundError:
+            logger.error(f"Settings file {settings_path} not found. Returning default settings.")
+            # This case should ideally be handled by ensure_settings_file_exists,
+            # but as a fallback:
+            return {
+                "email_notifications_enabled": True,
+                "email_reminder_interval_minutes": 60
+            }
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON from {settings_path}. Returning default settings.")
+            return {
+                "email_notifications_enabled": True,
+                "email_reminder_interval_minutes": 60
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error loading settings from {settings_path}: {e}. Returning default settings.")
+            return {
+                "email_notifications_enabled": True,
+                "email_reminder_interval_minutes": 60
+            }
+
+    @staticmethod
+    def save_settings(settings_data: Dict[str, Any]):
+        """Save settings to settings.json file.
+
+        Args:
+            settings_data: Dictionary containing settings to save.
+        """
+        settings_path = Config.SETTINGS_JSON_PATH
+        try:
+            with open(settings_path, 'w') as f:
+                json.dump(settings_data, f, indent=2)
+            logger.info(f"Settings saved successfully to {settings_path}")
+        except IOError as e:
+            logger.error(f"IOError saving settings to {settings_path}: {e}")
+            raise ValueError("Failed to save settings due to IO error.") from e
+        except Exception as e:
+            logger.error(f"Unexpected error saving settings to {settings_path}: {e}")
+            raise ValueError("Failed to save settings due to an unexpected error.") from e
+
     @staticmethod
     def load_data(data_type: Literal['ppm', 'ocm']) -> List[Dict[str, Any]]:
         """Load data from JSON file.
