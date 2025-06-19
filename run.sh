@@ -14,6 +14,8 @@ cp -n .env.example .env || true
 echo "Ensuring data directory exists..."
 mkdir -p data
 
-echo "Starting Flask application..."
+echo "Starting Gunicorn server..."
 echo "PORT is: ${PORT}"
-poetry run start-app
+
+# Run Gunicorn with 2 workers, binding to 0.0.0.0:$PORT
+poetry run gunicorn app:app --bind 0.0.0.0:${PORT} --workers 2
