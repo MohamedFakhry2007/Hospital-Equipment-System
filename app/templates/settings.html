@@ -8,17 +8,17 @@
     <!-- Alert container -->
     <div id="alertContainer"></div>
 
-    <form id="settingsForm">
+    <form method="POST" action="{{ url_for('views.save_settings_page') }}">
         <!-- Email Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="emailNotificationsToggle" name="email_notifications">
+            <input class="form-check-input" type="checkbox" role="switch" id="emailNotificationsToggle" name="email_notifications_enabled" {% if settings.email_notifications_enabled %}checked{% endif %}>
             <label class="form-check-label" for="emailNotificationsToggle">Enable Email Notifications for Reminders</label>
         </div>
 
         <!-- Time Interval for Emails -->
         <div class="mb-3">
             <label for="emailInterval" class="form-label">Reminder Email Check Interval (in minutes)</label>
-            <input type="number" class="form-control" id="emailInterval" name="email_interval" placeholder="e.g., 60" min="1">
+            <input type="number" class="form-control" id="emailInterval" name="email_reminder_interval_minutes" value="{{ settings.email_reminder_interval_minutes | default(60) }}" placeholder="e.g., 60" min="1">
             <small class="form-text text-muted">This setting might be used by the system scheduler to determine how often to check for and send reminder emails. The exact behavior depends on the backend scheduler's implementation.</small>
         </div>
 
@@ -37,5 +37,4 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}
