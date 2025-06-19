@@ -3,12 +3,14 @@ Email service for sending maintenance reminders.
 """
 import asyncio
 import logging
-import smtplib
 from datetime import datetime, timedelta
-from email.message import EmailMessage
 from typing import List, Dict, Any, Tuple
+import os
+import json
+import threading
 
 from app.config import Config
+from mailjet_rest import Client
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,25 @@ class EmailService:
     
     logger.debug("Initializing EmailService")
     
+    @staticmethod
+    def run_scheduler():
+        """Starts the reminder scheduler loop."""
+        
+        async def scheduler_loop():
+            while True:
+                try:
+                    await EmailService.process_reminders()
+                    await asyncio.sleep(Config.SCHEDULER_INTERVAL)  # configurable interval
+                except Exception as e:
+                    logger.error(f"Error in email scheduler loop: {str(e)}")
+                    await asyncio.sleep(60)  # retry after delay on error
+
+        def start_loop():
+            asyncio.run(scheduler_loop())
+
+        threading.Thread(target=start_loop, daemon=True).start()
+        logger.info("Email reminder scheduler started.")
+
     @staticmethod
     async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
         """Get upcoming maintenance within specified days.
@@ -76,7 +97,9 @@ class EmailService:
             return True
             
         try:
-            msg = EmailMessage()
+            api_key = Config.MAILJET_API_KEY
+            api_secret = Config.MAILJET_SECRET_KEY
+            mailjet = Client(auth=(api_key, api_secret), version='v3.1')
             
             # Email content
             subject = f"Hospital Equipment Maintenance Reminder - {len(upcoming)} upcoming tasks"
@@ -128,57 +151,60 @@ class EmailService:
             </html>
             """
             
-            # Set up email
-            msg.set_content("Please view this email with an HTML-compatible email client.")
-            msg.add_alternative(html_content, subtype='html')
-            
-            msg['Subject'] = subject
-            msg['From'] = Config.EMAIL_SENDER
-            msg['To'] = Config.EMAIL_RECEIVER
-            
-            # Send email
-            with smtplib.SMTP(Config.SMTP_SERVER, Config.SMTP_PORT) as server:
-                server.starttls()
-                server.login(Config.SMTP_USERNAME, Config.SMTP_PASSWORD)
-                server.send_message(msg)
-                
-            logger.info(f"Reminder email sent for {len(upcoming)} upcoming maintenance tasks")
-            return True
+            data = {
+                "SandboxMode": False,  # ⚠️ Add here
+                "Messages": [
+                    {
+                    "From": { "Email": Config.EMAIL_SENDER, "Name": "Hospital Equipment Maintenance System" },
+                    "To":   [ { "Email": Config.EMAIL_RECEIVER, "Name": "Recipient" } ],
+                    "Subject": subject,
+                    "HTMLPart": html_content,
+                    "CustomID": "ReminderEmail"
+                    }
+                ]
+            }
+
+            logger.debug(f"Sending email from: {Config.EMAIL_SENDER} to: {Config.EMAIL_RECEIVER} with data: {json.dumps(data)}")
+            result = mailjet.send.create(data=data)
+            logger.debug(f"Mailjet API response: {result.status_code}, {result.json()}")
+
+            if result.status_code == 200:
+                logger.info(f"Reminder email sent for {len(upcoming)} upcoming maintenance tasks")
+                return True
+            else:
+                logger.error(f"Failed to send reminder email: {result.status_code}, {result.json()}")
+                return False
             
         except Exception as e:
-            logger.error(f"Failed to send reminder email: {str(e)}")
+            logger.exception(f"Failed to send reminder email: {str(e)}")
             return False
     
     @staticmethod
     async def process_reminders():
         """Process and send reminders for upcoming maintenance."""
         from app.services.data_service import DataService
-        
+
         try:
             # Load PPM data
             ppm_data = DataService.load_data('ppm')
-            
-            # Get upcoming maintenance
-            upcoming = await EmailService.get_upcoming_maintenance(ppm_data)
-            
+
+            # Load OCM data
+            ocm_data = DataService.load_data('ocm')
+
+            # Get upcoming maintenance for PPM
+            upcoming_ppm = await EmailService.get_upcoming_maintenance(ppm_data)
+
+            # Get upcoming maintenance for OCM
+            upcoming_ocm = await EmailService.get_upcoming_maintenance(ocm_data)
+
+            # Combine upcoming maintenance tasks
+            upcoming = upcoming_ppm + upcoming_ocm
+
             # Send reminder if there are upcoming maintenance tasks
             if upcoming:
                 await EmailService.send_reminder_email(upcoming)
             else:
                 logger.info("No upcoming maintenance tasks found")
-                
+
         except Exception as e:
             logger.error(f"Error processing reminders: {str(e)}")
-            
-    @staticmethod
-    async def run_scheduler():
-        """Run scheduler for periodic reminder sending."""
-        if not Config.SCHEDULER_ENABLED:
-            logger.info("Reminder scheduler is disabled")
-            return
-            
-        logger.info(f"Starting reminder scheduler (interval: {Config.SCHEDULER_INTERVAL} hours)")
-        
-        while True:
-            await EmailService.process_reminders()
-            await asyncio.sleep(Config.SCHEDULER_INTERVAL * 3600)  # Convert hours to seconds

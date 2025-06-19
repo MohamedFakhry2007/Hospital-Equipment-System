@@ -23,14 +23,12 @@ class Config:
     PPM_JSON_PATH = os.path.join(DATA_DIR, "ppm.json")
     OCM_JSON_PATH = os.path.join(DATA_DIR, "ocm.json")
     
-    # Email configuration
-    SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-    EMAIL_SENDER = os.getenv("EMAIL_SENDER", "reminders@equipment.com")
+    # Mailjet configuration
+    MAILJET_API_KEY = os.getenv("MAILJET_API_KEY", "")
+    MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY", "")
+    EMAIL_SENDER = os.getenv("EMAIL_SENDER", "mailjet@equipment.com")
     EMAIL_RECEIVER = os.getenv("EMAIL_RECEIVER", "")
-    
+
     # Reminder configuration
     REMINDER_DAYS = int(os.getenv("REMINDER_DAYS", "60"))
     SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "True").lower() == "true"

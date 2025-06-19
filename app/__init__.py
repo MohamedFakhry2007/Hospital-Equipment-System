@@ -54,8 +54,7 @@ def start_email_scheduler():
     asyncio.set_event_loop(loop)
     
     try:
-        email_service = EmailService()
-        loop.run_until_complete(email_service.run_scheduler())
+        loop.run_until_complete(EmailService.run_scheduler())
     except Exception as e:
         logging.error(f"Error in email scheduler: {str(e)}")
     finally:
