@@ -352,3 +352,7 @@ def save_settings():
     except Exception as e:
         logger.error(f"Unexpected error saving settings: {str(e)}")
         return jsonify({"error": "Failed to save settings due to an unexpected error"}), 500
+
+@api_bp.route('/health')
+def health_check():
+    return 'OK', 200
