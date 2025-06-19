@@ -40,22 +40,16 @@ class EmailService:
             logger.warning("If running multiple application instances (e.g., Gunicorn workers), ensure this scheduler is enabled in only ONE instance to avoid duplicate emails.")
         
         try:
-            while True:
-                try:
-                    await EmailService.process_reminders()
-                    await asyncio.sleep(Config.SCHEDULER_INTERVAL)  # configurable interval
-                except asyncio.CancelledError:
-                    logger.info("Scheduler loop was cancelled.")
-                    break
-                except Exception as e:
-                    logger.error(f"Error in email scheduler loop: {str(e)}")
-                    # In case of error, wait a bit before retrying to avoid tight loops
-                    await asyncio.sleep(60)
+            # Removed the while True loop to run reminders only once
+            try:
+                await EmailService.process_reminders()
+            except Exception as e: # Catch specific errors if possible, e.g. related to email sending
+                logger.error(f"Error processing reminders: {str(e)}")
         finally:
-            # Ensure the flag is reset if the loop exits
+            # Ensure the flag is reset after the single execution
             with EmailService._scheduler_lock:
                 EmailService._scheduler_running = False
-            logger.info("Email reminder scheduler async loop stopped.")
+            logger.info("Email reminder processing finished.")
 
     @staticmethod
     async def get_upcoming_maintenance(data: List[Dict[str, Any]], days_ahead: int = None) -> List[Tuple[str, str, str, str, str]]:
