@@ -25,4 +25,9 @@ PORT=${PORT:-5000}
 echo "PORT is: $PORT"
 
 # Run Gunicorn.  Tell it to call the create_app() function in app/main.py
-poetry run gunicorn 'app:create_app()' --bind 0.0.0.0:${PORT} --workers 2
+poetry run gunicorn 'app:create_app()' \
+    --bind 0.0.0.0:${PORT} \
+    --workers 2 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level debug

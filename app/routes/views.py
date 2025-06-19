@@ -110,6 +110,13 @@ def index():
                            equipment=all_equipment) # Pass combined list
 
 
+@views_bp.route('/healthz')
+def health_check():
+    """Simple health check endpoint."""
+    logger.info("Health check endpoint /healthz was accessed.")
+    return "OK", 200
+
+
 @views_bp.route('/equipment/<data_type>/list')
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
