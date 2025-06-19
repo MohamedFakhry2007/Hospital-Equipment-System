@@ -20,7 +20,8 @@ def main():
     
     # Use the correct port from Render
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=Config.DEBUG, host="0.0.0.0", port=port)
+    # Disable reloader to prevent multiple scheduler instances during development
+    app.run(debug=Config.DEBUG, host="0.0.0.0", port=port, use_reloader=False)
 
 
 if __name__ == '__main__':
