@@ -22,6 +22,7 @@ class Config:
     DATA_DIR = os.path.join(BASE_DIR, "data")
     PPM_JSON_PATH = os.path.join(DATA_DIR, "ppm.json")
     OCM_JSON_PATH = os.path.join(DATA_DIR, "ocm.json")
+    SETTINGS_JSON_PATH = os.path.join(DATA_DIR, "settings.json")
     
     # Mailjet configuration
     MAILJET_API_KEY = os.getenv("MAILJET_API_KEY", "")

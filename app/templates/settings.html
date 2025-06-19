@@ -5,23 +5,27 @@
     <h2>Settings</h2>
     <hr>
 
+    <!-- Alert container -->
+    <div id="alertContainer"></div>
+
     <form id="settingsForm">
         <!-- Email Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="emailNotificationsToggle" name="email_notifications">
-            <label class="form-check-label" for="emailNotificationsToggle">Enable Email Notifications</label>
+            <label class="form-check-label" for="emailNotificationsToggle">Enable Email Notifications for Reminders</label>
         </div>
 
         <!-- Time Interval for Emails -->
         <div class="mb-3">
-            <label for="emailInterval" class="form-label">Time interval between emails (in minutes)</label>
+            <label for="emailInterval" class="form-label">Reminder Email Check Interval (in minutes)</label>
             <input type="number" class="form-control" id="emailInterval" name="email_interval" placeholder="e.g., 60" min="1">
+            <small class="form-text text-muted">This setting might be used by the system scheduler to determine how often to check for and send reminder emails. The exact behavior depends on the backend scheduler's implementation.</small>
         </div>
 
-        <!-- Desktop Push Notifications Toggle -->
+        <!-- Desktop Push Notifications Toggle (Keep for future use, but not implemented in this task) -->
         <div class="mb-3 form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="desktopNotificationsToggle" name="desktop_notifications">
-            <label class="form-check-label" for="desktopNotificationsToggle">Enable Desktop Push Notifications</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="desktopNotificationsToggle" name="desktop_notifications" disabled>
+            <label class="form-check-label" for="desktopNotificationsToggle">Enable Desktop Push Notifications (Feature not active)</label>
         </div>
 
         <hr>
@@ -29,4 +33,9 @@
     </form>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}
