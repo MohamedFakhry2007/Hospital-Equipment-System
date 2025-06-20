@@ -577,26 +577,55 @@ def settings_page():
 @views_bp.route('/settings', methods=['POST'])
 def save_settings_page():
     """Handle saving settings."""
-    email_notifications_enabled_str = request.form.get('email_notifications_enabled')
-    email_notifications_enabled = email_notifications_enabled_str == 'on' # HTML checkbox sends 'on' or nothing
+    if request.is_json:
+        data = request.get_json()
+    else:
+        # This case should ideally not happen if the frontend always sends JSON
+        flash('Invalid request format. Expected JSON.', 'danger')
+        return redirect(url_for('views.settings_page'))
 
-    email_reminder_interval_minutes_str = request.form.get('email_reminder_interval_minutes')
+    email_notifications_enabled = data.get('email_notifications_enabled', False) # Defaults to False if not present
+
     try:
-        email_reminder_interval_minutes = int(email_reminder_interval_minutes_str)
+        email_reminder_interval_minutes = int(data.get('email_reminder_interval_minutes'))
+        if email_reminder_interval_minutes <= 0:
+            raise ValueError("Email reminder interval must be a positive number.")
     except (ValueError, TypeError):
-        # Handle cases where conversion might fail or input is None
-        flash('Invalid value for email reminder interval. Please enter a number.', 'danger')
-        # Load current settings to display the page correctly even after error
+        flash('Invalid value for email reminder interval. Please enter a positive number.', 'danger')
         settings = DataService.load_settings()
+        # Attempt to merge with current form data for re-rendering if possible,
+        # or just show saved settings. For simplicity, showing saved.
         return render_template('settings.html', settings=settings)
 
-    recipient_email = request.form.get('recipient_email', '').strip()
+    recipient_email = data.get('recipient_email', '').strip()
 
     current_settings = DataService.load_settings()
-    # Update only the settings from the form
+
+    # Get push notification settings from the JSON data
+    push_notifications_enabled = data.get('push_notifications_enabled', False) # Defaults to False
+
+    push_notification_interval_minutes_str = data.get('push_notification_interval_minutes')
+    try:
+        push_notification_interval_minutes = int(push_notification_interval_minutes_str)
+        if push_notification_interval_minutes <= 0:
+            raise ValueError("Push notification interval must be a positive number.")
+    except (ValueError, TypeError):
+        flash('Invalid value for Push Notification Check Interval. Please enter a positive number.', 'danger')
+        settings = DataService.load_settings() # Load current settings for re-rendering
+        # Preserve other form values that were valid, if any, by merging them back
+        settings_to_render = settings.copy()
+        settings_to_render['email_notifications_enabled'] = email_notifications_enabled
+        settings_to_render['email_reminder_interval_minutes'] = email_reminder_interval_minutes
+        settings_to_render['recipient_email'] = recipient_email
+        # For the failing field, we might want to display the problematic input or a default
+        # settings_to_render['push_notification_interval_minutes'] = push_notification_interval_minutes_str # or a default
+        return render_template('settings.html', settings=settings_to_render)
+
     current_settings['email_notifications_enabled'] = email_notifications_enabled
     current_settings['email_reminder_interval_minutes'] = email_reminder_interval_minutes
     current_settings['recipient_email'] = recipient_email
+    current_settings['push_notifications_enabled'] = push_notifications_enabled
+    current_settings['push_notification_interval_minutes'] = push_notification_interval_minutes
 
     try:
         DataService.save_settings(current_settings)
