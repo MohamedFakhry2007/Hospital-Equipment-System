@@ -119,13 +119,17 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             console.log('Client-side validation passed.');
 
-            fetch('/api/settings', {
+            const fetchOptions = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(settingsData),
-            })
+            };
+
+            console.log('Preparing to send settings. Options:', JSON.stringify(fetchOptions, null, 2)); // Log the options
+
+            fetch('/api/settings', fetchOptions)
             .then(response => response.json().then(data => ({ status: response.status, body: data })))
             .then(({ status, body }) => {
                 if (status === 200 && body.message) {
