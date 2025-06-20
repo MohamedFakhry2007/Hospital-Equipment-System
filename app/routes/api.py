@@ -315,14 +315,18 @@ def get_settings():
 @api_bp.route('/settings', methods=['POST'])
 def save_settings():
     """Save application settings."""
-    logger.info(f"Attempting to save settings. Request headers: {request.headers}")
-    logger.info(f"Request Content-Type: {request.content_type}, is_json: {request.is_json}")
+    # Added detailed logging for headers and raw body
+    logger.info(f"save_settings called. Request Method: {request.method}")
+    logger.info(f"Request Headers: {request.headers}")
+    logger.info(f"Request Content-Type: {request.content_type}")
+    logger.info(f"Request is_json: {request.is_json}")
+    logger.debug(f"Request raw data: {request.get_data(as_text=True)}") # Log raw data
 
     # Try to parse JSON irrespective of Content-Type header, handle failure gracefully
     data = request.get_json(force=True, silent=True)
 
     if data is None:
-        logger.warning(f"Failed to parse request body as JSON. Request data: {request.data[:200]}...") # Log first 200 chars of raw data
+        logger.warning(f"Failed to parse request body as JSON. Request data (first 200 chars): {request.data[:200]}...")
         # The frontend reported "Invalid request format. Expected JSON."
         # We'll return a similar error, but make it clear it's from our explicit check.
         return jsonify({"error": "Invalid request format. Expected JSON data."}), 400
