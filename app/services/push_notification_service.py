@@ -3,14 +3,17 @@ Push Notification service for sending summarized maintenance reminders.
 """
 import asyncio
 import logging
+import json # For constructing the push payload
 from datetime import datetime
 from typing import List, Dict, Any, Tuple
 import os
 import threading
 
-# Assuming EmailService is in the same directory or adjust import path
+from pywebpush import webpush, WebPushException
+
 from app.services.email_service import EmailService
-from app.config import Config # For REMINDER_DAYS if not passed explicitly
+from app.config import Config
+from app.services.data_service import DataService # Added for loading subscriptions
 
 logger = logging.getLogger(__name__)
 
@@ -117,24 +120,79 @@ class PushNotificationService:
     @staticmethod
     async def send_push_notification(summary_message: str):
         """
-        Sends the push notification.
-        For now, this will just log the message.
-        Actual implementation would involve Web Push API or a similar service.
+        Sends the push notification to all subscribed clients.
         """
+        if not Config.VAPID_PRIVATE_KEY or not Config.VAPID_SUBJECT:
+            logger.error("VAPID private key or subject not configured. Cannot send push notifications.")
+            return False
+
+        subscriptions = DataService.load_push_subscriptions()
+        if not subscriptions:
+            logger.info("No push subscriptions found to send notifications to.")
+            return True # No error, just no one to send to
+
         if summary_message == "No upcoming maintenance tasks.":
-            logger.info(f"Push Notification: {summary_message}")
-        else:
-            # In a real scenario, this is where you'd interact with a push service
-            # (e.g., send a message to a VAPID endpoint for web push).
-            logger.info(f"SENDING PUSH NOTIFICATION (Simulated): {summary_message}")
-            # Placeholder for actual push sending logic
-            # E.g., await some_web_push_library.send(subscription_info, summary_message)
-        return True # Assuming success for now
+            logger.info(f"Push Notification (not sent as no tasks): {summary_message}")
+            # Optionally, you might still send a "no tasks" notification if desired
+            # For now, we only send if there are tasks.
+            return True
+
+        logger.info(f"Attempting to send push notification: '{summary_message}' to {len(subscriptions)} subscription(s).")
+
+        # Construct a simple payload for the push notification
+        # The client-side service worker will need to handle this payload to display the notification.
+        push_payload = {
+            "title": "Equipment Maintenance Reminder",
+            "body": summary_message,
+            # "icon": "/static/img/notification_icon.png", # Optional: path to an icon
+            # "data": {"url": "/"} # Optional: URL to open when notification is clicked
+        }
+        payload_json_str = json.dumps(push_payload)
+
+        success_count = 0
+        failure_count = 0
+        subscriptions_to_remove = []
+
+        for sub_info in subscriptions:
+            logger.debug(f"Sending to subscription endpoint: {sub_info.get('endpoint')[:50]}...")
+            try:
+                webpush(
+                    subscription_info=sub_info,
+                    data=payload_json_str,
+                    vapid_private_key=Config.VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": Config.VAPID_SUBJECT}
+                )
+                logger.info(f"Successfully sent push notification to endpoint: {sub_info.get('endpoint')[:50]}...")
+                success_count += 1
+            except WebPushException as ex:
+                logger.error(f"WebPushException sending to {sub_info.get('endpoint')[:50]}...: {ex}")
+                # ex.response might contain more details, e.g., ex.response.status_code
+                if ex.response:
+                    logger.error(f"Response status: {ex.response.status_code}, body: {ex.response.text}")
+                    # Common status codes indicating an invalid/expired subscription:
+                    # 404 Not Found, 410 Gone. These subscriptions should be removed.
+                    if ex.response.status_code in [404, 410]:
+                        logger.warning(f"Subscription {sub_info.get('endpoint')[:50]}... seems invalid (status {ex.response.status_code}). Marking for removal.")
+                        subscriptions_to_remove.append(sub_info.get("endpoint"))
+                failure_count += 1
+            except Exception as e:
+                logger.error(f"Unexpected error sending push notification to {sub_info.get('endpoint')[:50]}...: {e}", exc_info=True)
+                failure_count += 1
+
+        if subscriptions_to_remove:
+            logger.info(f"Removing {len(subscriptions_to_remove)} invalid/expired subscriptions.")
+            for endpoint in subscriptions_to_remove:
+                DataService.remove_push_subscription(endpoint)
+
+        logger.info(f"Push notification sending attempt complete. Successes: {success_count}, Failures: {failure_count}")
+        return success_count > 0 or (success_count == 0 and failure_count == 0 and len(subscriptions) > 0)
+
 
     @staticmethod
     async def process_push_notifications():
         """Process and send summarized push notifications for upcoming maintenance."""
-        from app.services.data_service import DataService # Avoid circular import
+        # DataService is already imported at the class level if needed, or can be imported here
+        # from app.services.data_service import DataService
 
         logger.info("Starting process_push_notifications.")
         settings = DataService.load_settings() # Reload settings to ensure fresh check

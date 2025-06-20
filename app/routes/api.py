@@ -11,6 +11,8 @@ from datetime import datetime
 
 from app.services.data_service import DataService
 from app.services.training_service import TrainingService
+from app.config import Config # Added for VAPID public key
+
 # ImportExportService and ValidationService removed
 
 api_bp = Blueprint('api', __name__)
@@ -383,3 +385,65 @@ def save_settings():
 @api_bp.route('/health')
 def health_check():
     return 'OK', 200
+
+# --- Push Notification API Routes ---
+
+@api_bp.route('/vapid_public_key', methods=['GET'])
+def vapid_public_key():
+    """Provide the VAPID public key to the client."""
+    if not Config.VAPID_PUBLIC_KEY:
+        logger.error("VAPID_PUBLIC_KEY not configured on the server.")
+        return jsonify({"error": "VAPID public key not configured."}), 500
+    return jsonify({"publicKey": Config.VAPID_PUBLIC_KEY}), 200
+
+@api_bp.route('/push_subscribe', methods=['POST'])
+def push_subscribe():
+    """
+    Subscribes a client for push notifications.
+    Expects a JSON payload with the PushSubscription object.
+    Example: {"endpoint": "...", "keys": {"p256dh": "...", "auth": "..."}}
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    subscription_info = request.get_json()
+    if not subscription_info or not subscription_info.get("endpoint"):
+        return jsonify({"error": "Invalid subscription object. 'endpoint' is required."}), 400
+
+    # Basic validation of the subscription object structure (more can be added)
+    if not isinstance(subscription_info.get("keys"), dict) or \
+       not subscription_info["keys"].get("p256dh") or \
+       not subscription_info["keys"].get("auth"):
+        return jsonify({"error": "Invalid subscription object structure. 'keys.p256dh' and 'keys.auth' are required."}), 400
+
+    try:
+        DataService.add_push_subscription(subscription_info)
+        logger.info(f"Successfully subscribed for push notifications: {subscription_info.get('endpoint')[:50]}...")
+        return jsonify({"message": "Subscription successful"}), 201
+    except Exception as e:
+        logger.error(f"Error subscribing for push notifications: {str(e)}", exc_info=True)
+        return jsonify({"error": "Failed to subscribe for push notifications"}), 500
+
+@api_bp.route('/push_unsubscribe', methods=['POST'])
+def push_unsubscribe():
+    """
+    Unsubscribes a client from push notifications.
+    Expects a JSON payload with the endpoint to unsubscribe.
+    Example: {"endpoint": "..."}
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    endpoint_to_remove = data.get("endpoint")
+
+    if not endpoint_to_remove:
+        return jsonify({"error": "Invalid request. 'endpoint' is required."}), 400
+
+    try:
+        DataService.remove_push_subscription(endpoint_to_remove)
+        logger.info(f"Successfully unsubscribed from push notifications: {endpoint_to_remove[:50]}...")
+        return jsonify({"message": "Unsubscription successful"}), 200
+    except Exception as e:
+        logger.error(f"Error unsubscribing from push notifications: {str(e)}", exc_info=True)
+        return jsonify({"error": "Failed to unsubscribe from push notifications"}), 500
