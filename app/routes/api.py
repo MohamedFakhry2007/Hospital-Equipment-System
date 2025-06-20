@@ -373,16 +373,6 @@ def save_settings():
         return jsonify({"error": "Failed to save settings due to an unexpected error"}), 500
 
 @api_bp.route('/health')
-        logger.info(f"Settings saved successfully: {settings_to_save}")
-        return jsonify({"message": "Settings saved successfully", "settings": settings_to_save}), 200
-    except ValueError as e: # Catch specific error from save_settings for IO issues
-        logger.error(f"Error saving settings (ValueError): {str(e)}")
-        return jsonify({"error": f"Failed to save settings: {str(e)}"}), 500
-    except Exception as e:
-        logger.error(f"Unexpected error saving settings: {str(e)}")
-        return jsonify({"error": "Failed to save settings due to an unexpected error"}), 500
-
-@api_bp.route('/health')
 def health_check():
     return 'OK', 200
 
