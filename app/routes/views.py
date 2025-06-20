@@ -578,6 +578,24 @@ def settings_page():
 def save_settings_page():
     """Handle saving settings."""
     logger.info("Received request to save settings.")
+    data = request.get_json(silent=True)
+
+    if data is None:
+        logger.warning("Request format is not JSON or failed to parse JSON.")
+        # Attempt to get data from form if not JSON, though frontend should send JSON
+        if request.form:
+            logger.warning("Received form data instead of JSON. This is unexpected for this endpoint.")
+            # Process request.form if necessary, or reject
+            # For now, strictly expect JSON as per frontend implementation
+            flash('Invalid request format. Expected JSON.', 'danger')
+            return redirect(url_for('views.settings_page'))
+        else:
+            logger.warning("No JSON data and no form data found in the request.")
+            flash('Invalid request: No data received or unparseable.', 'danger')
+            return redirect(url_for('views.settings_page'))
+
+    logger.debug(f"Request data: {data}")
+
     if request.is_json:
         data = request.get_json()
         logger.debug(f"Request data: {data}")
