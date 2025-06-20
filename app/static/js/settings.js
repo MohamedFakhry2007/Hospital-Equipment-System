@@ -119,15 +119,52 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             console.log('Client-side validation passed.');
 
-            fetch('/api/settings', {
+            const fetchOptions = {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(settingsData),
+            };
+
+            console.log('Preparing to send settings. Options:', JSON.stringify(fetchOptions, null, 2)); // Log the options
+
+            fetch(settingsForm.action, fetchOptions) // Use the form's action URL
+            .then(response => {
+                // Check if the response is JSON before trying to parse it
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    return response.json().then(data => ({ status: response.status, body: data, ok: response.ok }));
+                } else {
+                    // If not JSON, it might be a redirect page or HTML error, get text
+                    return response.text().then(text => ({ status: response.status, body: { error: `Unexpected response type: ${contentType}. Response text: ${text.substring(0, 200)}...` }, ok: response.ok }));
+                }
             })
-            .then(response => response.json().then(data => ({ status: response.status, body: data })))
-            .then(({ status, body }) => {
+            .then(({ status, body, ok }) => { // Added 'ok' from response
+                // The save_settings_page in views.py redirects on success/flash,
+                // so a 200 OK with JSON might not be the typical success case if it redirects.
+                // However, if it processes JSON and returns JSON (like api.py's version), this logic is fine.
+                // Given the flash message "Invalid request format. Expected JSON." comes from views.py,
+                // and it redirects, a successful JSON POST to it might also result in a redirect (e.g., 302).
+                // Fetch API by default does not follow redirects if the method is POST, unless `redirect: 'follow'` is set.
+                // If views.save_settings_page returns a JSON response directly on success, this is fine.
+                // If it redirects, the browser will handle the redirect (typically as a GET),
+                // and this .then() block might not see the "final" page content directly from the POST.
+                // For now, assume it might return JSON or an error in JSON.
+
+                if (ok && body.message) { // Check response.ok for success (status 200-299)
+                    showAlert(body.message, 'success');
+                    // If views.save_settings_page redirects, the user will see the new page.
+                    // If it returns JSON, this alert is shown.
+                    // To ensure settings are re-loaded on success if it doesn't redirect:
+                    // window.location.reload(); // Or update currentServerSettings and form fields
+                } else if (body.error) {
+                    showAlert(`Error: ${body.error}`, 'danger');
+                } else if (!ok) { // Handle other non-successful statuses that weren't JSON errors
+                    showAlert(`An error occurred while saving settings. Status: ${status}`, 'danger');
+                } else { // Fallback for unexpected successful response structure
+                    showAlert('Settings saved, but response format was unexpected.', 'warning');
+                }
                 if (status === 200 && body.message) {
                     showAlert(body.message, 'success');
                 } else if (body.error) {

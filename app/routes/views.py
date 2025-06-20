@@ -577,39 +577,61 @@ def settings_page():
 @views_bp.route('/settings', methods=['POST'])
 def save_settings_page():
     """Handle saving settings."""
-    if request.is_json:
-        data = request.get_json()
-    else:
-        # This case should ideally not happen if the frontend always sends JSON
-        flash('Invalid request format. Expected JSON.', 'danger')
-        return redirect(url_for('views.settings_page'))
+    logger.info("Received request to save settings.")
+    data = request.get_json(silent=True)
+
+    if data is None:
+        logger.warning("Request format is not JSON or failed to parse JSON.")
+        # Attempt to get data from form if not JSON, though frontend should send JSON
+        if request.form:
+            logger.warning("Received form data instead of JSON. This is unexpected for this endpoint.")
+            # Process request.form if necessary, or reject
+            # For now, strictly expect JSON as per frontend implementation
+            flash('Invalid request format. Expected JSON.', 'danger')
+            return redirect(url_for('views.settings_page'))
+        else:
+            logger.warning("No JSON data and no form data found in the request.")
+            flash('Invalid request: No data received or unparseable.', 'danger')
+            return redirect(url_for('views.settings_page'))
+
+    logger.debug(f"Request data: {data}")
 
     email_notifications_enabled = data.get('email_notifications_enabled', False) # Defaults to False if not present
+    logger.debug(f"Email notifications enabled: {email_notifications_enabled}")
 
     try:
         email_reminder_interval_minutes = int(data.get('email_reminder_interval_minutes'))
         if email_reminder_interval_minutes <= 0:
+            logger.warning("Invalid email reminder interval: must be a positive number.")
             raise ValueError("Email reminder interval must be a positive number.")
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error processing email reminder interval: {e}")
         flash('Invalid value for email reminder interval. Please enter a positive number.', 'danger')
         settings = DataService.load_settings()
         # Attempt to merge with current form data for re-rendering if possible,
         # or just show saved settings. For simplicity, showing saved.
         return render_template('settings.html', settings=settings)
+    logger.debug(f"Email reminder interval (minutes): {email_reminder_interval_minutes}")
 
     recipient_email = data.get('recipient_email', '').strip()
+    logger.debug(f"Recipient email: {recipient_email}")
 
     current_settings = DataService.load_settings()
+    logger.info("Loaded current settings.")
 
     # Get push notification settings from the JSON data
     push_notifications_enabled = data.get('push_notifications_enabled', False) # Defaults to False
+    logger.debug(f"Push notifications enabled: {push_notifications_enabled}")
 
     push_notification_interval_minutes_str = data.get('push_notification_interval_minutes')
+    logger.debug(f"Push notification interval (minutes string): {push_notification_interval_minutes_str}")
     try:
         push_notification_interval_minutes = int(push_notification_interval_minutes_str)
         if push_notification_interval_minutes <= 0:
+            logger.warning("Invalid push notification interval: must be a positive number.")
             raise ValueError("Push notification interval must be a positive number.")
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error processing push notification interval: {e}")
         flash('Invalid value for Push Notification Check Interval. Please enter a positive number.', 'danger')
         settings = DataService.load_settings() # Load current settings for re-rendering
         # Preserve other form values that were valid, if any, by merging them back
@@ -620,15 +642,18 @@ def save_settings_page():
         # For the failing field, we might want to display the problematic input or a default
         # settings_to_render['push_notification_interval_minutes'] = push_notification_interval_minutes_str # or a default
         return render_template('settings.html', settings=settings_to_render)
+    logger.debug(f"Push notification interval (minutes): {push_notification_interval_minutes}")
 
     current_settings['email_notifications_enabled'] = email_notifications_enabled
     current_settings['email_reminder_interval_minutes'] = email_reminder_interval_minutes
     current_settings['recipient_email'] = recipient_email
     current_settings['push_notifications_enabled'] = push_notifications_enabled
     current_settings['push_notification_interval_minutes'] = push_notification_interval_minutes
+    logger.info(f"Updated settings: {current_settings}")
 
     try:
         DataService.save_settings(current_settings)
+        logger.info("Settings saved successfully.")
         flash('Settings saved successfully!', 'success')
     except Exception as e:
         logger.error(f"Error saving settings: {str(e)}")
