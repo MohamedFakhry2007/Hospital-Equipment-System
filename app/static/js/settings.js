@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const settingsForm = document.getElementById('settingsForm');
+    const settingsForm = document.getElementById('settingsForm'); // Ensure your form has id="settingsForm"
     const emailNotificationsToggle = document.getElementById('emailNotificationsToggle');
     const emailIntervalInput = document.getElementById('emailInterval');
-    const recipientEmailInput = document.getElementById('recipientEmailInput'); // Added
-    const alertContainer = document.getElementById('alertContainer'); // Assuming an alert container is added to HTML
+    const recipientEmailInput = document.getElementById('recipientEmailInput');
+    const pushNotificationsToggle = document.getElementById('pushNotificationsToggle');
+    const pushIntervalInput = document.getElementById('pushInterval');
+    const alertContainer = document.getElementById('alertContainer');
 
     // Function to display alerts
     function showAlert(message, type = 'success') {
@@ -30,9 +32,14 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(settings => {
             console.log('Received settings:', settings);
             emailNotificationsToggle.checked = settings.email_notifications_enabled === true;
-            emailIntervalInput.value = settings.email_reminder_interval_minutes || 60; // Default to 60 if undefined
-            recipientEmailInput.value = settings.recipient_email || ''; // Default to empty string
-            console.log('Applied settings to form elements. Toggle checked:', emailNotificationsToggle.checked, 'Interval value:', emailIntervalInput.value, 'Recipient Email:', recipientEmailInput.value);
+            emailIntervalInput.value = settings.email_reminder_interval_minutes || 60;
+            recipientEmailInput.value = settings.recipient_email || '';
+
+            // Load push notification settings
+            pushNotificationsToggle.checked = settings.push_notifications_enabled === true;
+            pushIntervalInput.value = settings.push_notification_interval_minutes || 60; // Default to 60 if undefined
+
+            console.log('Applied settings to form elements. Email Toggle:', emailNotificationsToggle.checked, 'Email Interval:', emailIntervalInput.value, 'Recipient Email:', recipientEmailInput.value, 'Push Toggle:', pushNotificationsToggle.checked, 'Push Interval:', pushIntervalInput.value);
         })
         .catch(error => {
             console.error('Error loading settings:', error);
@@ -46,20 +53,28 @@ document.addEventListener('DOMContentLoaded', function () {
             alertContainer.innerHTML = ''; // Clear previous alerts
             console.log('Settings form submitted.');
 
-            const intervalValue = parseInt(emailIntervalInput.value, 10);
-            console.log('Raw interval input value:', emailIntervalInput.value, 'Parsed interval value:', intervalValue);
+            const emailIntervalValue = parseInt(emailIntervalInput.value, 10);
+            const pushIntervalValue = parseInt(pushIntervalInput.value, 10);
 
             const settingsData = {
                 email_notifications_enabled: emailNotificationsToggle.checked,
-                email_reminder_interval_minutes: intervalValue,
-                recipient_email: recipientEmailInput.value.trim() // Added
+                email_reminder_interval_minutes: emailIntervalValue,
+                recipient_email: recipientEmailInput.value.trim(),
+                push_notifications_enabled: pushNotificationsToggle.checked,
+                push_notification_interval_minutes: pushIntervalValue
             };
             console.log('Data to be sent:', settingsData);
 
-            // Basic client-side validation
+            // Basic client-side validation for email interval
             if (isNaN(settingsData.email_reminder_interval_minutes) || settingsData.email_reminder_interval_minutes <= 0) {
                 console.warn('Validation failed: Email interval must be a positive number. Value:', settingsData.email_reminder_interval_minutes);
-                showAlert('Email interval must be a positive number.', 'danger');
+                showAlert('Email reminder interval must be a positive number.', 'danger');
+                return;
+            }
+            // Basic client-side validation for push interval
+            if (isNaN(settingsData.push_notification_interval_minutes) || settingsData.push_notification_interval_minutes <= 0) {
+                console.warn('Validation failed: Push notification interval must be a positive number. Value:', settingsData.push_notification_interval_minutes);
+                showAlert('Push notification interval must be a positive number.', 'danger');
                 return;
             }
             console.log('Client-side validation passed.');

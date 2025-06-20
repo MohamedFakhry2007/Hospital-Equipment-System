@@ -21,6 +21,9 @@ def start_email_scheduler():
     """Start the email scheduler."""
     # This function is intended to be run in a separate thread
     from app.services.email_service import EmailService
+    # Import PushNotificationService here or adjust as needed
+    from app.services.push_notification_service import PushNotificationService
+
 
     logger = logging.getLogger(__name__) # Get a logger instance
 
@@ -38,7 +41,32 @@ def start_email_scheduler():
         if loop.is_running():
             loop.stop() # Stop the loop if it's still running
         loop.close()
-        logger.info("Background thread for scheduler has finished.")
+        logger.info("Background thread for email scheduler has finished.")
+
+
+# Function to start the Push Notification scheduler
+def start_push_notification_scheduler():
+    """Start the push notification scheduler."""
+    # This function is intended to be run in a separate thread
+    # EmailService import is above, ensure PushNotificationService is also imported
+    # from app.services.push_notification_service import PushNotificationService # Or ensure it's imported with EmailService
+
+    logger = logging.getLogger(__name__)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        logger.info("Background thread for Push Notification scheduler is starting.")
+        # PushNotificationService.run_scheduler_async_loop will handle its own singleton check
+        loop.run_until_complete(PushNotificationService.run_scheduler_async_loop())
+    except Exception as e:
+        logger.error(f"Exception in the Push Notification scheduler thread: {str(e)}", exc_info=True)
+    finally:
+        if loop.is_running():
+            loop.stop()
+        loop.close()
+        logger.info("Background thread for Push Notification scheduler has finished.")
 
 
 def create_app():
@@ -78,11 +106,17 @@ def create_app():
         # The EmailService.run_scheduler_async_loop() has an internal lock
         # (_scheduler_lock and _scheduler_running) to ensure only one
         # instance of the actual scheduling logic runs across all workers/threads.
-        scheduler_thread = threading.Thread(target=start_email_scheduler, daemon=True)
-        scheduler_thread.start()
+        email_scheduler_thread = threading.Thread(target=start_email_scheduler, daemon=True)
+        email_scheduler_thread.start()
         logger.info("Email scheduler thread initiated from create_app.")
+
+        # Start Push Notification Scheduler
+        # Similar logic for PushNotificationService, assuming it has its own lock
+        push_scheduler_thread = threading.Thread(target=start_push_notification_scheduler, daemon=True)
+        push_scheduler_thread.start()
+        logger.info("Push Notification scheduler thread initiated from create_app.")
     else:
-        logger.info("Scheduler is disabled in config (SCHEDULER_ENABLED=False).")
+        logger.info("Schedulers are disabled in config (SCHEDULER_ENABLED=False). Email and Push Notification schedulers will not start.")
 
     logger.info('Application initialization complete')
     
