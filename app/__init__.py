@@ -49,7 +49,7 @@ def start_push_notification_scheduler():
     """Start the push notification scheduler."""
     # This function is intended to be run in a separate thread
     # EmailService import is above, ensure PushNotificationService is also imported
-    # from app.services.push_notification_service import PushNotificationService # Or ensure it's imported with EmailService
+    from app.services.push_notification_service import PushNotificationService # Or ensure it's imported with EmailService
 
     logger = logging.getLogger(__name__)
 
