@@ -8,7 +8,7 @@
     <!-- Alert container -->
     <div id="alertContainer"></div>
 
-    <form method="POST" action="{{ url_for('views.save_settings_page') }}">
+    <form method="POST" action="{{ url_for('views.save_settings_page') }}" id="settingsForm">
         <!-- Email Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="emailNotificationsToggle" name="email_notifications_enabled" {% if settings.email_notifications_enabled %}checked{% endif %}>
