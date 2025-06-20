@@ -35,3 +35,8 @@ class Config:
     SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "True").lower() == "true" # Global switch for the email scheduler thread
     # SCHEDULER_INTERVAL (previously here) has been removed as the interval is now managed dynamically
     # via 'email_reminder_interval_minutes' in settings.json
+
+    # VAPID Keys for Web Push Notifications
+    VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+    VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:default@example.com") # Must be a mailto: or https: URL

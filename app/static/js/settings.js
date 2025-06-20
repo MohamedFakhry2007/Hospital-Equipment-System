@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pushNotificationsToggle = document.getElementById('pushNotificationsToggle');
     const pushIntervalInput = document.getElementById('pushInterval');
     const alertContainer = document.getElementById('alertContainer');
+    let currentServerSettings = {}; // To store loaded settings
 
     // Function to display alerts
     function showAlert(message, type = 'success') {
@@ -37,14 +38,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Load push notification settings
             pushNotificationsToggle.checked = settings.push_notifications_enabled === true;
-            pushIntervalInput.value = settings.push_notification_interval_minutes || 60; // Default to 60 if undefined
+            pushIntervalInput.value = settings.push_notification_interval_minutes || 60;
+            currentServerSettings = settings; // Store loaded settings
 
             console.log('Applied settings to form elements. Email Toggle:', emailNotificationsToggle.checked, 'Email Interval:', emailIntervalInput.value, 'Recipient Email:', recipientEmailInput.value, 'Push Toggle:', pushNotificationsToggle.checked, 'Push Interval:', pushIntervalInput.value);
+
+            // Initialize Push Notification Manager and UI
+            if (window.pushNotificationManager) {
+                window.pushNotificationManager.initialize()
+                    .then(() => {
+                        // Update toggle state based on both server setting and current browser subscription status
+                        // The initialize function in notifications.js already calls updateSubscriptionButton
+                        // which now uses window.currentServerSettings.
+                        // We just need to ensure the toggle reflects the server's preference initially.
+                        window.pushNotificationManager.updatePushToggleButtonState(
+                            pushNotificationsToggle,
+                            currentServerSettings.push_notifications_enabled
+                        );
+                    });
+            }
         })
         .catch(error => {
             console.error('Error loading settings:', error);
             showAlert('Failed to load current settings. Please try again later.', 'danger');
         });
+
+    // Add event listener for the push notifications toggle
+    if (pushNotificationsToggle && window.pushNotificationManager) {
+        pushNotificationsToggle.addEventListener('change', async function(event) {
+            // Store the initial server setting for push_notifications_enabled
+            const initialServerPushEnabled = currentServerSettings.push_notifications_enabled;
+            const successfulToggle = await window.pushNotificationManager.handlePushNotificationsToggle(event, initialServerPushEnabled);
+
+            if (!successfulToggle) {
+                // If handlePushNotificationsToggle returned false (e.g. permission denied and toggle reverted),
+                // ensure our currentServerSettings reflects that the state wasn't *successfully* changed to the new toggle value.
+                // The toggle itself is already reverted by handlePushNotificationsToggle.
+                // We need to make sure that if save is hit now, it saves the *original* state if the toggle action failed.
+                // This is tricky. For now, the save function will just read the current .checked state.
+                // The handlePushNotificationsToggle already reverts the .checked state on failure.
+            }
+            // The push_notifications_enabled for saving will be based on the final state of pushNotificationsToggle.checked
+        });
+    }
 
     // Handle form submission
     if (settingsForm) {
@@ -56,11 +92,15 @@ document.addEventListener('DOMContentLoaded', function () {
             const emailIntervalValue = parseInt(emailIntervalInput.value, 10);
             const pushIntervalValue = parseInt(pushIntervalInput.value, 10);
 
+            // The push_notifications_enabled state is now directly from the toggle's current state
+            // which should have been managed by handlePushNotificationsToggle
+            const finalPushEnabledState = pushNotificationsToggle.checked;
+
             const settingsData = {
                 email_notifications_enabled: emailNotificationsToggle.checked,
                 email_reminder_interval_minutes: emailIntervalValue,
                 recipient_email: recipientEmailInput.value.trim(),
-                push_notifications_enabled: pushNotificationsToggle.checked,
+                push_notifications_enabled: finalPushEnabledState, // Use the toggle's current state
                 push_notification_interval_minutes: pushIntervalValue
             };
             console.log('Data to be sent:', settingsData);

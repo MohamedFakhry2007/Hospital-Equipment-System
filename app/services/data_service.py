@@ -58,7 +58,9 @@ class DataService:
             default_settings = {
                 "email_notifications_enabled": True,
                 "email_reminder_interval_minutes": 60,
-                "recipient_email": ""
+                "recipient_email": "",
+                "push_notifications_enabled": False, # Default for push notifications
+                "push_notification_interval_minutes": 60 # Default interval for push
             }
             try:
                 with open(settings_path, 'w') as f:
@@ -82,7 +84,9 @@ class DataService:
         default_settings = {
             "email_notifications_enabled": True,
             "email_reminder_interval_minutes": 60,
-            "recipient_email": ""
+            "recipient_email": "",
+            "push_notifications_enabled": False,
+            "push_notification_interval_minutes": 60
         }
 
         try:
@@ -209,6 +213,86 @@ class DataService:
         except Exception as e:
             logger.error(f"Unexpected error saving {data_type} data to {file_path}: {str(e)}")
             raise ValueError(f"Failed to save {data_type} data due to an unexpected error.") from e
+
+    # --- Push Subscription Management ---
+    @staticmethod
+    def get_push_subscriptions_path() -> Path:
+        """Returns the path to the push_subscriptions.json file."""
+        return Path(Config.DATA_DIR) / "push_subscriptions.json"
+
+    @staticmethod
+    def ensure_push_subscriptions_file_exists():
+        """Ensure push_subscriptions.json file exists."""
+        subscriptions_path = DataService.get_push_subscriptions_path()
+        if not subscriptions_path.exists():
+            logger.info(f"Creating new push subscriptions file: {subscriptions_path}")
+            with open(subscriptions_path, 'w') as f:
+                json.dump([], f) # Initialize with an empty list
+
+    @staticmethod
+    def load_push_subscriptions() -> List[Dict[str, Any]]:
+        """Load push subscriptions from push_subscriptions.json."""
+        DataService.ensure_push_subscriptions_file_exists()
+        subscriptions_path = DataService.get_push_subscriptions_path()
+        try:
+            with open(subscriptions_path, 'r') as f:
+                content = f.read()
+                if not content.strip():
+                    return []
+                subscriptions = json.loads(content)
+                if not isinstance(subscriptions, list): # Ensure it's a list
+                    logger.warning(f"Push subscriptions file {subscriptions_path} does not contain a list. Resetting.")
+                    return []
+                return subscriptions
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.error(f"Error loading push subscriptions from {subscriptions_path}: {e}. Returning empty list.", exc_info=True)
+            return []
+
+    @staticmethod
+    def save_push_subscriptions(subscriptions: List[Dict[str, Any]]):
+        """Save push subscriptions to push_subscriptions.json."""
+        DataService.ensure_push_subscriptions_file_exists()
+        subscriptions_path = DataService.get_push_subscriptions_path()
+        try:
+            with open(subscriptions_path, 'w') as f:
+                json.dump(subscriptions, f, indent=2)
+            logger.info(f"Push subscriptions saved successfully to {subscriptions_path}.")
+        except IOError as e:
+            logger.error(f"IOError saving push subscriptions to {subscriptions_path}: {e}", exc_info=True)
+            raise ValueError("Failed to save push subscriptions due to IO error.") from e
+
+    @staticmethod
+    def add_push_subscription(subscription_info: Dict[str, Any]):
+        """Adds a new push subscription if it doesn't already exist."""
+        subscriptions = DataService.load_push_subscriptions()
+        # Assuming subscription_info contains an 'endpoint' field that is unique
+        endpoint = subscription_info.get("endpoint")
+        if not endpoint:
+            logger.warning("Attempted to add push subscription without an endpoint.")
+            return
+
+        exists = any(sub.get("endpoint") == endpoint for sub in subscriptions)
+        if not exists:
+            subscriptions.append(subscription_info)
+            DataService.save_push_subscriptions(subscriptions)
+            logger.info(f"Added new push subscription: {endpoint}")
+        else:
+            logger.info(f"Push subscription already exists: {endpoint}")
+
+    @staticmethod
+    def remove_push_subscription(endpoint_to_remove: str):
+        """Removes a push subscription by its endpoint."""
+        subscriptions = DataService.load_push_subscriptions()
+        updated_subscriptions = [sub for sub in subscriptions if sub.get("endpoint") != endpoint_to_remove]
+
+        if len(updated_subscriptions) < len(subscriptions):
+            DataService.save_push_subscriptions(updated_subscriptions)
+            logger.info(f"Removed push subscription: {endpoint_to_remove}")
+        else:
+            logger.info(f"Push subscription not found for removal: {endpoint_to_remove}")
+
+    # --- End Push Subscription Management ---
+
 
     @staticmethod
     def calculate_status(entry_data: Dict[str, Any], data_type: Literal['ppm', 'ocm']) -> Literal["Upcoming", "Overdue", "Maintained"]:
