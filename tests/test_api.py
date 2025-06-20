@@ -323,3 +323,117 @@ def test_bulk_delete_invalid_data_type(client):
     assert response.status_code == 400
     json_data = response.get_json()
     assert "Invalid data type" in json_data['message']
+
+
+# --- Tests for /api/settings ---
+
+def test_get_settings_success(client):
+    """Test successfully retrieving settings."""
+    # Mock DataService.load_settings
+    mock_settings_data = {
+        "email_notifications_enabled": True,
+        "email_reminder_interval_minutes": 60,
+        "recipient_email": "test@example.com",
+        "push_notifications_enabled": False,
+        "push_notification_interval_minutes": 30
+    }
+    with patch('app.services.data_service.DataService.load_settings', return_value=mock_settings_data) as mock_load:
+        response = client.get('/api/settings')
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert json_data == mock_settings_data
+        mock_load.assert_called_once()
+
+def test_get_settings_load_error(client):
+    """Test error handling when DataService.load_settings fails."""
+    with patch('app.services.data_service.DataService.load_settings', side_effect=Exception("Failed to load")) as mock_load:
+        response = client.get('/api/settings')
+        assert response.status_code == 500
+        json_data = response.get_json()
+        assert "Failed to load settings" in json_data['error']
+        mock_load.assert_called_once()
+
+def test_save_settings_success(client):
+    """Test successfully saving valid settings."""
+    new_settings_payload = {
+        "email_notifications_enabled": False,
+        "email_reminder_interval_minutes": 120,
+        "recipient_email": "new@example.com",
+        "push_notifications_enabled": True,
+        "push_notification_interval_minutes": 45
+    }
+    # Mock load_settings (called first in the endpoint) and save_settings
+    # The endpoint loads current, updates, then saves.
+    # So, save_settings will be called with the merged data.
+    initial_settings_data = {
+        "email_notifications_enabled": True, "email_reminder_interval_minutes": 60, "recipient_email": "old@example.com",
+        "push_notifications_enabled": False, "push_notification_interval_minutes": 30,
+        "another_existing_setting": "value" # To test preservation
+    }
+
+    expected_saved_settings = initial_settings_data.copy()
+    expected_saved_settings.update(new_settings_payload)
+
+    with patch('app.services.data_service.DataService.load_settings', return_value=initial_settings_data) as mock_load, \
+         patch('app.services.data_service.DataService.save_settings', return_value=None) as mock_save:
+        response = client.post('/api/settings', json=new_settings_payload)
+        assert response.status_code == 200
+        json_data = response.get_json()
+        assert "Settings saved successfully" in json_data['message']
+        assert json_data['settings'] == expected_saved_settings
+
+        mock_load.assert_called_once()
+        mock_save.assert_called_once_with(expected_saved_settings)
+
+
+def test_save_settings_validation_errors(client):
+    """Test validation errors when saving settings."""
+    # Test invalid type for boolean
+    invalid_payload_type = {"email_notifications_enabled": "not-a-boolean"}
+    response = client.post('/api/settings', json=invalid_payload_type)
+    assert response.status_code == 400
+    assert "Invalid type for email_notifications_enabled" in response.get_json()['error']
+
+    # Test invalid value for interval (e.g., zero or negative)
+    valid_bools_invalid_interval = {
+        "email_notifications_enabled": True, "email_reminder_interval_minutes": 0, "recipient_email": "test@example.com",
+        "push_notifications_enabled": True, "push_notification_interval_minutes": 30
+    }
+    response = client.post('/api/settings', json=valid_bools_invalid_interval)
+    assert response.status_code == 400
+    assert "Invalid value for email_reminder_interval_minutes" in response.get_json()['error']
+
+    valid_email_invalid_push_interval = {
+        "email_notifications_enabled": True, "email_reminder_interval_minutes": 60, "recipient_email": "test@example.com",
+        "push_notifications_enabled": True, "push_notification_interval_minutes": -5
+    }
+    response = client.post('/api/settings', json=valid_email_invalid_push_interval)
+    assert response.status_code == 400
+    assert "Invalid value for push_notification_interval_minutes" in response.get_json()['error']
+
+    # Test missing key (e.g. push_notifications_enabled is required by the endpoint)
+    missing_key_payload = {
+        "email_notifications_enabled": False,
+        "email_reminder_interval_minutes": 120,
+        "recipient_email": "new@example.com",
+        # "push_notifications_enabled": True, # Missing
+        "push_notification_interval_minutes": 45
+    }
+    response = client.post('/api/settings', json=missing_key_payload)
+    assert response.status_code == 400 # Should fail because push_notifications_enabled will be None, failing bool check
+    assert "Invalid type for push_notifications_enabled" in response.get_json()['error']
+
+
+def test_save_settings_save_error(client):
+    """Test error handling when DataService.save_settings fails."""
+    settings_payload = {
+        "email_notifications_enabled": True, "email_reminder_interval_minutes": 60, "recipient_email": "test@example.com",
+        "push_notifications_enabled": False, "push_notification_interval_minutes": 30
+    }
+    with patch('app.services.data_service.DataService.load_settings', return_value=settings_payload), \
+         patch('app.services.data_service.DataService.save_settings', side_effect=Exception("Failed to save")) as mock_save:
+        response = client.post('/api/settings', json=settings_payload)
+        assert response.status_code == 500
+        json_data = response.get_json()
+        assert "Failed to save settings" in json_data['error']
+        mock_save.assert_called_once()

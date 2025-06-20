@@ -325,25 +325,52 @@ def save_settings():
     email_reminder_interval_minutes = data.get("email_reminder_interval_minutes")
     recipient_email = data.get("recipient_email", "") # Default to empty string if not provided
 
+    push_notifications_enabled = data.get("push_notifications_enabled")
+    push_notification_interval_minutes = data.get("push_notification_interval_minutes")
+
     if not isinstance(email_notifications_enabled, bool):
         return jsonify({"error": "Invalid type for email_notifications_enabled, boolean expected."}), 400
-
     if not isinstance(email_reminder_interval_minutes, int) or email_reminder_interval_minutes <= 0:
         err_msg = "Invalid value for email_reminder_interval_minutes, positive integer expected."
         return jsonify({"error": err_msg}), 400
-
     if not isinstance(recipient_email, str):
         return jsonify({"error": "Invalid type for recipient_email, string expected."}), 400
 
-    # Construct settings object to save only known settings
+    if not isinstance(push_notifications_enabled, bool):
+        return jsonify({"error": "Invalid type for push_notifications_enabled, boolean expected."}), 400
+    if not isinstance(push_notification_interval_minutes, int) or push_notification_interval_minutes <= 0:
+        err_msg = "Invalid value for push_notification_interval_minutes, positive integer expected."
+        return jsonify({"error": err_msg}), 400
+
+    # Construct settings object to save all known settings
+    # It's important that DataService.save_settings either overwrites the entire file
+    # or can merge settings. Assuming it overwrites with settings_to_save.
     settings_to_save = {
         "email_notifications_enabled": email_notifications_enabled,
         "email_reminder_interval_minutes": email_reminder_interval_minutes,
-        "recipient_email": recipient_email.strip()
+        "recipient_email": recipient_email.strip(),
+        "push_notifications_enabled": push_notifications_enabled,
+        "push_notification_interval_minutes": push_notification_interval_minutes,
     }
 
+    # Preserve any other settings that might be in data/settings.json but not managed through this API call
+    # This requires loading current settings first.
     try:
-        DataService.save_settings(settings_to_save)
+        current_settings = DataService.load_settings()
+        # Update current_settings with validated values from the request
+        current_settings.update(settings_to_save)
+        # Now save the merged settings
+        DataService.save_settings(current_settings)
+        logger.info(f"Settings saved successfully: {current_settings}")
+        return jsonify({"message": "Settings saved successfully", "settings": current_settings}), 200
+    except ValueError as e: # Catch specific error from save_settings for IO issues
+        logger.error(f"Error saving settings (ValueError): {str(e)}")
+        return jsonify({"error": f"Failed to save settings: {str(e)}"}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error saving settings: {str(e)}")
+        return jsonify({"error": "Failed to save settings due to an unexpected error"}), 500
+
+@api_bp.route('/health')
         logger.info(f"Settings saved successfully: {settings_to_save}")
         return jsonify({"message": "Settings saved successfully", "settings": settings_to_save}), 200
     except ValueError as e: # Catch specific error from save_settings for IO issues

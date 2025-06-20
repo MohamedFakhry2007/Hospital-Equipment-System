@@ -29,14 +29,22 @@
             <small class="form-text text-muted">If set, reminder emails will be sent to this address. If left blank, the system default recipient will be used.</small>
         </div>
 
-        <!-- Desktop Push Notifications Toggle (Keep for future use, but not implemented in this task) -->
+        <!-- Push Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="desktopNotificationsToggle" name="desktop_notifications" disabled>
-            <label class="form-check-label" for="desktopNotificationsToggle">Enable Desktop Push Notifications (Feature not active)</label>
+            <input class="form-check-input" type="checkbox" role="switch" id="pushNotificationsToggle" name="push_notifications_enabled">
+            <label class="form-check-label" for="pushNotificationsToggle">Enable Desktop Push Notifications for Reminders</label>
+        </div>
+
+        <!-- Time Interval for Push Notifications -->
+        <div class="mb-3">
+            <label for="pushInterval" class="form-label">Push Notification Check Interval (in minutes)</label>
+            <input type="number" class="form-control" id="pushInterval" name="push_notification_interval_minutes" placeholder="e.g., 60" min="1">
+            <small class="form-text text-muted">How often the system checks for and sends push notifications. (Note: Actual browser push notifications require user permission and service worker setup, which are not part of this backend-focused update.)</small>
         </div>
 
         <hr>
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <!-- This button click is handled by settings.js to submit via API -->
+        <button type="submit" class="btn btn-primary" id="saveSettingsButton">Save Settings</button>
     </form>
 </div>
 

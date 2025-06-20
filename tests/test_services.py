@@ -1535,3 +1535,61 @@ async def test_run_scheduler_disabled(mock_logger, mock_process_reminders):
     await EmailService.run_scheduler()
     mock_logger.info.assert_called_with("Reminder scheduler is disabled")
     mock_process_reminders.assert_not_called()
+
+
+# --- PushNotificationService Tests ---
+from app.services.push_notification_service import PushNotificationService
+
+class TestPushNotificationService:
+
+    def test_summarize_upcoming_maintenance_no_tasks(self):
+        summary = PushNotificationService.summarize_upcoming_maintenance([])
+        assert summary == "No upcoming maintenance tasks."
+
+    def test_summarize_upcoming_maintenance_ppm_only(self):
+        # Tuple format: (type, department, serial, description, due_date_str, engineer)
+        ppm_tasks = [
+            ('PPM', 'Dept A', 'PPM001', 'Quarter I', '01/08/2024', 'Eng1'),
+            ('PPM', 'Dept B', 'PPM002', 'Quarter II', '10/08/2024', 'Eng2'),
+        ]
+        summary = PushNotificationService.summarize_upcoming_maintenance(ppm_tasks)
+        assert summary == "2 PPM tasks due soon."
+
+    def test_summarize_upcoming_maintenance_ocm_only(self):
+        ocm_tasks = [
+            ('OCM', 'Dept C', 'OCM001', 'Next Maintenance', '05/08/2024', 'Eng3'),
+        ]
+        summary = PushNotificationService.summarize_upcoming_maintenance(ocm_tasks)
+        assert summary == "1 OCM task due soon."
+
+    def test_summarize_upcoming_maintenance_ppm_and_ocm(self):
+        tasks = [
+            ('PPM', 'Dept A', 'PPM001', 'Quarter I', '01/08/2024', 'Eng1'),
+            ('OCM', 'Dept C', 'OCM001', 'Next Maintenance', '05/08/2024', 'Eng3'),
+            ('PPM', 'Dept B', 'PPM002', 'Quarter II', '10/08/2024', 'Eng2'),
+        ]
+        summary = PushNotificationService.summarize_upcoming_maintenance(tasks)
+        assert summary == "2 PPM tasks and 1 OCM task due soon."
+
+    def test_summarize_upcoming_maintenance_single_ppm_single_ocm(self):
+        tasks = [
+            ('PPM', 'Dept A', 'PPM001', 'Quarter I', '01/08/2024', 'Eng1'),
+            ('OCM', 'Dept C', 'OCM001', 'Next Maintenance', '05/08/2024', 'Eng3'),
+        ]
+        summary = PushNotificationService.summarize_upcoming_maintenance(tasks)
+        assert summary == "1 PPM task and 1 OCM task due soon."
+
+    # Test send_push_notification (basic logging test)
+    @patch('app.services.push_notification_service.logger')
+    @pytest.mark.asyncio
+    async def test_send_push_notification_logs_message(self, mock_logger):
+        summary_message = "Test push notification summary"
+        await PushNotificationService.send_push_notification(summary_message)
+        mock_logger.info.assert_called_with(f"SENDING PUSH NOTIFICATION (Simulated): {summary_message}")
+
+    @patch('app.services.push_notification_service.logger')
+    @pytest.mark.asyncio
+    async def test_send_push_notification_logs_no_tasks(self, mock_logger):
+        summary_message = "No upcoming maintenance tasks."
+        await PushNotificationService.send_push_notification(summary_message)
+        mock_logger.info.assert_called_with(f"Push Notification: {summary_message}")
