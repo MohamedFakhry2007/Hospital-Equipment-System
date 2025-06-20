@@ -596,6 +596,15 @@ def save_settings_page():
 
     logger.debug(f"Request data: {data}")
 
+    if request.is_json:
+        data = request.get_json()
+        logger.debug(f"Request data: {data}")
+    else:
+        logger.warning("Request format is not JSON.")
+        # This case should ideally not happen if the frontend always sends JSON
+        flash('Invalid request format. Expected JSON.', 'danger')
+        return redirect(url_for('views.settings_page'))
+
     email_notifications_enabled = data.get('email_notifications_enabled', False) # Defaults to False if not present
     logger.debug(f"Email notifications enabled: {email_notifications_enabled}")
 
