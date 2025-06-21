@@ -302,67 +302,68 @@ class DataService:
         today = datetime.now().date()
 
         if data_type == 'ppm':
-            # For PPM, status is based on Eng1-4 fields.
-            # This is a simplified interpretation: if all Eng fields for past/current quarters are filled, it's Maintained.
-            # A more precise calculation would need actual quarter dates.
-            # Assuming EngX fields imply work done for that quarter.
-            # For PPM, status is based on PPM_Q_I to PPM_Q_IV fields, specifically their 'quarter_date' and 'engineer'.
             today_date = datetime.now().date()
-            is_overdue = False
-            maintained_quarters_count = 0
-            past_due_quarters_with_engineer = 0
-            total_past_due_quarters = 0
+            is_overdue = False  # Becomes true if any past quarter_date has no engineer
 
-            for q_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+            # Variables to summarize quarter states
+            num_past_due_quarters_total = 0  # Count of quarters with date < today
+            num_past_due_quarters_maintained = 0  # Count of past_due quarters with an engineer
+            num_future_quarters = 0  # Count of quarters with date >= today
+            # has_any_valid_quarter_date = False # Not strictly needed for the final logic flow with current defaults
+
+            quarter_keys = ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']
+
+            for q_key in quarter_keys:
                 quarter_info = entry_data.get(q_key, {})
-                if not isinstance(quarter_info, dict): # Should be a dict after model validation
-                    quarter_info = {}
+                # Ensure quarter_info is a dict, useful if data is malformed (though Pydantic should handle)
+                if not isinstance(quarter_info, dict): quarter_info = {}
 
                 quarter_date_str = quarter_info.get('quarter_date')
-                engineer_name = quarter_info.get('engineer')
+                engineer_name = quarter_info.get('engineer', "").strip() # Ensure engineer_name is a string
 
                 if not quarter_date_str:
-                    # If no date, this quarter cannot make it overdue by itself,
-                    # but lack of engineer might contribute to "Upcoming" if no other action.
-                    continue
+                    continue  # Skip this quarter if no date is specified
 
                 try:
                     current_quarter_date = datetime.strptime(quarter_date_str, '%d/%m/%Y').date()
+                    # has_any_valid_quarter_date = True # A valid date was found and parsed
                 except ValueError:
-                    logger.warning(f"Invalid quarter_date format for {entry_data.get('SERIAL')}, quarter {q_key}: {quarter_date_str}")
-                    continue # Skip this quarter for status calculation if date is invalid
+                    logger.warning(
+                        f"Invalid quarter_date format for PPM entry {entry_data.get('SERIAL', 'N/A')}, "
+                        f"quarter {q_key}: '{quarter_date_str}'. Skipping this date for status calc."
+                    )
+                    continue  # Skip if date is invalid
 
                 if current_quarter_date < today_date:
-                    total_past_due_quarters += 1
-                    if engineer_name and engineer_name.strip():
-                        past_due_quarters_with_engineer += 1
+                    num_past_due_quarters_total += 1
+                    if engineer_name:  # Check if engineer string is not empty
+                        num_past_due_quarters_maintained += 1
                     else:
-                        is_overdue = True # Found a past due quarter without an engineer
+                        is_overdue = True  # A past due quarter is not maintained
+                else:  # current_quarter_date >= today_date
+                    num_future_quarters += 1
 
-                # For "Maintained" status, we count quarters with an engineer, irrespective of date for now.
-                # Refinement: "Maintained" typically means past services are done.
-                if engineer_name and engineer_name.strip():
-                    maintained_quarters_count +=1
-
-
+            # --- Determine final status ---
             if is_overdue:
                 return "Overdue"
 
-            # If all past due quarters have an engineer, and there was at least one such quarter
-            if total_past_due_quarters > 0 and past_due_quarters_with_engineer == total_past_due_quarters:
+            # If not overdue, check for Maintained or Upcoming
+            if num_future_quarters > 0:
+                # If there's any future work, and it's not overdue, it's Upcoming.
+                # This implies any past work (if existing) was maintained.
+                return "Upcoming"
+
+            # No future quarters. All scheduled work is in the past (or no work scheduled).
+            # And not 'Overdue', so all past work (if any) must have been maintained.
+            if num_past_due_quarters_total > 0:
+                # There was past work, and it's all maintained (since not 'Overdue').
+                # This also implies num_past_due_quarters_maintained == num_past_due_quarters_total
                 return "Maintained"
 
-            # If there are no past due quarters, and some future quarters might or might not have engineers
-            # or if all past due quarters are maintained, but there are future quarters.
-            if not total_past_due_quarters and maintained_quarters_count > 0 : # e.g. all future but one is assigned
-                 # This could still be upcoming if all assigned quarters are in the future
-                 # Let's refine "Maintained": if all *past* quarters are done, and there are future ones.
-                 # The existing logic: if not overdue, and past_due_quarters_with_engineer == total_past_due_quarters
-                 # this covers the case where past work is done. If total_past_due_quarters is 0, it's upcoming.
-                 pass # Fall through to Upcoming
-
-            # If no quarters were overdue, and no past quarters were "maintained" (e.g. all future, or past but no engineer which means overdue)
-            # Default to upcoming if not Overdue and not clearly Maintained (all past work done)
+            # Default cases:
+            # 1. No future quarters, no past due quarters (e.g., all dates were invalid, or no dates at all).
+            #    This means has_any_valid_quarter_date would be False if we tracked it.
+            # In these scenarios, "Upcoming" seems a safe default.
             return "Upcoming"
 
         elif data_type == 'ocm':
@@ -933,3 +934,43 @@ class DataService:
         except Exception as e:
             logger.exception(f"Error in export_data for {data_type}: {str(e)}")
             raise
+
+    @staticmethod
+    def update_all_ppm_statuses():
+        """
+        Recalculates and updates the status for all PPM entries in ppm.json.
+        Saves the data back to the file if any statuses were changed.
+        """
+        logger.info("Starting update of all PPM statuses.")
+        try:
+            all_ppm_data = DataService.load_data('ppm')
+            if not all_ppm_data:
+                logger.info("No PPM data found to update statuses.")
+                return
+
+            statuses_changed_count = 0
+            updated_data = []
+
+            for entry in all_ppm_data:
+                original_status = entry.get('Status')
+                # Ensure entry is mutable for in-place update if needed, or create a copy
+                entry_copy = entry.copy()
+
+                new_status = DataService.calculate_status(entry_copy, 'ppm')
+
+                if original_status != new_status:
+                    entry_copy['Status'] = new_status
+                    statuses_changed_count += 1
+                    logger.debug(f"PPM SERIAL {entry_copy.get('SERIAL', 'N/A')}: Status changed from '{original_status}' to '{new_status}'.")
+
+                updated_data.append(entry_copy)
+
+            if statuses_changed_count > 0:
+                DataService.save_data(updated_data, 'ppm')
+                logger.info(f"Successfully updated statuses for {statuses_changed_count} PPM entries. Data saved.")
+            else:
+                logger.info("No PPM statuses required updating.")
+
+        except Exception as e:
+            logger.error(f"Error during PPM status update process: {str(e)}", exc_info=True)
+            # Depending on application design, might want to raise this or handle more gracefully.
