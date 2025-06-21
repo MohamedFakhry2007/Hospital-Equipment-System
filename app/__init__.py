@@ -120,4 +120,14 @@ def create_app():
 
     logger.info('Application initialization complete')
     
+    # Update PPM statuses on startup
+    # Ensure DataService is imported
+    from app.services.data_service import DataService
+    try:
+        logger.info("Attempting to update PPM statuses on application startup...")
+        DataService.update_all_ppm_statuses()
+        logger.info("PPM statuses update process completed.")
+    except Exception as e:
+        logger.error(f"Error during initial PPM status update: {str(e)}", exc_info=True)
+
     return app

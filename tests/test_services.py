@@ -516,28 +516,173 @@ def test_calculate_ppm_quarter_dates(mock_data_service, mocker):
         "PPM_Q_I": {"quarter_date": "01/04/2024", "engineer": "EngA"},
         "PPM_Q_II": {"quarter_date": "01/07/2024", "engineer": None}
     }, "Upcoming", "15/03/2024"), # Still upcoming as no past due items.
-    # Scenario: Mixed - past maintained, future upcoming
+    # Scenario: Mixed - past maintained, future upcoming -> Should be Upcoming
     ({
         "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": "EngA"}, # Past, maintained
         "PPM_Q_II": {"quarter_date": "01/04/2024", "engineer": None}  # Future, no eng
-    }, "Maintained", "15/03/2024"), # Considered Maintained because past work is done.
+    }, "Upcoming", "15/03/2024"),
     # Scenario: Upcoming (no past due quarters, but no engineers assigned yet for future)
     ({ "PPM_Q_I": {"quarter_date": "01/06/2024", "engineer": None} }, "Upcoming", "15/03/2024"),
     # Scenario: Upcoming (one quarter with no date info - should not make it overdue)
-    ({ "PPM_Q_I": {"engineer": "EngA"} }, "Upcoming", "15/03/2024"),
-    # Scenario: Maintained (only one past quarter, and it's maintained)
+    ({ "PPM_Q_I": {"engineer": "EngA"} }, "Upcoming", "15/03/2024"), # No date, defaults to upcoming
+    # Scenario: Maintained (only one past quarter, and it's maintained, no future quarters)
     ({ "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": "EngA"} }, "Maintained", "15/03/2024"),
+    # Scenario: User's example - Overdue
+    ({
+        "PPM_Q_I": {"quarter_date": "01/01/2025", "engineer": None},
+        "PPM_Q_II": {"quarter_date": "01/04/2025", "engineer": None},
+        "PPM_Q_III": {"quarter_date": "01/07/2025", "engineer": None},
+        "PPM_Q_IV": {"quarter_date": "01/11/2025", "engineer": None}
+    }, "Overdue", "21/06/2025"),
+    # Scenario: User's example - Upcoming (past maintained, future exists)
+    ({
+        "PPM_Q_I": {"quarter_date": "01/01/2025", "engineer": "EngUser1"},
+        "PPM_Q_II": {"quarter_date": "01/04/2025", "engineer": "EngUser2"},
+        "PPM_Q_III": {"quarter_date": "01/07/2025", "engineer": None},
+        "PPM_Q_IV": {"quarter_date": "01/11/2025", "engineer": None}
+    }, "Upcoming", "21/06/2025"),
+    # Scenario: All quarters past and maintained -> Maintained
+    ({
+        "PPM_Q_I": {"quarter_date": "01/01/2023", "engineer": "EngA"},
+        "PPM_Q_II": {"quarter_date": "01/04/2023", "engineer": "EngB"}
+    }, "Maintained", "01/08/2023"), # Today is after all quarter dates
+    # Scenario: No valid quarter dates at all -> Upcoming
+    ({
+        "PPM_Q_I": {"quarter_date": "invalid-date"},
+        "PPM_Q_II": {"engineer": "EngInvalid"} # No date
+    }, "Upcoming", "15/03/2024"),
+    # Scenario: All quarter dates are today or future -> Upcoming
+    ({
+        "PPM_Q_I": {"quarter_date": "15/03/2024", "engineer": "EngToday"}, # Date is today
+        "PPM_Q_II": {"quarter_date": "01/07/2024", "engineer": "EngFuture"} # Date is future
+    }, "Upcoming", "15/03/2024"),
 ])
-def test_calculate_status_ppm_new_logic(mock_data_service, mocker, ppm_quarters_data, expected_status, today_str):
+def test_calculate_status_ppm(mock_data_service, mocker, ppm_quarters_data, expected_status, today_str): # Renamed for clarity
     fixed_today = datetime.strptime(today_str, "%d/%m/%Y").date()
-    mocker.patch('app.services.data_service.datetime', now=lambda: datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+    # Mock datetime.now().date() used inside calculate_status
+    mocker.patch('app.services.data_service.datetime.now', return_value=datetime(fixed_today.year, fixed_today.month, fixed_today.day))
 
+    # SERIAL is used in logging within calculate_status if a date is invalid
     ppm_entry_data = {"SERIAL": "TestPPMStatus"}
-    ppm_entry_data.update(ppm_quarters_data) # Add PPM_Q_X data
 
-    status = mock_data_service.calculate_status(ppm_entry_data, "ppm")
+    # Ensure all quarter keys are present in ppm_entry_data, even if empty, to mimic real structure
+    for q_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+        ppm_entry_data.setdefault(q_key, {}) # Initialize with empty dict if not in ppm_quarters_data
+
+    ppm_entry_data.update(ppm_quarters_data) # Add specific test case quarter data
+
+    status = DataService.calculate_status(ppm_entry_data, "ppm") # Call as static method
     assert status == expected_status
 
+# --- Tests for DataService.update_all_ppm_statuses ---
+
+@patch.object(DataService, 'load_data')
+@patch.object(DataService, 'save_data')
+@patch.object(DataService, 'calculate_status') # Mock calculate_status for focused testing of update_all_ppm_statuses logic
+def test_update_all_ppm_statuses_no_changes(mock_calculate_status, mock_save_data, mock_load_data, caplog):
+    ppm_entry_1 = {"SERIAL": "PPM001", "Status": "Upcoming", "PPM_Q_I": {"quarter_date": "01/01/2025"}}
+    ppm_entry_2 = {"SERIAL": "PPM002", "Status": "Overdue", "PPM_Q_I": {"quarter_date": "01/01/2024"}}
+
+    mock_load_data.return_value = [ppm_entry_1, ppm_entry_2]
+    # Let calculate_status return the same status, simulating no change needed
+    mock_calculate_status.side_effect = lambda entry, dtype: entry['Status']
+
+    with caplog.at_level(logging.INFO):
+        DataService.update_all_ppm_statuses()
+
+    mock_load_data.assert_called_once_with('ppm')
+    assert mock_calculate_status.call_count == 2
+    mock_save_data.assert_not_called()
+    assert "No PPM statuses required updating." in caplog.text
+
+@patch.object(DataService, 'load_data')
+@patch.object(DataService, 'save_data')
+# Use real calculate_status to test integration, assumes calculate_status is well-tested separately
+def test_update_all_ppm_statuses_with_changes(mock_save_data, mock_load_data, mocker, caplog):
+    # Today: 15/06/2024
+    fixed_today = date(2024, 6, 15)
+    mocker.patch('app.services.data_service.datetime.now', return_value=datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+
+    # Entry 1: Status is "Upcoming", but date is past & no engineer -> should become "Overdue"
+    ppm_entry_1_orig = {
+        "SERIAL": "PPM001", "Status": "Upcoming",
+        "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": None} # Past, no eng
+    }
+    # Entry 2: Status is "Overdue", but date is future -> should become "Upcoming"
+    ppm_entry_2_orig = {
+        "SERIAL": "PPM002", "Status": "Overdue",
+        "PPM_Q_I": {"quarter_date": "01/07/2024", "engineer": None} # Future
+    }
+    # Entry 3: Status is "Upcoming", date is future -> should remain "Upcoming" (no change)
+    ppm_entry_3_orig = {
+        "SERIAL": "PPM003", "Status": "Upcoming",
+        "PPM_Q_I": {"quarter_date": "01/08/2024", "engineer": None} # Future
+    }
+
+    mock_load_data.return_value = [ppm_entry_1_orig, ppm_entry_2_orig, ppm_entry_3_orig]
+
+    with caplog.at_level(logging.INFO):
+        DataService.update_all_ppm_statuses()
+
+    mock_load_data.assert_called_once_with('ppm')
+    mock_save_data.assert_called_once()
+
+    # Check the data passed to save_data
+    saved_data = mock_save_data.call_args[0][0]
+    assert len(saved_data) == 3
+
+    saved_entry_1 = next(e for e in saved_data if e['SERIAL'] == "PPM001")
+    assert saved_entry_1['Status'] == "Overdue"
+
+    saved_entry_2 = next(e for e in saved_data if e['SERIAL'] == "PPM002")
+    assert saved_entry_2['Status'] == "Upcoming"
+
+    saved_entry_3 = next(e for e in saved_data if e['SERIAL'] == "PPM003")
+    assert saved_entry_3['Status'] == "Upcoming" # No change for this one
+
+    assert f"Successfully updated statuses for 2 PPM entries. Data saved." in caplog.text
+
+
+@patch.object(DataService, 'load_data', return_value=[]) # No data
+@patch.object(DataService, 'save_data')
+def test_update_all_ppm_statuses_no_data(mock_save_data, mock_load_data, caplog):
+    with caplog.at_level(logging.INFO):
+        DataService.update_all_ppm_statuses()
+
+    mock_load_data.assert_called_once_with('ppm')
+    mock_save_data.assert_not_called()
+    assert "No PPM data found to update statuses." in caplog.text
+
+@patch.object(DataService, 'load_data', side_effect=Exception("Load error!"))
+@patch.object(DataService, 'save_data')
+def test_update_all_ppm_statuses_load_data_exception(mock_save_data, mock_load_data, caplog):
+    with caplog.at_level(logging.ERROR):
+        DataService.update_all_ppm_statuses()
+
+    mock_load_data.assert_called_once_with('ppm')
+    mock_save_data.assert_not_called()
+    assert "Error during PPM status update process: Load error!" in caplog.text
+
+@patch.object(DataService, 'load_data')
+@patch.object(DataService, 'save_data', side_effect=Exception("Save error!"))
+def test_update_all_ppm_statuses_save_data_exception(mock_save_data, mock_load_data, mocker, caplog):
+    # Today: 15/06/2024
+    fixed_today = date(2024, 6, 15)
+    mocker.patch('app.services.data_service.datetime.now', return_value=datetime(fixed_today.year, fixed_today.month, fixed_today.day))
+
+    # Setup data that will cause a change, thus triggering save_data
+    ppm_entry_change = {
+        "SERIAL": "PPM_SAVE_ERR", "Status": "Upcoming",
+        "PPM_Q_I": {"quarter_date": "01/01/2024", "engineer": None} # Will change to Overdue
+    }
+    mock_load_data.return_value = [ppm_entry_change]
+
+    with caplog.at_level(logging.ERROR):
+        DataService.update_all_ppm_statuses()
+
+    mock_load_data.assert_called_once_with('ppm')
+    mock_save_data.assert_called_once() # save_data should be attempted
+    assert "Error during PPM status update process: Save error!" in caplog.text
 
 # --- Tests for add_entry with status ---
 def test_add_ppm_entry_calculates_status_new(mock_data_service, mocker):
