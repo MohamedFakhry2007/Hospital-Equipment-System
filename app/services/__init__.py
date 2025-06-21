@@ -3,4 +3,4 @@ import logging
 logger = logging.getLogger(__name__)
 logger.debug("Initializing services package")
 
-from .training_service import TrainingService
+from app.services.training_service import Training

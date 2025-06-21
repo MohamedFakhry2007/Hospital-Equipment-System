@@ -1,1 +1,16 @@
-[]
+[
+    {
+        "id": 2,
+        "employee_id": "55135153",
+        "name": "xzcxz",
+        "department": "sdnjnhj",
+        "trainer": "bjhjhjh",
+        "trained_on_machines": [
+            "e",
+            "g",
+            "j"
+        ],
+        "last_trained_date": "2025-05-08",
+        "next_due_date": "2025-04-15"
+    }
+]

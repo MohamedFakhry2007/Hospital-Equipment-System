@@ -1,1 +1,1 @@
-from .training import TrainingRecord
+from app.models.training import Training
