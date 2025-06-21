@@ -23,8 +23,7 @@
                     <th>Employee ID</th>
                     <th>Name</th>
                     <th>Department</th>
-                    <th>Trainer</th>
-                    <th>Trained On Machines</th>
+                    <th>Trained On Machines / Trainers</th>
                     <th>Last Trained</th>
                     <th>Next Due</th>
                     <th>Actions</th>
@@ -40,8 +39,12 @@
                         <td>{{ training.department }}</td>
                         <td>{{ training.trainer }}</td>
                         <td>
-                            {% if training.trained_on_machines %}
-                                {{ training.trained_on_machines|join(', ') }}
+                            {% if training.machine_trainer_assignments and training.machine_trainer_assignments|length > 0 %}
+                                <ul class="list-unstyled mb-0">
+                                {% for assignment in training.machine_trainer_assignments %}
+                                    <li>{{ assignment.machine }}{% if assignment.trainer %} ({{ assignment.trainer }}){% endif %}</li>
+                                {% endfor %}
+                                </ul>
                             {% else %}
                                 N/A
                             {% endif %}
@@ -54,8 +57,7 @@
                                     data-employee-id="{{ training.employee_id }}"
                                     data-name="{{ training.name }}"
                                     data-department="{{ training.department }}"
-                                    data-trainer="{{ training.trainer }}"
-                                    data-machines="{{ training.trained_on_machines|join(',') }}"
+                                    data-machine-assignments="{{ training.machine_trainer_assignments|tojson|forceescape }}"
                                     data-last-trained="{{ training.last_trained_date if training.last_trained_date else '' }}"
                                     data-next-due="{{ training.next_due_date if training.next_due_date else '' }}"
                                     data-bs-toggle="modal" data-bs-target="#editTrainingModal">
@@ -118,13 +120,12 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="addTrainedOnMachines" class="form-label">Trained On Machines</label>
-                        <select class="form-select" id="addTrainedOnMachines" name="trained_on_machines" multiple size="6">
-                            {% for device in all_devices %}
-                                <option value="{{ device }}">{{ device }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple machines. Machines will be filtered by department selection.</small>
+                        <label class="form-label">Machine Training Assignments</label>
+                        <div id="addMachineAssignmentsContainer" class="machine-assignments-container border p-2" style="max-height: 300px; overflow-y: auto;">
+                            <p class="text-muted text-center" id="addMachinePlaceholder">Select a department to see available machines.</p>
+                            <!-- Machine assignments will be dynamically inserted here -->
+                        </div>
+                        <small class="form-text text-muted">Select machines and assign a trainer for each.</small>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -187,13 +188,12 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="editTrainedOnMachines" class="form-label">Trained On Machines</label>
-                        <select class="form-select" id="editTrainedOnMachines" name="trained_on_machines" multiple size="6">
-                            {% for device in all_devices %}
-                                <option value="{{ device }}">{{ device }}</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple machines. Machines will be filtered by department selection.</small>
+                        <label class="form-label">Machine Training Assignments</label>
+                        <div id="editMachineAssignmentsContainer" class="machine-assignments-container border p-2" style="max-height: 300px; overflow-y: auto;">
+                            <p class="text-muted text-center" id="editMachinePlaceholder">Select a department to see available machines.</p>
+                            <!-- Machine assignments will be dynamically inserted here -->
+                        </div>
+                        <small class="form-text text-muted">Select machines and assign a trainer for each.</small>
                     </div>
                      <div class="row">
                         <div class="col-md-6 mb-3">
@@ -220,58 +220,133 @@
 {% block scripts %}
 {{ super() }}
 <script>
-// Department-based device filtering
 const devicesByDepartment = {{ devices_by_department|tojson }};
+const trainingModules = {{ training_modules|tojson }}; // Assuming training_modules are passed to template
 
-function filterDevicesByDepartment(departmentSelect, devicesSelect) {
-    const selectedDepartment = departmentSelect.value;
-    const devicesOptions = devicesSelect.querySelectorAll('option');
-    
-    // Show all devices if no department selected
-    if (!selectedDepartment) {
-        devicesOptions.forEach(option => {
-            option.style.display = 'block';
-        });
+function populateMachineAssignments(departmentValue, containerId, placeholderId, existingAssignments = []) {
+    const container = document.getElementById(containerId);
+    const placeholder = document.getElementById(placeholderId);
+    container.innerHTML = ''; // Clear previous content
+
+    if (!departmentValue) {
+        placeholder.textContent = 'Select a department to see available machines.';
+        placeholder.style.display = 'block';
+        container.appendChild(placeholder);
+        return;
+    }
+
+    const machinesInDepartment = devicesByDepartment[departmentValue] || [];
+
+    if (machinesInDepartment.length === 0) {
+        placeholder.textContent = 'No machines found for this department.';
+        placeholder.style.display = 'block';
+        container.appendChild(placeholder);
         return;
     }
     
-    // Get devices for selected department
-    const departmentDevices = devicesByDepartment[selectedDepartment] || [];
-    
-    // Show/hide devices based on department
-    devicesOptions.forEach(option => {
-        if (option.value === '' || departmentDevices.includes(option.value)) {
-            option.style.display = 'block';
-        } else {
-            option.style.display = 'none';
+    placeholder.style.display = 'none';
+
+    machinesInDepartment.forEach(machineName => {
+        const assignmentRow = document.createElement('div');
+        assignmentRow.classList.add('row', 'mb-2', 'align-items-center', 'machine-assignment-entry');
+        assignmentRow.dataset.machineName = machineName;
+
+        const existingAssignment = existingAssignments.find(a => a.machine === machineName);
+
+        // Checkbox column
+        const colCheckbox = document.createElement('div');
+        colCheckbox.classList.add('col-md-1');
+        const checkboxDiv = document.createElement('div');
+        checkboxDiv.classList.add('form-check');
+        const checkbox = document.createElement('input');
+        checkbox.classList.add('form-check-input', 'machine-select-checkbox');
+        checkbox.type = 'checkbox';
+        checkbox.value = machineName;
+        checkbox.id = `${containerId}_checkbox_${machineName.replace(/\s+/g, '_')}`;
+        if (existingAssignment) {
+            checkbox.checked = true;
         }
-    });
-    
-    // Clear selection of hidden devices
-    Array.from(devicesSelect.selectedOptions).forEach(option => {
-        if (option.style.display === 'none') {
-            option.selected = false;
-        }
+        checkboxDiv.appendChild(checkbox);
+        colCheckbox.appendChild(checkboxDiv);
+
+        // Machine name column
+        const colMachineName = document.createElement('div');
+        colMachineName.classList.add('col-md-5');
+        const machineLabel = document.createElement('label');
+        machineLabel.classList.add('form-check-label');
+        machineLabel.setAttribute('for', checkbox.id);
+        machineLabel.textContent = machineName;
+        colMachineName.appendChild(machineLabel);
+
+        // Trainer select column
+        const colTrainerSelect = document.createElement('div');
+        colTrainerSelect.classList.add('col-md-6');
+        const trainerSelect = document.createElement('select');
+        trainerSelect.classList.add('form-select', 'trainer-assign-select');
+        trainerSelect.disabled = !checkbox.checked;
+
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Select Trainer...';
+        trainerSelect.appendChild(defaultOption);
+
+        trainingModules.forEach(trainer => {
+            const option = document.createElement('option');
+            option.value = trainer;
+            option.textContent = trainer;
+            if (existingAssignment && existingAssignment.trainer === trainer) {
+                option.selected = true;
+            }
+            trainerSelect.appendChild(option);
+        });
+        colTrainerSelect.appendChild(trainerSelect);
+
+        checkbox.addEventListener('change', function() {
+            trainerSelect.disabled = !this.checked;
+            if (!this.checked) {
+                trainerSelect.value = ''; // Clear trainer selection if machine is deselected
+            }
+        });
+
+        assignmentRow.appendChild(colCheckbox);
+        assignmentRow.appendChild(colMachineName);
+        assignmentRow.appendChild(colTrainerSelect);
+        container.appendChild(assignmentRow);
     });
 }
 
-// Add event listeners for department changes
+
 document.addEventListener('DOMContentLoaded', function() {
     const addDepartmentSelect = document.getElementById('addDepartment');
-    const addDevicesSelect = document.getElementById('addTrainedOnMachines');
+    const addMachineContainerId = 'addMachineAssignmentsContainer';
+    const addMachinePlaceholderId = 'addMachinePlaceholder';
+
     const editDepartmentSelect = document.getElementById('editDepartment');
-    const editDevicesSelect = document.getElementById('editTrainedOnMachines');
-    
-    if (addDepartmentSelect && addDevicesSelect) {
+    const editMachineContainerId = 'editMachineAssignmentsContainer';
+    const editMachinePlaceholderId = 'editMachinePlaceholder';
+
+    if (addDepartmentSelect) {
         addDepartmentSelect.addEventListener('change', function() {
-            filterDevicesByDepartment(this, addDevicesSelect);
+            populateMachineAssignments(this.value, addMachineContainerId, addMachinePlaceholderId, []);
         });
+        // Initial population if a department is already selected (e.g. form validation fail)
+        if(addDepartmentSelect.value) {
+             populateMachineAssignments(addDepartmentSelect.value, addMachineContainerId, addMachinePlaceholderId, []);
+        } else {
+             populateMachineAssignments(null, addMachineContainerId, addMachinePlaceholderId, []); // Show placeholder
+        }
     }
-    
-    if (editDepartmentSelect && editDevicesSelect) {
+
+    if (editDepartmentSelect) {
         editDepartmentSelect.addEventListener('change', function() {
-            filterDevicesByDepartment(this, editDevicesSelect);
+            // When department changes in edit mode, we pass empty assignments
+            // as user is expected to re-select if department changes.
+            // Or, we could try to preserve selections if machines still exist. For now, clear.
+            populateMachineAssignments(this.value, editMachineContainerId, editMachinePlaceholderId, []);
         });
+        // Initial population for edit modal will be handled when modal is shown,
+        // using existing training data. See training.js modifications.
+         populateMachineAssignments(null, editMachineContainerId, editMachinePlaceholderId, []); // Show placeholder initially
     }
 });
 </script>

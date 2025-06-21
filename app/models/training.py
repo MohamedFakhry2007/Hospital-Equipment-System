@@ -1,11 +1,11 @@
 class Training:
-    def __init__(self, id, employee_id, name, department, trainer, trained_on_machines, last_trained_date=None, next_due_date=None):
+    def __init__(self, id, employee_id, name, department, machine_trainer_assignments, last_trained_date=None, next_due_date=None):
         self.id = id
         self.employee_id = employee_id
         self.name = name
         self.department = department
-        self.trainer = trainer
-        self.trained_on_machines = trained_on_machines # Expected to be a list of strings
+        # self.trainer = trainer # This field is removed.
+        self.machine_trainer_assignments = machine_trainer_assignments # New structure: list of dicts
         self.last_trained_date = last_trained_date
         self.next_due_date = next_due_date
 
@@ -15,28 +15,48 @@ class Training:
             "employee_id": self.employee_id,
             "name": self.name,
             "department": self.department,
-            "trainer": self.trainer,
-            "trained_on_machines": self.trained_on_machines,
+            "machine_trainer_assignments": self.machine_trainer_assignments, # e.g., [{ "machine": "MachineA", "trainer": "TrainerX" }, ...]
             "last_trained_date": self.last_trained_date,
             "next_due_date": self.next_due_date
         }
 
     @staticmethod
     def from_dict(data):
-        # Ensure 'id' is handled correctly, especially if it might be missing for new entries before saving
         training_id = data.get("id")
-        # If 'trained_on_machines' is a string, convert it to a list
-        trained_on_machines = data.get("trained_on_machines", [])
-        if isinstance(trained_on_machines, str):
-            trained_on_machines = [m.strip() for m in trained_on_machines.split(',') if m.strip()]
+
+        machine_trainer_assignments = data.get("machine_trainer_assignments")
+
+        # Backward compatibility: If new field is missing, try to convert from old fields
+        if machine_trainer_assignments is None:
+            machine_trainer_assignments = []
+            old_trained_on_machines = data.get("trained_on_machines", [])
+            # The old 'trainer' field was a single string, intended as a general trainer for all machines listed.
+            # If new form sends individual trainers, this old field might not be present or relevant.
+            # However, for purely old data, it might exist.
+            old_general_trainer = data.get("trainer")
+
+            if isinstance(old_trained_on_machines, str):
+                old_trained_on_machines = [m.strip() for m in old_trained_on_machines.split(',') if m.strip()]
+
+            if old_trained_on_machines:
+                for machine_name in old_trained_on_machines:
+                    # If an old_general_trainer was specified, use it. Otherwise, trainer for this machine is None.
+                    machine_trainer_assignments.append({
+                        "machine": machine_name,
+                        "trainer": old_general_trainer if old_general_trainer else None
+                    })
+
+        # Ensure machine_trainer_assignments is a list, even if it came as null from JSON
+        if machine_trainer_assignments is None:
+            machine_trainer_assignments = []
+
 
         return Training(
             id=training_id,
             employee_id=data.get("employee_id"),
             name=data.get("name"),
             department=data.get("department"),
-            trainer=data.get("trainer"),
-            trained_on_machines=trained_on_machines,
+            machine_trainer_assignments=machine_trainer_assignments,
             last_trained_date=data.get("last_trained_date"),
             next_due_date=data.get("next_due_date")
         )

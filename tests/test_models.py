@@ -176,3 +176,141 @@ class TestOCMEntry:
         data["Status"] = "NonExistentStatus"
         with pytest.raises(ValidationError):
             OCMEntry(**data)
+
+
+# Test data for Training model
+new_format_training_data_valid = {
+    "id": 1,
+    "employee_id": "E1001",
+    "name": "John Doe",
+    "department": "Production A",
+    "machine_trainer_assignments": [
+        {"machine": "CNC Mill", "trainer": "Alice"},
+        {"machine": "Lathe X1000", "trainer": "Bob"}
+    ],
+    "last_trained_date": "2023-01-15",
+    "next_due_date": "2024-01-15"
+}
+
+old_format_training_data_str_machines = {
+    "id": 2,
+    "employee_id": "E1002",
+    "name": "Jane Smith",
+    "department": "Production B",
+    "trainer": "Charlie",
+    "trained_on_machines": "Packaging Line 1,Conveyor Belt Z",
+    "last_trained_date": "2023-02-20",
+    "next_due_date": "2024-02-20"
+}
+
+old_format_training_data_list_machines = {
+    "id": 3,
+    "employee_id": "E1003",
+    "name": "Mike Brown",
+    "department": "Maintenance",
+    "trainer": "David",
+    "trained_on_machines": ["Tool Grinder", "Hydraulic Press"],
+    "last_trained_date": "2023-03-10",
+    "next_due_date": "2024-03-10"
+}
+
+old_format_training_data_no_trainer = {
+    "id": 4,
+    "employee_id": "E1004",
+    "name": "Sue Green",
+    "department": "Lab",
+    "trained_on_machines": ["Spectrometer"],
+    "last_trained_date": "2023-04-05",
+    "next_due_date": "2024-04-05"
+}
+
+empty_assignments_training_data = {
+    "id": 5,
+    "employee_id": "E1005",
+    "name": "Chris White",
+    "department": "Production A",
+    "machine_trainer_assignments": [],
+    "last_trained_date": "2023-05-01",
+    "next_due_date": "2024-05-01"
+}
+
+# Import Training model
+from app.models.training import Training
+
+class TestTraining:
+    def test_from_dict_new_format(self):
+        training = Training.from_dict(new_format_training_data_valid)
+        assert training.id == 1
+        assert training.employee_id == "E1001"
+        assert training.name == "John Doe"
+        assert training.department == "Production A"
+        assert len(training.machine_trainer_assignments) == 2
+        assert training.machine_trainer_assignments[0] == {"machine": "CNC Mill", "trainer": "Alice"}
+        assert training.machine_trainer_assignments[1] == {"machine": "Lathe X1000", "trainer": "Bob"}
+        assert training.last_trained_date == "2023-01-15"
+        assert training.next_due_date == "2024-01-15"
+
+    def test_from_dict_old_format_str_machines(self):
+        training = Training.from_dict(old_format_training_data_str_machines)
+        assert training.id == 2
+        assert training.employee_id == "E1002"
+        assert training.name == "Jane Smith"
+        assert training.department == "Production B"
+        assert len(training.machine_trainer_assignments) == 2
+        assert {"machine": "Packaging Line 1", "trainer": "Charlie"} in training.machine_trainer_assignments
+        assert {"machine": "Conveyor Belt Z", "trainer": "Charlie"} in training.machine_trainer_assignments
+        assert training.last_trained_date == "2023-02-20"
+
+    def test_from_dict_old_format_list_machines(self):
+        training = Training.from_dict(old_format_training_data_list_machines)
+        assert training.id == 3
+        assert training.department == "Maintenance"
+        assert len(training.machine_trainer_assignments) == 2
+        assert {"machine": "Tool Grinder", "trainer": "David"} in training.machine_trainer_assignments
+        assert {"machine": "Hydraulic Press", "trainer": "David"} in training.machine_trainer_assignments
+
+    def test_from_dict_old_format_no_trainer(self):
+        training = Training.from_dict(old_format_training_data_no_trainer)
+        assert training.id == 4
+        assert training.department == "Lab"
+        assert len(training.machine_trainer_assignments) == 1
+        assert training.machine_trainer_assignments[0] == {"machine": "Spectrometer", "trainer": None}
+
+    def test_from_dict_empty_assignments(self):
+        training = Training.from_dict(empty_assignments_training_data)
+        assert training.id == 5
+        assert training.department == "Production A"
+        assert training.machine_trainer_assignments == []
+
+    def test_from_dict_none_assignments(self):
+        data = new_format_training_data_valid.copy()
+        data["machine_trainer_assignments"] = None
+        training = Training.from_dict(data)
+        assert training.machine_trainer_assignments == [] # Should default to empty list
+
+    def test_from_dict_missing_assignments_and_old_fields(self):
+        data = {
+            "id": 6, "employee_id": "E1006", "name": "No Machines", "department": "QA",
+            "last_trained_date": "2023-06-01"
+        } # No machine_trainer_assignments, no trained_on_machines, no trainer
+        training = Training.from_dict(data)
+        assert training.machine_trainer_assignments == []
+
+    def test_to_dict(self):
+        training = Training.from_dict(new_format_training_data_valid)
+        d = training.to_dict()
+        assert d["id"] == 1
+        assert d["employee_id"] == "E1001"
+        assert d["name"] == "John Doe"
+        assert d["department"] == "Production A"
+        assert len(d["machine_trainer_assignments"]) == 2
+        assert d["machine_trainer_assignments"][0] == {"machine": "CNC Mill", "trainer": "Alice"}
+        assert d["machine_trainer_assignments"][1] == {"machine": "Lathe X1000", "trainer": "Bob"}
+        assert d["last_trained_date"] == "2023-01-15"
+        assert d["next_due_date"] == "2024-01-15"
+        assert "trainer" not in d # Ensure old top-level trainer field is not present
+
+    def test_to_dict_empty_assignments(self):
+        training = Training.from_dict(empty_assignments_training_data)
+        d = training.to_dict()
+        assert d["machine_trainer_assignments"] == []

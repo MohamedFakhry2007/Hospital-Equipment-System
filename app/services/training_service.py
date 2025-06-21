@@ -41,13 +41,12 @@ def add_training(training_data):
     new_id = max([t.id for t in trainings if t.id is not None], default=0) + 1 if trainings else 1
     training_data['id'] = new_id
 
-    # Ensure trained_on_machines is a list
-    raw_machines = training_data.get('trained_on_machines')
-    if isinstance(raw_machines, str):
-        training_data['trained_on_machines'] = [m.strip() for m in raw_machines.split(',') if m.strip()]
-    elif not isinstance(raw_machines, list):
-        training_data['trained_on_machines'] = []
-
+    # The Training.from_dict method now handles the structure of 'machine_trainer_assignments'
+    # and backward compatibility from 'trained_on_machines' and 'trainer'.
+    # So, direct manipulation of 'trained_on_machines' or 'machine_trainer_assignments'
+    # in training_data before calling from_dict is less critical here, assuming client sends correct new format.
+    # If client sends 'machine_trainer_assignments', it should be a list of dicts.
+    # If client sends old format, from_dict will handle it.
 
     new_training = Training.from_dict(training_data)
     trainings.append(new_training)
@@ -76,15 +75,16 @@ def update_training(training_id, training_data):
         current_training = trainings[training_to_update_idx]
         # Update attributes from training_data
         for key, value in training_data.items():
-            if key == 'trained_on_machines':
-                if isinstance(value, str):
-                    value = [m.strip() for m in value.split(',') if m.strip()]
-                elif not isinstance(value, list):
-                    value = [] # Default to empty list if not string or list
+            # The key 'trained_on_machines' is deprecated in favor of 'machine_trainer_assignments'.
+            # The client should send 'machine_trainer_assignments' as a list of dicts.
+            # No special conversion is needed here for 'machine_trainer_assignments' if client sends correct format.
             setattr(current_training, key, value)
 
         # Ensure 'id' is not accidentally overwritten by None from form if not present
-        if 'id' not in training_data or training_data['id'] is None:
+        # Also, ensure the 'id' on the object matches the training_id from the URL parameter.
+        if getattr(current_training, 'id', None) != training_id :
+             setattr(current_training, 'id', training_id) # Enforce consistency
+        elif 'id' not in training_data or training_data['id'] is None:
             setattr(current_training, 'id', training_id)
 
         trainings[training_to_update_idx] = current_training

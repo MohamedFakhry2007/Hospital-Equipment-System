@@ -25,13 +25,22 @@ document.addEventListener('DOMContentLoaded', function () {
             trainings.forEach((training, index) => {
                 const row = trainingTableBody.insertRow();
                 row.id = `training-row-${training.id}`;
+                let assignmentsHtml = 'N/A';
+                if (training.machine_trainer_assignments && training.machine_trainer_assignments.length > 0) {
+                    assignmentsHtml = '<ul class="list-unstyled mb-0">';
+                    training.machine_trainer_assignments.forEach(a => {
+                        assignmentsHtml += `<li>${a.machine}${a.trainer ? ` (${a.trainer})` : ''}</li>`;
+                    });
+                    assignmentsHtml += '</ul>';
+                }
+
+                // The 'Trainer' column is removed from the table header, so we don't add a cell for it.
                 row.innerHTML = `
                     <td>${index + 1}</td>
                     <td>${training.employee_id || 'N/A'}</td>
                     <td>${training.name || 'N/A'}</td>
                     <td>${training.department || 'N/A'}</td>
-                    <td>${training.trainer || 'N/A'}</td>
-                    <td>${(Array.isArray(training.trained_on_machines) ? training.trained_on_machines.join(', ') : (training.trained_on_machines || 'N/A'))}</td>
+                    <td>${assignmentsHtml}</td>
                     <td>${training.last_trained_date || 'N/A'}</td>
                     <td>${training.next_due_date || 'N/A'}</td>
                     <td>
@@ -40,8 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 data-employee-id="${training.employee_id || ''}"
                                 data-name="${training.name || ''}"
                                 data-department="${training.department || ''}"
-                                data-trainer="${training.trainer || ''}"
-                                data-machines="${Array.isArray(training.trained_on_machines) ? training.trained_on_machines.join(',') : (training.trained_on_machines || '')}"
+                                data-machine-assignments='${JSON.stringify(training.machine_trainer_assignments || [])}'
                                 data-last-trained="${training.last_trained_date || ''}"
                                 data-next-due="${training.next_due_date || ''}"
                                 data-bs-toggle="modal" data-bs-target="#editTrainingModal">
@@ -64,9 +72,25 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             const formData = new FormData(addTrainingForm);
             const data = Object.fromEntries(formData.entries());
-            // Convert comma-separated string for machines to array if needed by backend,
-            // or ensure backend handles string. Service expects string and converts.
-            // data.trained_on_machines = data.trained_on_machines.split(',').map(s => s.trim()).filter(s => s);
+
+            // Collect machine_trainer_assignments
+            data.machine_trainer_assignments = [];
+            const assignmentRows = document.querySelectorAll('#addMachineAssignmentsContainer .machine-assignment-entry');
+            assignmentRows.forEach(row => {
+                const checkbox = row.querySelector('.machine-select-checkbox');
+                if (checkbox && checkbox.checked) {
+                    const machineName = checkbox.value;
+                    const trainerSelect = row.querySelector('.trainer-assign-select');
+                    const trainer = trainerSelect ? trainerSelect.value : null;
+                    if (machineName) { // Ensure machine name is valid
+                        data.machine_trainer_assignments.push({ machine: machineName, trainer: trainer });
+                    }
+                }
+            });
+
+            // Remove individual fields that are now part of machine_trainer_assignments from top-level data
+            // delete data.trained_on_machines; // This field is no longer a direct input
+            // delete data.trainer; // This field is no longer a direct input
 
             try {
                 const response = await fetch('/api/trainings', {
@@ -97,14 +121,34 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('click', function(event) {
         if (event.target.classList.contains('edit-training-btn') || event.target.closest('.edit-training-btn')) {
             const button = event.target.closest('.edit-training-btn');
-            document.getElementById('editTrainingId').value = button.dataset.id;
-            document.getElementById('editEmployeeId').value = button.dataset.employeeId;
-            document.getElementById('editName').value = button.dataset.name;
-            document.getElementById('editDepartment').value = button.dataset.department;
-            document.getElementById('editTrainer').value = button.dataset.trainer;
-            document.getElementById('editTrainedOnMachines').value = button.dataset.machines;
-            document.getElementById('editLastTrainedDate').value = button.dataset.lastTrained;
-            document.getElementById('editNextDueDate').value = button.dataset.nextDue;
+            const trainingId = button.dataset.id;
+            const employeeId = button.dataset.employeeId;
+            const name = button.dataset.name;
+            const department = button.dataset.department;
+            const machineAssignmentsStr = button.dataset.machineAssignments;
+            const lastTrained = button.dataset.lastTrained;
+            const nextDue = button.dataset.nextDue;
+
+            document.getElementById('editTrainingId').value = trainingId;
+            document.getElementById('editEmployeeId').value = employeeId;
+            document.getElementById('editName').value = name;
+            document.getElementById('editDepartment').value = department;
+            document.getElementById('editLastTrainedDate').value = lastTrained;
+            document.getElementById('editNextDueDate').value = nextDue;
+
+            let machineAssignments = [];
+            try {
+                machineAssignments = JSON.parse(machineAssignmentsStr || '[]');
+            } catch (e) {
+                console.error('Error parsing machine assignments JSON:', e);
+                machineAssignments = [];
+            }
+
+            // Populate machine assignments in the edit modal
+            // Assumes populateMachineAssignments function is globally available or imported
+            // and devicesByDepartment, trainingModules are also available in this scope.
+            // This function is defined in training/list.html inline script.
+            populateMachineAssignments(department, 'editMachineAssignmentsContainer', 'editMachinePlaceholder', machineAssignments);
         }
     });
 
@@ -114,8 +158,26 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             const formData = new FormData(editTrainingForm);
             const data = Object.fromEntries(formData.entries());
-            const trainingId = data.id;
-            // delete data.id; // ID is in URL, not body for typical REST APIs, but our backend expects it in body too.
+            const trainingId = data.id; // Keep this, as service layer might use it for matching.
+
+            // Collect machine_trainer_assignments
+            data.machine_trainer_assignments = [];
+            const assignmentRows = document.querySelectorAll('#editMachineAssignmentsContainer .machine-assignment-entry');
+            assignmentRows.forEach(row => {
+                const checkbox = row.querySelector('.machine-select-checkbox');
+                if (checkbox && checkbox.checked) {
+                    const machineName = checkbox.value;
+                    const trainerSelect = row.querySelector('.trainer-assign-select');
+                    const trainer = trainerSelect ? trainerSelect.value : null;
+                    if (machineName) {
+                        data.machine_trainer_assignments.push({ machine: machineName, trainer: trainer });
+                    }
+                }
+            });
+
+            // Remove individual fields that are now part of machine_trainer_assignments
+            // delete data.trained_on_machines;
+            // delete data.trainer;
 
             try {
                 const response = await fetch(`/api/trainings/${trainingId}`, {
