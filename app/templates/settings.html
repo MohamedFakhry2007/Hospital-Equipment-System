@@ -8,7 +8,7 @@
     <!-- Alert container -->
     <div id="alertContainer"></div>
 
-    <form method="POST" action="{{ url_for('views.save_settings_page') }}" id="settingsForm">
+    <form id="settingsForm">
         <!-- Email Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
             <input class="form-check-input" type="checkbox" role="switch" id="emailNotificationsToggle" name="email_notifications_enabled" {% if settings.email_notifications_enabled %}checked{% endif %}>
@@ -31,25 +31,24 @@
 
         <!-- Push Notifications Toggle -->
         <div class="mb-3 form-check form-switch">
-            <input class="form-check-input" type="checkbox" role="switch" id="pushNotificationsToggle" name="push_notifications_enabled">
+            <input class="form-check-input" type="checkbox" role="switch" id="pushNotificationsToggle" name="push_notifications_enabled" {% if settings.push_notifications_enabled %}checked{% endif %}>
             <label class="form-check-label" for="pushNotificationsToggle">Enable Desktop Push Notifications for Reminders</label>
         </div>
 
         <!-- Time Interval for Push Notifications -->
         <div class="mb-3">
             <label for="pushInterval" class="form-label">Push Notification Check Interval (in minutes)</label>
-            <input type="number" class="form-control" id="pushInterval" name="push_notification_interval_minutes" placeholder="e.g., 60" min="1">
-            <small class="form-text text-muted">How often the system checks for and sends push notifications. (Note: Actual browser push notifications require user permission and service worker setup, which are not part of this backend-focused update.)</small>
+            <input type="number" class="form-control" id="pushInterval" name="push_notification_interval_minutes" value="{{ settings.push_notification_interval_minutes | default(60) }}" placeholder="e.g., 60" min="1">
+            <small class="form-text text-muted">How often the system checks for and sends push notifications.</small>
         </div>
 
         <hr>
-        <!-- This button click is handled by settings.js to submit via API -->
         <button type="submit" class="btn btn-primary" id="saveSettingsButton">Save Settings</button>
     </form>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
-{{ super() }}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}

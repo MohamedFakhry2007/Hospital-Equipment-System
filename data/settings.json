@@ -2,6 +2,6 @@
   "email_notifications_enabled": false,
   "email_reminder_interval_minutes": 500,
   "recipient_email": "mohamedfakhrysmile@gmail.com",
-  "push_notifications_enabled": false,
-  "push_notification_interval_minutes": 60
+  "push_notifications_enabled": true,
+  "push_notification_interval_minutes": 5
 }

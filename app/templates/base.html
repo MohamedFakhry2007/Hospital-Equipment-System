@@ -72,5 +72,6 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/notifications.js') }}" defer></script> {# Added notifications.js #}
     <script src="{{ url_for('static', filename='js/equipment_list.js') }}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
