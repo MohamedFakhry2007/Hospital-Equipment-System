@@ -1617,45 +1617,104 @@ def test_add_training_placeholder(mock_training_service):
     # add_training(data)
     # trainings = get_all_trainings()
     # assert len(trainings) == 1
-    # assert trainings[0].name == "John Doe"
-    pass
+    from app.services import training_service
+    from app.models.training import Training
 
-def test_get_all_trainings_placeholder(mock_training_service):
-    """Placeholder test for retrieving all training records."""
-    # from app.services.training_service import get_all_trainings
-    # trainings = get_all_trainings()
-    # assert isinstance(trainings, list)
-    pass
+    # Sample data for tests
+    training_data_1 = {
+        "employee_id": "EMP001", "name": "John Doe", "department": "Prod A",
+        "machine_trainer_assignments": [{"machine": "CNC Mill", "trainer": "Alice"}],
+        "last_trained_date": "2023-01-01"
+    }
+    training_data_2 = {
+        "employee_id": "EMP002", "name": "Jane Smith", "department": "Prod B",
+        "machine_trainer_assignments": [
+            {"machine": "Lathe", "trainer": "Bob"},
+            {"machine": "Grinder", "trainer": "Charlie"}
+        ],
+        "last_trained_date": "2023-02-01"
+    }
+    old_format_data = {
+        "employee_id": "EMP003", "name": "Old Timer", "department": "Maint",
+        "trainer": "General Dave", "trained_on_machines": "Welder,Press",
+        "last_trained_date": "2022-12-01"
+    }
 
-def test_get_training_by_id_placeholder(mock_training_service):
-    """Placeholder test for retrieving a specific training record."""
-    # from app.services.training_service import add_training, get_training_by_id
-    # data = {"employee_id": "EMP002", "name": "Jane Smith", ... , "id": 1} # Assume service handles ID or it's pre-set
-    # # Need to adjust how ID is handled for test; service usually generates it.
-    # # Maybe add a record, then fetch it by the ID it received.
-    # new_rec = add_training({"employee_id": "EMP002", "name": "Jane Smith"})
-    # fetched = get_training_by_id(new_rec.id)
-    # assert fetched is not None
-    # assert fetched.name == "Jane Smith"
-    pass
+    # Test add_training
+    added_training_1 = training_service.add_training(training_data_1.copy()) # Use copy to avoid altering dict
+    assert added_training_1 is not None
+    assert added_training_1.id == 1
+    assert added_training_1.name == "John Doe"
+    assert added_training_1.machine_trainer_assignments == [{"machine": "CNC Mill", "trainer": "Alice"}]
 
-def test_update_training_placeholder(mock_training_service):
-    """Placeholder test for updating a training record."""
-    # from app.services.training_service import add_training, update_training, get_training_by_id
-    # new_rec = add_training({"employee_id": "EMP003", "name": "Update Me"})
-    # update_data = {"name": "Updated Name"}
-    # updated = update_training(new_rec.id, update_data)
-    # assert updated is not None
-    # assert updated.name == "Updated Name"
-    # fetched = get_training_by_id(new_rec.id)
-    # assert fetched.name == "Updated Name"
-    pass
+    added_training_2 = training_service.add_training(training_data_2.copy())
+    assert added_training_2.id == 2
+    assert added_training_2.name == "Jane Smith"
+    assert len(added_training_2.machine_trainer_assignments) == 2
 
-def test_delete_training_placeholder(mock_training_service):
-    """Placeholder test for deleting a training record."""
-    # from app.services.training_service import add_training, delete_training, get_training_by_id
-    # new_rec = add_training({"employee_id": "EMP004", "name": "Delete Me"})
-    # deleted = delete_training(new_rec.id)
-    # assert deleted is True
-    # assert get_training_by_id(new_rec.id) is None
-    pass
+    # Test get_all_trainings
+    all_trainings = training_service.get_all_trainings()
+    assert len(all_trainings) == 2
+    assert isinstance(all_trainings[0], Training)
+
+    # Test get_training_by_id
+    fetched_training_1 = training_service.get_training_by_id(1)
+    assert fetched_training_1 is not None
+    assert fetched_training_1.name == "John Doe"
+    assert training_service.get_training_by_id(99) is None # Non-existent
+
+    # Test update_training
+    update_data = {
+        "name": "Johnathan Doe",
+        "machine_trainer_assignments": [{"machine": "CNC Mill", "trainer": "Eve"}],
+        "department": "Prod Alpha"
+    }
+    updated_training = training_service.update_training(1, update_data)
+    assert updated_training is not None
+    assert updated_training.id == 1 # Ensure ID is preserved
+    assert updated_training.name == "Johnathan Doe"
+    assert updated_training.machine_trainer_assignments == [{"machine": "CNC Mill", "trainer": "Eve"}]
+    assert updated_training.department == "Prod Alpha"
+    # Employee ID should remain from original if not in update_data
+    assert updated_training.employee_id == "EMP001"
+
+
+    fetched_after_update = training_service.get_training_by_id(1)
+    assert fetched_after_update.name == "Johnathan Doe"
+    assert fetched_after_update.machine_trainer_assignments == [{"machine": "CNC Mill", "trainer": "Eve"}]
+
+    assert training_service.update_training(99, update_data) is None # Non-existent
+
+    # Test delete_training
+    assert training_service.delete_training(2) is True
+    assert training_service.get_training_by_id(2) is None
+    all_trainings_after_delete = training_service.get_all_trainings()
+    assert len(all_trainings_after_delete) == 1
+    assert training_service.delete_training(99) is False # Non-existent
+
+    # Test adding with old format (backward compatibility via Model's from_dict)
+    added_old_format = training_service.add_training(old_format_data.copy())
+    assert added_old_format is not None
+    assert added_old_format.id == 2 # ID 1 was deleted, this should be the next available or max+1
+                                    # after delete, list was [id:1], next id should be 2.
+                                    # Re-check ID logic: add_training does max_id + 1
+                                    # Trainings left: [id:1]. Max ID is 1. So next ID is 2. Correct.
+    assert added_old_format.name == "Old Timer"
+    assert len(added_old_format.machine_trainer_assignments) == 2
+    assert {"machine": "Welder", "trainer": "General Dave"} in added_old_format.machine_trainer_assignments
+    assert {"machine": "Press", "trainer": "General Dave"} in added_old_format.machine_trainer_assignments
+
+    # Test empty file scenario
+    # Clear the file by saving an empty list through the service
+    training_service.save_trainings([])
+    assert len(training_service.get_all_trainings()) == 0
+    first_add_after_empty = training_service.add_training(training_data_1.copy())
+    assert first_add_after_empty.id == 1 # ID should reset to 1 for empty data
+
+# Remove other placeholder tests as they are now covered by the above single test method.
+# Consolidating into one test method for TrainingService for now, can be split later if needed.
+# The following are effectively removed by replacing the block:
+# def test_get_all_trainings_placeholder(mock_training_service): pass
+# def test_get_training_by_id_placeholder(mock_training_service): pass
+# def test_update_training_placeholder(mock_training_service): pass
+# def test_delete_training_placeholder(mock_training_service): pass
