@@ -53,42 +53,46 @@
         <div class="row align-items-end"> {# Q1 and Q2 #}
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q1 Target Date</label>
-                <p class="form-control-plaintext">{{ entry.Q1_Date or 'N/A' }}</p>
-            </div>            <div class="col-md-3 mb-3">
-                <label for="Q1_Engineer" class="form-label">Q1 Engineer</label>
-                <input type="text" class="form-control" id="Q1_Engineer" name="Q1_Engineer" value="{{ entry.Q1_Engineer if entry.Q1_Engineer is defined else request.form.Q1_Engineer or '' }}">
+                <p class="form-control-plaintext" id="PPM_Q_I_date_display">{{ entry.PPM_Q_I.quarter_date or 'N/A' }}</p>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_I_engineer" class="form-label">Q1 Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_I_engineer" name="PPM_Q_I_engineer" value="{{ request.form['PPM_Q_I.engineer'] if request.form else (entry.PPM_Q_I.engineer or '') }}">
             </div>
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q2 Target Date</label>
-                <p class="form-control-plaintext">{{ entry.Q2_Date or 'N/A' }}</p>
-            </div>            <div class="col-md-3 mb-3">
-                <label for="Q2_Engineer" class="form-label">Q2 Engineer</label>
-                <input type="text" class="form-control" id="Q2_Engineer" name="Q2_Engineer" value="{{ entry.Q2_Engineer if entry.Q2_Engineer is defined else request.form.Q2_Engineer or '' }}">
+                <p class="form-control-plaintext" id="PPM_Q_II_date_display">{{ entry.PPM_Q_II.quarter_date or 'N/A' }}</p>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_II_engineer" class="form-label">Q2 Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" value="{{ request.form['PPM_Q_II.engineer'] if request.form else (entry.PPM_Q_II.engineer or '') }}">
             </div>
         </div>
         <div class="row align-items-end"> {# Q3 and Q4 #}
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q3 Target Date</label>
-                <p class="form-control-plaintext">{{ entry.Q3_Date or 'N/A' }}</p>
-            </div>            <div class="col-md-3 mb-3">
-                <label for="Q3_Engineer" class="form-label">Q3 Engineer</label>
-                <input type="text" class="form-control" id="Q3_Engineer" name="Q3_Engineer" value="{{ entry.Q3_Engineer if entry.Q3_Engineer is defined else request.form.Q3_Engineer or '' }}">
+                <p class="form-control-plaintext" id="PPM_Q_III_date_display">{{ entry.PPM_Q_III.quarter_date or 'N/A' }}</p>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_III_engineer" class="form-label">Q3 Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" value="{{ request.form['PPM_Q_III.engineer'] if request.form else (entry.PPM_Q_III.engineer or '') }}">
             </div>
             <div class="col-md-3 mb-3">
                 <label class="form-label">Q4 Target Date</label>
-                <p class="form-control-plaintext">{{ entry.Q4_Date or 'N/A' }}</p>
-            </div>            <div class="col-md-3 mb-3">
-                <label for="Q4_Engineer" class="form-label">Q4 Engineer</label>
-                <input type="text" class="form-control" id="Q4_Engineer" name="Q4_Engineer" value="{{ entry.Q4_Engineer if entry.Q4_Engineer is defined else request.form.Q4_Engineer or '' }}">
+                <p class="form-control-plaintext" id="PPM_Q_IV_date_display">{{ entry.PPM_Q_IV.quarter_date or 'N/A' }}</p>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label for="PPM_Q_IV_engineer" class="form-label">Q4 Engineer</label>
+                <input type="text" class="form-control" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" value="{{ request.form['PPM_Q_IV.engineer'] if request.form else (entry.PPM_Q_IV.engineer or '') }}">
             </div>
         </div>
         <hr>
         {# PPM Engineer Work Done (Actual) section removed #}
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Status" class="form-label">Status (Optional, auto-calculated if blank)</label>
+                <label for="Status" class="form-label">Overall Status</label>
                 <select class="form-select" id="Status" name="Status">
-                    <option value="" {% if not (request.form.Status if request.form else entry.Status) %}selected{% endif %}>Auto-calculate</option>
+                    {# Options will be dynamically managed by JS, but provide fallbacks #}
                     <option value="Upcoming" {% if (request.form.Status if request.form else entry.Status) == 'Upcoming' %}selected{% endif %}>Upcoming</option>
                     <option value="Overdue" {% if (request.form.Status if request.form else entry.Status) == 'Overdue' %}selected{% endif %}>Overdue</option>
                     <option value="Maintained" {% if (request.form.Status if request.form else entry.Status) == 'Maintained' %}selected{% endif %}>Maintained</option>
@@ -100,4 +104,99 @@
         <a href="{{ url_for('views.list_equipment', data_type='ppm') }}" class="btn btn-secondary mt-3">Cancel</a>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const q1DateDisplay = document.getElementById('PPM_Q_I_date_display');
+    const q2DateDisplay = document.getElementById('PPM_Q_II_date_display');
+    const q3DateDisplay = document.getElementById('PPM_Q_III_date_display');
+    const q4DateDisplay = document.getElementById('PPM_Q_IV_date_display');
+
+    const q1EngineerInput = document.getElementById('PPM_Q_I_engineer');
+    const q2EngineerInput = document.getElementById('PPM_Q_II_engineer');
+    const q3EngineerInput = document.getElementById('PPM_Q_III_engineer');
+    const q4EngineerInput = document.getElementById('PPM_Q_IV_engineer');
+
+    const overallStatusSelect = document.getElementById('Status');
+
+    function parseDate(dateStr) { // DD/MM/YYYY
+        if (!dateStr || typeof dateStr !== 'string' || dateStr === 'N/A') return null;
+        const parts = dateStr.split('/');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        const date = new Date(year, month, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+            return null;
+        }
+        return date;
+    }
+
+    function calculateOverallStatus(q1DateStr, q1Eng, q2DateStr, q2Eng, q3DateStr, q3Eng, q4DateStr, q4Eng) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let isOverdue = false;
+        let numPastDueQuartersTotal = 0;
+        let numFutureQuarters = 0;
+
+        const quarters = [
+            { dateStr: q1DateStr, eng: q1Eng },
+            { dateStr: q2DateStr, eng: q2Eng },
+            { dateStr: q3DateStr, eng: q3Eng },
+            { dateStr: q4DateStr, eng: q4Eng }
+        ];
+
+        for (const quarter of quarters) {
+            const currentDate = parseDate(quarter.dateStr);
+            if (!currentDate) continue;
+
+            if (currentDate < today) {
+                numPastDueQuartersTotal++;
+                if (!quarter.eng || quarter.eng.trim() === '') {
+                    isOverdue = true;
+                }
+            } else {
+                numFutureQuarters++;
+            }
+        }
+
+        if (isOverdue) return "Overdue";
+        if (numFutureQuarters > 0) return "Upcoming";
+        if (numPastDueQuartersTotal > 0) return "Maintained";
+
+        return "Upcoming";
+    }
+
+    function updateEditPPMFormStatus() {
+        const q1Date = q1DateDisplay ? q1DateDisplay.textContent.trim() : null;
+        const q2Date = q2DateDisplay ? q2DateDisplay.textContent.trim() : null;
+        const q3Date = q3DateDisplay ? q3DateDisplay.textContent.trim() : null;
+        const q4Date = q4DateDisplay ? q4DateDisplay.textContent.trim() : null;
+
+        const status = calculateOverallStatus(
+            q1Date, q1EngineerInput.value,
+            q2Date, q2EngineerInput.value,
+            q3Date, q3EngineerInput.value,
+            q4Date, q4EngineerInput.value
+        );
+
+        overallStatusSelect.value = status;
+        overallStatusSelect.disabled = true; // Make read-only
+    }
+
+    // Initial calculation on page load
+    updateEditPPMFormStatus();
+
+    // Add event listeners to engineer inputs
+    q1EngineerInput.addEventListener('input', updateEditPPMFormStatus);
+    q2EngineerInput.addEventListener('input', updateEditPPMFormStatus);
+    q3EngineerInput.addEventListener('input', updateEditPPMFormStatus);
+    q4EngineerInput.addEventListener('input', updateEditPPMFormStatus);
+});
+</script>
 {% endblock %}

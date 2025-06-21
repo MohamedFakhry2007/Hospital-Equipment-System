@@ -192,45 +192,132 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const q1DateInput = document.getElementById('PPM_Q_I_date');
+    const q1DateInput = document.getElementById('PPM_Q_I_date');
     const q2DateInput = document.getElementById('PPM_Q_II_date');
     const q3DateInput = document.getElementById('PPM_Q_III_date');
     const q4DateInput = document.getElementById('PPM_Q_IV_date');
 
-    function calculateNextQuarterDate(dateStr) {
+    const q1EngineerInput = document.getElementById('PPM_Q_I_engineer');
+    const q2EngineerInput = document.getElementById('PPM_Q_II_engineer');
+    const q3EngineerInput = document.getElementById('PPM_Q_III_engineer');
+    const q4EngineerInput = document.getElementById('PPM_Q_IV_engineer');
+
+    const overallStatusSelect = document.getElementById('Status');
+
+    function parseDate(dateStr) { // DD/MM/YYYY
+        if (!dateStr || typeof dateStr !== 'string') return null;
         const parts = dateStr.split('/');
-        if (parts.length !== 3) return '';
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        const date = new Date(year, month, day);
+        // Check if date is valid (e.g. not 31/02/2023)
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+            return null;
+        }
+        return date;
+    }
+
+    function calculateOverallStatus(q1DateStr, q1Eng, q2DateStr, q2Eng, q3DateStr, q3Eng, q4DateStr, q4Eng) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize today to midnight for accurate date comparison
+
+        let isOverdue = false;
+        let numPastDueQuartersTotal = 0;
+        // let numPastDueQuartersMaintained = 0; // Not directly needed for this simplified logic flow
+        let numFutureQuarters = 0;
+        // let hasAnyValidQuarterDate = false; // Not strictly needed for this logic flow
+
+        const quarters = [
+            { dateStr: q1DateStr, eng: q1Eng },
+            { dateStr: q2DateStr, eng: q2Eng },
+            { dateStr: q3DateStr, eng: q3Eng },
+            { dateStr: q4DateStr, eng: q4Eng }
+        ];
+
+        for (const quarter of quarters) {
+            const currentDate = parseDate(quarter.dateStr);
+            if (!currentDate) continue; // Skip if date is invalid or not specified
+            // hasAnyValidQuarterDate = true;
+
+            if (currentDate < today) {
+                numPastDueQuartersTotal++;
+                if (!quarter.eng || quarter.eng.trim() === '') {
+                    isOverdue = true;
+                }
+                // else { numPastDueQuartersMaintained++; }
+            } else { // currentDate >= today
+                numFutureQuarters++;
+            }
+        }
+
+        if (isOverdue) return "Overdue";
+        if (numFutureQuarters > 0) return "Upcoming";
+        if (numPastDueQuartersTotal > 0) return "Maintained"; // All past work done, no future work
+
+        return "Upcoming"; // Default (e.g., no valid dates at all)
+    }
+
+    function calculateNextQuarterDate(dateStr) {
+        const date = parseDate(dateStr);
+        if (!date) return '';
         
-        const date = new Date(parts[2], parts[1] - 1, parts[0]); // DD/MM/YYYY to Date
         date.setMonth(date.getMonth() + 3); // Add 3 months
         
-        // Format back to DD/MM/YYYY
         const dd = String(date.getDate()).padStart(2, '0');
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0'); // JS months are 0-indexed
         const yyyy = date.getFullYear();
         return `${dd}/${mm}/${yyyy}`;
     }
 
-    q1DateInput.addEventListener('change', function() {
-        const q1Date = this.value;
-        if (!q1Date) {
+    function updatePPMForm() {
+        const q1Date = q1DateInput.value;
+        let q2Date = '', q3Date = '', q4Date = '';
+
+        if (q1Date && parseDate(q1Date)) {
+            q2Date = calculateNextQuarterDate(q1Date);
+            q2DateInput.value = q2Date;
+            if (q2Date) {
+                q3Date = calculateNextQuarterDate(q2Date);
+                q3DateInput.value = q3Date;
+                if (q3Date) {
+                    q4Date = calculateNextQuarterDate(q3Date);
+                    q4DateInput.value = q4Date;
+                } else {
+                    q4DateInput.value = '';
+                }
+            } else {
+                q3DateInput.value = '';
+                q4DateInput.value = '';
+            }
+        } else { // Q1 date is empty or invalid
             q2DateInput.value = '';
             q3DateInput.value = '';
             q4DateInput.value = '';
-            return;
         }
 
-        // Calculate Q2 date (3 months after Q1)
-        const q2Date = calculateNextQuarterDate(q1Date);
-        q2DateInput.value = q2Date;
+        const status = calculateOverallStatus(
+            q1Date, q1EngineerInput.value,
+            q2DateInput.value, q2EngineerInput.value,
+            q3DateInput.value, q3EngineerInput.value,
+            q4DateInput.value, q4EngineerInput.value
+        );
 
-        // Calculate Q3 date (3 months after Q2)
-        const q3Date = calculateNextQuarterDate(q2Date);
-        q3DateInput.value = q3Date;
+        overallStatusSelect.value = status;
+        overallStatusSelect.disabled = true; // Make read-only
+    }
 
-        // Calculate Q4 date (3 months after Q3)
-        const q4Date = calculateNextQuarterDate(q3Date);
-        q4DateInput.value = q4Date;
-    });
+    // Initial calculation on page load in case of pre-filled form (e.g. validation error reload)
+    updatePPMForm();
+
+    // Add event listeners
+    q1DateInput.addEventListener('change', updatePPMForm);
+    q1EngineerInput.addEventListener('input', updatePPMForm); // Recalculate if engineer changes
+    q2EngineerInput.addEventListener('input', updatePPMForm);
+    q3EngineerInput.addEventListener('input', updatePPMForm);
+    q4EngineerInput.addEventListener('input', updatePPMForm);
 });
 </script>
 {% endblock %}
