@@ -22,10 +22,14 @@ This project is a web-based system designed to manage hospital equipment mainten
     *   Send email reminders for upcoming PPM tasks.
     *   Configurable reminder period (default: 60 days).
 *   **Data Storage:**
-    *   Data is stored in JSON files (`ppm.json`, `ocm.json`).
+    *   Data is stored in JSON files (`ppm.json`, `ocm.json`, `training.json`).
 * **PPM/OCM data**:
     * PPM data has information about the equipement and it has 4 quarters, with a date and an engineer.
     * OCM data has information about the equipement and it has the OCM for this year and next year and the name of the engineer.
+*   **Training Management:**
+    *   Track employee training records, including employee details, trainer, machines trained on, and training dates.
+    *   Add, edit, and delete training records through a dedicated interface.
+    *   Training data is stored in `training.json`.
 
 ## Technical Stack
 

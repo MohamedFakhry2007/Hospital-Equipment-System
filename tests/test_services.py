@@ -1593,3 +1593,69 @@ class TestPushNotificationService:
         summary_message = "No upcoming maintenance tasks."
         await PushNotificationService.send_push_notification(summary_message)
         mock_logger.info.assert_called_with(f"Push Notification: {summary_message}")
+
+# --- TrainingService Tests (Placeholders) ---
+
+@pytest.fixture
+def mock_training_service(tmp_path, mocker):
+    """Fixture for TrainingService, ensuring data file uses tmp_path."""
+    training_file = tmp_path / "test_training.json"
+    mocker.patch('app.services.training_service.DATA_FILE', str(training_file))
+
+    # Ensure file is created empty for each test
+    with open(training_file, 'w') as f:
+        json.dump([], f)
+
+    # Return the path for direct manipulation if needed, or the service instance
+    return str(training_file)
+
+
+def test_add_training_placeholder(mock_training_service):
+    """Placeholder test for adding a training record."""
+    # from app.services.training_service import add_training, get_all_trainings
+    # data = {"employee_id": "EMP001", "name": "John Doe", ...}
+    # add_training(data)
+    # trainings = get_all_trainings()
+    # assert len(trainings) == 1
+    # assert trainings[0].name == "John Doe"
+    pass
+
+def test_get_all_trainings_placeholder(mock_training_service):
+    """Placeholder test for retrieving all training records."""
+    # from app.services.training_service import get_all_trainings
+    # trainings = get_all_trainings()
+    # assert isinstance(trainings, list)
+    pass
+
+def test_get_training_by_id_placeholder(mock_training_service):
+    """Placeholder test for retrieving a specific training record."""
+    # from app.services.training_service import add_training, get_training_by_id
+    # data = {"employee_id": "EMP002", "name": "Jane Smith", ... , "id": 1} # Assume service handles ID or it's pre-set
+    # # Need to adjust how ID is handled for test; service usually generates it.
+    # # Maybe add a record, then fetch it by the ID it received.
+    # new_rec = add_training({"employee_id": "EMP002", "name": "Jane Smith"})
+    # fetched = get_training_by_id(new_rec.id)
+    # assert fetched is not None
+    # assert fetched.name == "Jane Smith"
+    pass
+
+def test_update_training_placeholder(mock_training_service):
+    """Placeholder test for updating a training record."""
+    # from app.services.training_service import add_training, update_training, get_training_by_id
+    # new_rec = add_training({"employee_id": "EMP003", "name": "Update Me"})
+    # update_data = {"name": "Updated Name"}
+    # updated = update_training(new_rec.id, update_data)
+    # assert updated is not None
+    # assert updated.name == "Updated Name"
+    # fetched = get_training_by_id(new_rec.id)
+    # assert fetched.name == "Updated Name"
+    pass
+
+def test_delete_training_placeholder(mock_training_service):
+    """Placeholder test for deleting a training record."""
+    # from app.services.training_service import add_training, delete_training, get_training_by_id
+    # new_rec = add_training({"employee_id": "EMP004", "name": "Delete Me"})
+    # deleted = delete_training(new_rec.id)
+    # assert deleted is True
+    # assert get_training_by_id(new_rec.id) is None
+    pass

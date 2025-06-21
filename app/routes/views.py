@@ -10,6 +10,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask import send_file
 import tempfile
 from app.services.data_service import DataService
+from app.services import training_service # Added for training page
 from datetime import datetime # Keep datetime
 
 views_bp = Blueprint('views', __name__)
@@ -669,3 +670,17 @@ def save_settings_page():
         flash('An error occurred while saving settings.', 'danger')
 
     return redirect(url_for('views.settings_page'))
+
+# Training Management Page
+@views_bp.route('/training')
+def training_management_page():
+    """Display the training management page."""
+    try:
+        all_trainings = training_service.get_all_trainings()
+        # Convert Training objects to dicts if necessary for the template,
+        # or ensure template handles objects. Assuming template handles objects with attributes.
+        return render_template('training/list.html', trainings=all_trainings)
+    except Exception as e:
+        logger.error(f"Error loading training management page: {str(e)}", exc_info=True)
+        flash("Error loading training data.", "danger")
+        return render_template('training/list.html', trainings=[])
