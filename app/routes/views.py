@@ -11,6 +11,7 @@ from flask import send_file
 import tempfile
 from app.services.data_service import DataService
 from app.services import training_service # Added for training page
+from app.constants import DEPARTMENTS, TRAINING_MODULES, QUARTER_STATUS_OPTIONS, GENERAL_STATUS_OPTIONS, DEVICES_BY_DEPARTMENT, ALL_DEVICES
 from datetime import datetime # Keep datetime
 import json
 from pathlib import Path
@@ -175,22 +176,26 @@ def add_ppm_equipment():
             "Department": form_data.get("Department"),
             "LOG_Number": form_data.get("LOG_Number"),            "Installation_Date": form_data.get("Installation_Date", "").strip() or None,
             "Warranty_End": form_data.get("Warranty_End", "").strip() or None,
-            "Status": "Upcoming",  # Default status for new equipment
+            "Status": form_data.get("Status", "Upcoming"),  # Use form status or default
             "PPM_Q_I": {
                 "quarter_date": q1_date_to_store,
-                "engineer": form_data.get("PPM_Q_I_engineer", "").strip() or None
+                "engineer": form_data.get("PPM_Q_I_engineer", "").strip() or None,
+                "status": form_data.get("PPM_Q_I_status", "").strip() or None
             },
             "PPM_Q_II": {
                 "quarter_date": q2_date_str,
-                "engineer": form_data.get("PPM_Q_II_engineer", "").strip() or None
+                "engineer": form_data.get("PPM_Q_II_engineer", "").strip() or None,
+                "status": form_data.get("PPM_Q_II_status", "").strip() or None
             },
             "PPM_Q_III": {
                 "quarter_date": q3_date_str,
-                "engineer": form_data.get("PPM_Q_III_engineer", "").strip() or None
+                "engineer": form_data.get("PPM_Q_III_engineer", "").strip() or None,
+                "status": form_data.get("PPM_Q_III_status", "").strip() or None
             },
             "PPM_Q_IV": {
                 "quarter_date": q4_date_str,
-                "engineer": form_data.get("PPM_Q_IV_engineer", "").strip() or None
+                "engineer": form_data.get("PPM_Q_IV_engineer", "").strip() or None,
+                "status": form_data.get("PPM_Q_IV_status", "").strip() or None
             }
         }
         # Ensure Name is None if empty, not just for "if not ppm_data['Name']" which might fail if key missing
@@ -204,14 +209,20 @@ def add_ppm_equipment():
         except ValueError as e:
             flash(f"Error adding equipment: {str(e)}", 'danger')
             # Re-render form with submitted data and errors (errors flashed)
-            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data) # Pass original form_data
+            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data, 
+                                 departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS,
+                                 general_status_options=GENERAL_STATUS_OPTIONS) # Pass original form_data
         except Exception as e:
             logger.error(f"Error adding PPM equipment: {str(e)}")
             flash('An unexpected error occurred while adding.', 'danger')
-            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data)
+            return render_template('equipment/add_ppm.html', data_type='ppm', form_data=form_data,
+                                 departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS,
+                                 general_status_options=GENERAL_STATUS_OPTIONS)
 
     # GET request: show empty form
-    return render_template('equipment/add_ppm.html', data_type='ppm', form_data={})
+    return render_template('equipment/add_ppm.html', data_type='ppm', form_data={},
+                         departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS,
+                         general_status_options=GENERAL_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
 def add_ocm_equipment():
@@ -239,13 +250,13 @@ def add_ocm_equipment():
             return redirect(url_for('views.list_equipment', data_type='ocm'))
         except ValueError as e:
             flash(f"Error adding equipment: {str(e)}", 'danger')
-            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data)
+            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data, departments=DEPARTMENTS, general_status_options=GENERAL_STATUS_OPTIONS)
         except Exception as e:
             logger.error(f"Error adding OCM equipment: {str(e)}")
             flash('An unexpected error occurred while adding.', 'danger')
-            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data)
+            return render_template('equipment/add_ocm.html', data_type='ocm', form_data=form_data, departments=DEPARTMENTS, general_status_options=GENERAL_STATUS_OPTIONS)
 
-    return render_template('equipment/add_ocm.html', data_type='ocm', form_data={})
+    return render_template('equipment/add_ocm.html', data_type='ocm', form_data={}, departments=DEPARTMENTS, general_status_options=GENERAL_STATUS_OPTIONS)
 
 
 @views_bp.route('/equipment/ppm/edit/<SERIAL>', methods=['GET', 'POST'])
@@ -679,8 +690,186 @@ def training_management_page():
         all_trainings = training_service.get_all_trainings()
         # Convert Training objects to dicts if necessary for the template,
         # or ensure template handles objects. Assuming template handles objects with attributes.
-        return render_template('training/list.html', trainings=all_trainings)
+        return render_template('training/list.html', 
+                             trainings=all_trainings,
+                             departments=DEPARTMENTS,
+                             training_modules=TRAINING_MODULES,
+                             devices_by_department=DEVICES_BY_DEPARTMENT,
+                             all_devices=ALL_DEVICES)
     except Exception as e:
         logger.error(f"Error loading training management page: {str(e)}", exc_info=True)
         flash("Error loading training data.", "danger")
-        return render_template('training/list.html', trainings=[])
+        return render_template('training/list.html', 
+                             trainings=[],
+                             departments=DEPARTMENTS,
+                             training_modules=TRAINING_MODULES,
+                             devices_by_department=DEVICES_BY_DEPARTMENT,
+                             all_devices=ALL_DEVICES)
+
+# Barcode Generation Routes
+@views_bp.route('/equipment/<data_type>/<serial>/barcode')
+def generate_barcode(data_type, serial):
+    """Generate and display barcode for a specific equipment."""
+    from app.services.barcode_service import BarcodeService
+    
+    try:
+        # Get equipment details
+        equipment = DataService.get_entry(data_type, serial)
+        if not equipment:
+            flash(f"Equipment with serial '{serial}' not found.", 'warning')
+            return redirect(url_for('views.list_equipment', data_type=data_type))
+        
+        # Generate barcode
+        barcode_base64 = BarcodeService.generate_barcode_base64(serial)
+        
+        return render_template('equipment/barcode.html', 
+                             equipment=equipment, 
+                             barcode_base64=barcode_base64,
+                             data_type=data_type,
+                             serial=serial)
+    except Exception as e:
+        logger.error(f"Error generating barcode for {serial}: {str(e)}")
+        flash('Error generating barcode.', 'danger')
+        return redirect(url_for('views.list_equipment', data_type=data_type))
+
+@views_bp.route('/equipment/<data_type>/<serial>/barcode/download')
+def download_barcode(data_type, serial):
+    """Download barcode image for a specific equipment."""
+    from app.services.barcode_service import BarcodeService
+    
+    try:
+        # Get equipment details
+        equipment = DataService.get_entry(data_type, serial)
+        if not equipment:
+            flash(f"Equipment with serial '{serial}' not found.", 'warning')
+            return redirect(url_for('views.list_equipment', data_type=data_type))
+        
+        # Generate printable barcode
+        equipment_name = equipment.get('Name') or equipment.get('MODEL') or equipment.get('Model')
+        department = equipment.get('Department')
+        
+        barcode_bytes = BarcodeService.generate_printable_barcode(
+            serial, equipment_name, department
+        )
+        
+        # Create file-like object
+        barcode_file = io.BytesIO(barcode_bytes)
+        barcode_file.seek(0)
+        
+        return send_file(
+            barcode_file,
+            mimetype='image/png',
+            as_attachment=True,
+            download_name=f'barcode_{serial}.png'
+        )
+    except Exception as e:
+        logger.error(f"Error downloading barcode for {serial}: {str(e)}")
+        flash('Error downloading barcode.', 'danger')
+        return redirect(url_for('views.list_equipment', data_type=data_type))
+
+@views_bp.route('/equipment/<data_type>/barcodes/bulk')
+def bulk_barcodes(data_type):
+    """Generate bulk barcodes for all equipment of a specific type."""
+    from app.services.barcode_service import BarcodeService
+    
+    try:
+        # Get all equipment
+        equipment_list = DataService.get_all_entries(data_type)
+        
+        barcodes = []
+        for equipment in equipment_list:
+            serial = equipment.get('SERIAL') if data_type == 'ppm' else equipment.get('Serial')
+            if serial:
+                try:
+                    barcode_base64 = BarcodeService.generate_barcode_base64(serial)
+                    barcodes.append({
+                        'equipment': equipment,
+                        'barcode_base64': barcode_base64,
+                        'serial': serial
+                    })
+                except Exception as e:
+                    logger.error(f"Error generating barcode for {serial}: {str(e)}")
+        
+        return render_template('equipment/bulk_barcodes.html', 
+                             barcodes=barcodes,
+                             data_type=data_type)
+    except Exception as e:
+        logger.error(f"Error generating bulk barcodes for {data_type}: {str(e)}")
+        flash('Error generating bulk barcodes.', 'danger')
+        return redirect(url_for('views.list_equipment', data_type=data_type))
+
+@views_bp.route('/equipment/<data_type>/barcodes/bulk/download')
+def download_bulk_barcodes(data_type):
+    """Download all barcodes as a ZIP file."""
+    from app.services.barcode_service import BarcodeService
+    import zipfile
+    
+    try:
+        # Get all equipment
+        equipment_list = DataService.get_all_entries(data_type)
+        
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for equipment in equipment_list:
+                serial = equipment.get('SERIAL') if data_type == 'ppm' else equipment.get('Serial')
+                if serial:
+                    try:
+                        equipment_name = equipment.get('Name') or equipment.get('MODEL') or equipment.get('Model')
+                        department = equipment.get('Department')
+                        
+                        barcode_bytes = BarcodeService.generate_printable_barcode(
+                            serial, equipment_name, department
+                        )
+                        
+                        # Add to ZIP
+                        zip_file.writestr(f'barcode_{serial}.png', barcode_bytes)
+                    except Exception as e:
+                        logger.error(f"Error generating barcode for {serial}: {str(e)}")
+        
+        zip_buffer.seek(0)
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{data_type}_barcodes.zip'
+        )
+    except Exception as e:
+        logger.error(f"Error downloading bulk barcodes for {data_type}: {str(e)}")
+        flash('Error downloading bulk barcodes.', 'danger')
+        return redirect(url_for('views.list_equipment', data_type=data_type))
+
+
+# Machine Assignment Route
+@views_bp.route('/equipment/machine-assignment')
+def machine_assignment():
+    """Display the machine assignment page."""
+    return render_template('equipment/machine_assignment.html',
+                         departments=DEPARTMENTS,
+                         training_modules=TRAINING_MODULES,
+                         devices_by_department=DEVICES_BY_DEPARTMENT)
+
+@views_bp.route('/equipment/machine-assignment', methods=['POST'])
+def save_machine_assignment():
+    """Save machine assignments."""
+    try:
+        data = request.get_json()
+        assignments = data.get('assignments', [])
+        
+        # Here you would typically save the assignments to the database
+        # For now, we'll just log them
+        logger.info(f"Machine assignments saved: {assignments}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully saved {len(assignments)} machine assignments.'
+        })
+    except Exception as e:
+        logger.error(f"Error saving machine assignments: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': 'Error saving machine assignments.'
+        }), 500
+

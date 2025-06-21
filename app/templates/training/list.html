@@ -100,17 +100,31 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="addDepartment" class="form-label">Department</label>
-                            <input type="text" class="form-control" id="addDepartment" name="department">
+                            <select class="form-select" id="addDepartment" name="department">
+                                <option value="">Select Department</option>
+                                {% for dept in departments %}
+                                    <option value="{{ dept }}">{{ dept }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="addTrainer" class="form-label">Trainer</label>
-                            <input type="text" class="form-control" id="addTrainer" name="trainer">
+                            <label for="addTrainer" class="form-label">Training Module</label>
+                            <select class="form-select" id="addTrainer" name="trainer">
+                                <option value="">Select Training Module</option>
+                                {% for module in training_modules %}
+                                    <option value="{{ module }}">{{ module }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="addTrainedOnMachines" class="form-label">Trained On Machines (comma-separated)</label>
-                        <input type="text" class="form-control" id="addTrainedOnMachines" name="trained_on_machines">
-                        <small class="form-text text-muted">e.g., MRI Scanner, X-Ray Machine, Ultrasound</small>
+                        <label for="addTrainedOnMachines" class="form-label">Trained On Machines</label>
+                        <select class="form-select" id="addTrainedOnMachines" name="trained_on_machines" multiple size="6">
+                            {% for device in all_devices %}
+                                <option value="{{ device }}">{{ device }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple machines. Machines will be filtered by department selection.</small>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -152,21 +166,34 @@
                             <label for="editName" class="form-label">Employee Name <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="editName" name="name" required>
                         </div>
-                    </div>
-                    <div class="row">
+                    </div>                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="editDepartment" class="form-label">Department</label>
-                            <input type="text" class="form-control" id="editDepartment" name="department">
+                            <select class="form-select" id="editDepartment" name="department">
+                                <option value="">Select Department</option>
+                                {% for dept in departments %}
+                                    <option value="{{ dept }}">{{ dept }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="editTrainer" class="form-label">Trainer</label>
-                            <input type="text" class="form-control" id="editTrainer" name="trainer">
+                            <label for="editTrainer" class="form-label">Training Module</label>
+                            <select class="form-select" id="editTrainer" name="trainer">
+                                <option value="">Select Training Module</option>
+                                {% for module in training_modules %}
+                                    <option value="{{ module }}">{{ module }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="editTrainedOnMachines" class="form-label">Trained On Machines (comma-separated)</label>
-                        <input type="text" class="form-control" id="editTrainedOnMachines" name="trained_on_machines">
-                        <small class="form-text text-muted">e.g., MRI Scanner, X-Ray Machine, Ultrasound</small>
+                        <label for="editTrainedOnMachines" class="form-label">Trained On Machines</label>
+                        <select class="form-select" id="editTrainedOnMachines" name="trained_on_machines" multiple size="6">
+                            {% for device in all_devices %}
+                                <option value="{{ device }}">{{ device }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple machines. Machines will be filtered by department selection.</small>
                     </div>
                      <div class="row">
                         <div class="col-md-6 mb-3">
@@ -192,5 +219,61 @@
 
 {% block scripts %}
 {{ super() }}
+<script>
+// Department-based device filtering
+const devicesByDepartment = {{ devices_by_department|tojson }};
+
+function filterDevicesByDepartment(departmentSelect, devicesSelect) {
+    const selectedDepartment = departmentSelect.value;
+    const devicesOptions = devicesSelect.querySelectorAll('option');
+    
+    // Show all devices if no department selected
+    if (!selectedDepartment) {
+        devicesOptions.forEach(option => {
+            option.style.display = 'block';
+        });
+        return;
+    }
+    
+    // Get devices for selected department
+    const departmentDevices = devicesByDepartment[selectedDepartment] || [];
+    
+    // Show/hide devices based on department
+    devicesOptions.forEach(option => {
+        if (option.value === '' || departmentDevices.includes(option.value)) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+    
+    // Clear selection of hidden devices
+    Array.from(devicesSelect.selectedOptions).forEach(option => {
+        if (option.style.display === 'none') {
+            option.selected = false;
+        }
+    });
+}
+
+// Add event listeners for department changes
+document.addEventListener('DOMContentLoaded', function() {
+    const addDepartmentSelect = document.getElementById('addDepartment');
+    const addDevicesSelect = document.getElementById('addTrainedOnMachines');
+    const editDepartmentSelect = document.getElementById('editDepartment');
+    const editDevicesSelect = document.getElementById('editTrainedOnMachines');
+    
+    if (addDepartmentSelect && addDevicesSelect) {
+        addDepartmentSelect.addEventListener('change', function() {
+            filterDevicesByDepartment(this, addDevicesSelect);
+        });
+    }
+    
+    if (editDepartmentSelect && editDevicesSelect) {
+        editDepartmentSelect.addEventListener('change', function() {
+            filterDevicesByDepartment(this, editDevicesSelect);
+        });
+    }
+});
+</script>
 <script src="{{ url_for('static', filename='js/training.js') }}"></script>
 {% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'base.html' %}
+
+{% block title %}Machine Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Machine Assignment</h4>
+                    <p class="text-muted mb-0">Assign trainers to machines by department</p>
+                </div>
+                <div class="card-body">
+                    <form id="machineAssignmentForm">
+                        <!-- Department Selection -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label for="departmentSelect" class="form-label">Select Department <span class="text-danger">*</span></label>
+                                <select class="form-select" id="departmentSelect" name="department" required>
+                                    <option value="">Choose a department...</option>
+                                    {% for dept in departments %}
+                                        <option value="{{ dept }}">{{ dept }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Machine Assignment Section (Initially Hidden) -->
+                        <div id="machineAssignmentSection" style="display: none;">
+                            <hr>
+                            <h5>Machine Assignments</h5>
+                            <p class="text-muted">Select machines and assign trainers for the chosen department.</p>
+                            
+                            <div id="machineList" class="row">
+                                <!-- Machine assignment rows will be dynamically generated here -->
+                            </div>
+                            
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary">Save Assignments</button>
+                                <button type="button" class="btn btn-secondary" onclick="clearAssignments()">Clear All</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Machine Assignment Row Template -->
+<template id="machineRowTemplate">
+    <div class="col-md-6 mb-3 machine-assignment-row">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-1">
+                        <div class="form-check">
+                            <input class="form-check-input machine-checkbox" type="checkbox" name="selected_machines" value="">
+                            <label class="form-check-label"></label>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label machine-name"></label>
+                    </div>
+                    <div class="col-md-6">
+                        <select class="form-select trainer-select" name="trainer" disabled>
+                            <option value="">Select Trainer</option>
+                            {% for module in training_modules %}
+                                <option value="{{ module }}">{{ module }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+.machine-assignment-row .card {
+    transition: all 0.3s ease;
+}
+
+.machine-assignment-row .card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.machine-checkbox:checked + label {
+    font-weight: bold;
+}
+
+.trainer-select:disabled {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const devicesByDepartment = {{ devices_by_department|tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const departmentSelect = document.getElementById('departmentSelect');
+    const machineAssignmentSection = document.getElementById('machineAssignmentSection');
+    const machineList = document.getElementById('machineList');
+    const machineRowTemplate = document.getElementById('machineRowTemplate');
+    
+    departmentSelect.addEventListener('change', function() {
+        const selectedDepartment = this.value;
+        
+        if (selectedDepartment) {
+            generateMachineAssignments(selectedDepartment);
+            machineAssignmentSection.style.display = 'block';
+        } else {
+            machineAssignmentSection.style.display = 'none';
+            machineList.innerHTML = '';
+        }
+    });
+    
+    function generateMachineAssignments(department) {
+        const machines = devicesByDepartment[department] || [];
+        machineList.innerHTML = '';
+        
+        machines.forEach(machine => {
+            const template = machineRowTemplate.content.cloneNode(true);
+            
+            // Set machine name
+            const machineNameLabel = template.querySelector('.machine-name');
+            machineNameLabel.textContent = machine;
+            
+            // Set checkbox value
+            const checkbox = template.querySelector('.machine-checkbox');
+            checkbox.value = machine;
+            checkbox.id = `machine_${machine.replace(/\s+/g, '_')}`;
+            
+            // Set label for attribute
+            const label = template.querySelector('.form-check-label');
+            label.setAttribute('for', checkbox.id);
+            
+            // Add event listener to checkbox
+            checkbox.addEventListener('change', function() {
+                const trainerSelect = this.closest('.machine-assignment-row').querySelector('.trainer-select');
+                trainerSelect.disabled = !this.checked;
+                if (!this.checked) {
+                    trainerSelect.value = '';
+                }
+            });
+            
+            machineList.appendChild(template);
+        });
+    }
+    
+    // Form submission
+    document.getElementById('machineAssignmentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const selectedMachines = formData.getAll('selected_machines');
+        const assignments = [];
+        
+        selectedMachines.forEach(machine => {
+            const row = document.querySelector(`input[value="${machine}"]`).closest('.machine-assignment-row');
+            const trainer = row.querySelector('.trainer-select').value;
+            
+            if (trainer) {
+                assignments.push({
+                    machine: machine,
+                    trainer: trainer,
+                    department: departmentSelect.value
+                });
+            }
+        });
+        
+        if (assignments.length > 0) {
+            // Here you would typically send the data to the server
+            console.log('Machine Assignments:', assignments);
+            alert(`Successfully assigned ${assignments.length} machines to trainers!`);
+        } else {
+            alert('Please select at least one machine and assign a trainer.');
+        }
+    });
+});
+
+function clearAssignments() {
+    const checkboxes = document.querySelectorAll('.machine-checkbox');
+    const trainerSelects = document.querySelectorAll('.trainer-select');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    trainerSelects.forEach(select => {
+        select.disabled = true;
+        select.value = '';
+    });
+}
+</script>
+{% endblock %}
+

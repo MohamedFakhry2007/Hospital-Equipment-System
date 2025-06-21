@@ -9,8 +9,13 @@
         {# Common Fields #}
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Department" class="form-label">Department Name/ID <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Department" name="Department" value="{{ form_data.Department or '' }}" required>
+                <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
+                <select class="form-select" id="Department" name="Department" required>
+                    <option value="">Select Department</option>
+                    {% for dept in departments %}
+                        <option value="{{ dept }}" {% if form_data.Department == dept %}selected{% endif %}>{{ dept }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="MODEL" class="form-label">Model <span class="text-danger">*</span></label>
@@ -33,12 +38,6 @@
                 <input type="text" class="form-control" id="MANUFACTURER" name="MANUFACTURER" value="{{ form_data.MANUFACTURER or '' }}" required>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Department" name="Department" value="{{ form_data.Department or '' }}" required>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
                 <label for="LOG_Number" class="form-label">Log Number <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="LOG_Number" name="LOG_Number" value="{{ form_data.LOG_Number or '' }}" required>
             </div>
@@ -60,31 +59,49 @@
             <div class="col-md-6">
                 <h6>Quarter I</h6>
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_I_date" class="form-label">Q1 Date (DD/MM/YYYY)</label>
                         <input type="text" class="form-control" id="PPM_Q_I_date" name="PPM_Q_I_date" 
                                value="{{ form_data.PPM_Q_I.quarter_date if form_data.get('PPM_Q_I') else '' }}" 
                                pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_I_engineer" class="form-label">Q1 Engineer</label>
                         <input type="text" class="form-control" id="PPM_Q_I_engineer" name="PPM_Q_I_engineer" 
                                value="{{ form_data.PPM_Q_I.engineer if form_data.get('PPM_Q_I') else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="PPM_Q_I_status" class="form-label">Q1 Status</label>
+                        <select class="form-select" id="PPM_Q_I_status" name="PPM_Q_I_status">
+                            <option value="">Select Status</option>
+                            {% for status in quarter_status_options %}
+                                <option value="{{ status }}" {% if form_data.get('PPM_Q_I', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>            <div class="col-md-6">
                 <h6>Quarter II</h6>
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_II_date" class="form-label">Q2 Date (Auto-calculated)</label>
                         <input type="text" class="form-control" id="PPM_Q_II_date" 
                                value="{{ form_data.PPM_Q_II.quarter_date if form_data.get('PPM_Q_II') else '' }}" 
                                readonly disabled>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_II_engineer" class="form-label">Q2 Engineer</label>
                         <input type="text" class="form-control" id="PPM_Q_II_engineer" name="PPM_Q_II_engineer" 
                                value="{{ form_data.PPM_Q_II.engineer if form_data.get('PPM_Q_II') else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="PPM_Q_II_status" class="form-label">Q2 Status</label>
+                        <select class="form-select" id="PPM_Q_II_status" name="PPM_Q_II_status">
+                            <option value="">Select Status</option>
+                            {% for status in quarter_status_options %}
+                                <option value="{{ status }}" {% if form_data.get('PPM_Q_II', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>
@@ -93,44 +110,75 @@
             <div class="col-md-6">
                 <h6>Quarter III</h6>
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_III_date" class="form-label">Q3 Date (Auto-calculated)</label>
                         <input type="text" class="form-control" id="PPM_Q_III_date"
                                value="{{ form_data.PPM_Q_III.quarter_date if form_data.get('PPM_Q_III') else '' }}" 
                                readonly disabled>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_III_engineer" class="form-label">Q3 Engineer</label>
                         <input type="text" class="form-control" id="PPM_Q_III_engineer" name="PPM_Q_III_engineer" 
                                value="{{ form_data.PPM_Q_III.engineer if form_data.get('PPM_Q_III') else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="PPM_Q_III_status" class="form-label">Q3 Status</label>
+                        <select class="form-select" id="PPM_Q_III_status" name="PPM_Q_III_status">
+                            <option value="">Select Status</option>
+                            {% for status in quarter_status_options %}
+                                <option value="{{ status }}" {% if form_data.get('PPM_Q_III', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
                 <h6>Quarter IV</h6>
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_IV_date" class="form-label">Q4 Date (Auto-calculated)</label>
                         <input type="text" class="form-control" id="PPM_Q_IV_date"
                                value="{{ form_data.PPM_Q_IV.quarter_date if form_data.get('PPM_Q_IV') else '' }}" 
                                readonly disabled>
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label for="PPM_Q_IV_engineer" class="form-label">Q4 Engineer</label>
                         <input type="text" class="form-control" id="PPM_Q_IV_engineer" name="PPM_Q_IV_engineer" 
                                value="{{ form_data.PPM_Q_IV.engineer if form_data.get('PPM_Q_IV') else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="PPM_Q_IV_status" class="form-label">Q4 Status</label>
+                        <select class="form-select" id="PPM_Q_IV_status" name="PPM_Q_IV_status">
+                            <option value="">Select Status</option>
+                            {% for status in quarter_status_options %}
+                                <option value="{{ status }}" {% if form_data.get('PPM_Q_IV', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Status" class="form-label">Status</label>
+                <label for="Status" class="form-label">Overall Status</label>
                 <select class="form-select" id="Status" name="Status">
-                    <option value="Upcoming" {% if form_data.Status == 'Upcoming' or not form_data.Status %}selected{% endif %}>Upcoming</option>
-                    <option value="Overdue" {% if form_data.Status == 'Overdue' %}selected{% endif %}>Overdue</option>
-                    <option value="Maintained" {% if form_data.Status == 'Maintained' %}selected{% endif %}>Maintained</option>
+                    <option value="">Select Status</option>
+                    {% for status in general_status_options %}
+                        <option value="{{ status }}" {% if form_data.Status == status or (not form_data.Status and status == 'Upcoming') %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
                 </select>
+            </div>
+        </div>
+
+        <hr>
+        <h5 class="mt-4 mb-3">Barcode Generation</h5>
+        <div class="row">
+            <div class="col-md-12 mb-3">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    After adding the equipment, you can generate and print a barcode using the serial number.
+                    The barcode will be available in the equipment list.
+                </div>
             </div>
         </div>
 

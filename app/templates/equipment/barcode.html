@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Barcode - {{ serial }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Barcode for {{ data_type.upper() }} Equipment</h4>
+                </div>
+                <div class="card-body text-center">
+                    <h5>Serial Number: {{ serial }}</h5>
+                    {% if equipment.get('Name') or equipment.get('MODEL') or equipment.get('Model') %}
+                        <p class="text-muted">{{ equipment.get('Name') or equipment.get('MODEL') or equipment.get('Model') }}</p>
+                    {% endif %}
+                    {% if equipment.get('Department') %}
+                        <p class="text-muted">Department: {{ equipment.get('Department') }}</p>
+                    {% endif %}
+                    
+                    <div class="barcode-container my-4">
+                        <img src="data:image/png;base64,{{ barcode_base64 }}" alt="Barcode for {{ serial }}" class="img-fluid">
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{{ url_for('views.download_barcode', data_type=data_type, serial=serial) }}" 
+                           class="btn btn-primary me-2">
+                            <i class="fas fa-download"></i> Download Barcode
+                        </a>
+                        <button onclick="window.print()" class="btn btn-secondary me-2">
+                            <i class="fas fa-print"></i> Print Barcode
+                        </button>
+                        <a href="{{ url_for('views.list_equipment', data_type=data_type) }}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .btn, .card-header, .navbar, .footer {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .barcode-container {
+        page-break-inside: avoid;
+    }
+}
+</style>
+{% endblock %}
+

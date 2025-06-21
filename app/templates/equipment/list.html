@@ -18,6 +18,16 @@
             <a href="{{ url_for('views.import_export_page') }}" class="btn btn-secondary">Import/Export Page</a>
         </div>
         <div class="col-md-auto">
+            <a href="{{ url_for('views.bulk_barcodes', data_type=data_type) }}" class="btn btn-info">
+                <i class="fas fa-qrcode"></i> Bulk Barcodes
+            </a>
+        </div>
+        <div class="col-md-auto">
+            <a href="{{ url_for('views.machine_assignment') }}" class="btn btn-success">
+                <i class="fas fa-cogs"></i> Machine Assignment
+            </a>
+        </div>
+        <div class="col-md-auto">
             <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">
                 Delete Selected (<span id="selectedCount">0</span>)
             </button>
@@ -67,12 +77,16 @@
                         {% if data_type == 'ppm' %}
                             <th>Q1</th>
                             <th>Eng1</th>
+                            <th>Q1 Status</th>
                             <th>Q2</th>
                             <th>Eng2</th>
+                            <th>Q2 Status</th>
                             <th>Q3</th>
                             <th>Eng3</th>
+                            <th>Q3 Status</th>
                             <th>Q4</th>
-                            <th>Eng4</th>                        {% elif data_type == 'ocm' %}
+                            <th>Eng4</th>
+                            <th>Q4 Status</th>                        {% elif data_type == 'ocm' %}
                             <th>Service Date</th>
                             <th>Next Maintenance</th>
                             <th>Engineer</th>
@@ -111,12 +125,16 @@
                             {% if data_type == 'ppm' %}
                                 <td>{{ entry.get('PPM_Q_I', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_I', {}).get('engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('PPM_Q_I', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_I', {}).get('status', 'N/A') }}</span></td>
                                 <td>{{ entry.get('PPM_Q_II', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_II', {}).get('engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('PPM_Q_II', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_II', {}).get('status', 'N/A') }}</span></td>
                                 <td>{{ entry.get('PPM_Q_III', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_III', {}).get('engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('PPM_Q_III', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_III', {}).get('status', 'N/A') }}</span></td>
                                 <td>{{ entry.get('PPM_Q_IV', {}).get('quarter_date', '') }}</td>
                                 <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', '') }}</td>
+                                <td><span class="badge bg-{{ entry.get('PPM_Q_IV', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_IV', {}).get('status', 'N/A') }}</span></td>
                                 <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
                             {% elif data_type == 'ocm' %}
                                 <td>{{ entry.get('Service_Date', '') }}</td>
@@ -129,6 +147,10 @@
                                     <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=entry.SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>                                {% elif data_type == 'ocm' %}
                                      <a href="{{ url_for('views.edit_ocm_equipment', Serial=entry.Serial) }}" class="btn btn-sm btn-warning">Edit</a>
                                 {% endif %}
+                                <a href="{{ url_for('views.generate_barcode', data_type=data_type, serial=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}" 
+                                   class="btn btn-sm btn-info">
+                                    <i class="fas fa-qrcode"></i>
+                                </a>
                                 <form action="{{ url_for('views.delete_equipment', data_type=data_type, SERIAL=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}" method="post" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Delete</button>
                                 </form>

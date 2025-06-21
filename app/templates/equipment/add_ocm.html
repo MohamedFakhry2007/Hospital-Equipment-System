@@ -9,7 +9,12 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Department" name="Department" value="{{ form_data.Department or '' }}" required>
+                <select class="form-select" id="Department" name="Department" required>
+                    <option value="">Select Department</option>
+                    {% for dept in departments %}
+                        <option value="{{ dept }}" {% if form_data.Department == dept %}selected{% endif %}>{{ dept }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="Name" class="form-label">Equipment Name <span class="text-danger">*</span></label>
@@ -63,10 +68,22 @@
                 <label for="Status" class="form-label">Status <span class="text-danger">*</span></label>
                 <select class="form-select" id="Status" name="Status" required>
                     <option value="">Select Status</option>
-                    <option value="Upcoming" {% if form_data.Status == 'Upcoming' %}selected{% endif %}>Upcoming</option>
-                    <option value="Scheduled" {% if form_data.Status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
-                    <option value="Completed" {% if form_data.Status == 'Completed' %}selected{% endif %}>Completed</option>
+                    {% for status in general_status_options %}
+                        <option value="{{ status }}" {% if form_data.Status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
                 </select>
+            </div>
+        </div>
+
+        <hr>
+        <h5 class="mt-4 mb-3">Barcode Generation</h5>
+        <div class="row">
+            <div class="col-md-12 mb-3">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    After adding the equipment, you can generate and print a barcode using the serial number.
+                    The barcode will be available in the equipment list.
+                </div>
             </div>
         </div>
 
