@@ -35,11 +35,11 @@ class BarcodeService:
             # Generate barcode image in memory
             buffer = io.BytesIO()
             code.write(buffer, options={
-                'module_width': 0.2,
-                'module_height': 15.0,
-                'quiet_zone': 6.5,
-                'font_size': 10,
-                'text_distance': 5.0,
+                'module_width': 0.3,  # Make bars wider
+                'module_height': 8.0,  # Make bars shorter
+                'quiet_zone': 3.0,    # Adjust quiet zone
+                'font_size': 8,       # Smaller font for shorter barcode
+                'text_distance': 3.0, # Adjust text distance
                 'background': 'white',
                 'foreground': 'black',
             })
