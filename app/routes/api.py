@@ -242,6 +242,7 @@ def bulk_delete(data_type):
 
 @api_bp.route('/trainings', methods=['POST'])
 @login_required
+@permission_required('manage_training')
 def add_training_route():
     if not request.is_json:
         logger.warning("Add training request is not JSON")
@@ -261,6 +262,7 @@ def add_training_route():
 
 @api_bp.route('/trainings', methods=['GET'])
 @login_required
+@permission_required('view_training')
 def get_all_trainings_route():
     try:
         records = training_service.get_all_trainings()
@@ -271,6 +273,7 @@ def get_all_trainings_route():
 
 @api_bp.route('/trainings/<training_id>', methods=['GET'])
 @login_required
+@permission_required('view_training')
 def get_training_by_id_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings
@@ -286,6 +289,7 @@ def get_training_by_id_route(training_id):
 
 @api_bp.route('/trainings/<training_id>', methods=['PUT'])
 @login_required
+@permission_required('manage_training')
 def update_training_route(training_id):
     if not request.is_json:
         logger.warning(f"Update training request for ID {training_id} is not JSON")
@@ -310,6 +314,7 @@ def update_training_route(training_id):
 
 @api_bp.route('/trainings/<training_id>', methods=['DELETE'])
 @login_required
+@permission_required('manage_training')
 def delete_training_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings

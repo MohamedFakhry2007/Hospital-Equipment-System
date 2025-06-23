@@ -14,6 +14,7 @@
     
     <!-- Controls Row -->
     <div class="row mb-3">
+        {% if current_user.has_permission('manage_training') %}
         <div class="col-md-auto">
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTrainingModal">
                 <i class="fas fa-plus"></i> Add New Training
@@ -24,6 +25,7 @@
                 <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
             </button>
         </div>
+        {% endif %}
         <div class="col-md-auto">
             <select id="filterEmployeeId" class="form-select d-inline-block" style="width: auto;" title="Filter by Employee ID">
                 <option value="">All Employees</option>
@@ -80,7 +82,7 @@
                     <th class="sortable" data-sort="next_due_date">
                         Next Due <i class="fas fa-sort"></i>
                     </th>
-                    <th>Actions</th>
+                    {% if current_user.has_permission('manage_training') %}<th>Actions</th>{% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -125,6 +127,7 @@
                         </td>
                         <td>{{ training.last_trained_date if training.last_trained_date else 'N/A' }}</td>
                         <td>{{ training.next_due_date if training.next_due_date else 'N/A' }}</td>
+                        {% if current_user.has_permission('manage_training') %}
                         <td>
                             <button class="btn btn-sm btn-primary edit-training-btn"
                                     data-id="{{ training.id }}"
@@ -141,6 +144,7 @@
                                 <i class="fas fa-trash"></i> Delete
                             </button>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 {% else %}
@@ -153,6 +157,7 @@
     </div>
 </div>
 
+{% if current_user.has_permission('manage_training') %}
 <!-- Add Training Modal -->
 <div class="modal fade" id="addTrainingModal" tabindex="-1" aria-labelledby="addTrainingModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -306,6 +311,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 {% endblock %}
 
