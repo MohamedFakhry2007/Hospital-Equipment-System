@@ -9,8 +9,9 @@ import io
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask import send_file
-from flask_login import login_required
+from flask_login import login_required, current_user
 import tempfile
+from app.models import User
 from app.services.data_service import DataService
 from app.services import training_service # Added for training page
 from app.services.audit_service import AuditService
@@ -747,36 +748,47 @@ def download_template(template_type):
 def settings_page():
     """Display the settings page."""
     settings = DataService.load_settings()
-    return render_template('settings.html', settings=settings)
+    users = []
+    if current_user.is_authenticated and current_user.role.name == 'Admin':
+        users = User.query.all()
+    return render_template('settings.html', settings=settings, users=users)
 
 settings_bp = Blueprint('settings', __name__)
 SETTINGS_FILE = Path("data/settings.json")
 
 
-@settings_bp.route('/settings', methods=['GET'])
-def settings_page():
-    # Load current settings
-    if SETTINGS_FILE.exists():
-        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-            settings = json.load(f)
-    else:
-        settings = {}
+# Note: The following two routes seem redundant or misplaced.
+# The @views_bp.route('/settings') already handles GET requests.
+# The @views_bp.route('/settings', methods=['POST']) below handles POST requests.
+# I'll comment out the @settings_bp routes for now as they might be causing conflicts or are leftovers.
 
-    return render_template('settings.html', settings=settings)
+# @settings_bp.route('/settings', methods=['GET'])
+# def settings_page_bp():  # Renamed to avoid conflict
+#     # Load current settings
+#     if SETTINGS_FILE.exists():
+#         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+#             settings = json.load(f)
+#     else:
+#         settings = {}
+#     users = []
+#     if current_user.is_authenticated and current_user.role.name == 'Admin':
+#         users = User.query.all()
+#     return render_template('settings.html', settings=settings, users=users)
 
 
-@settings_bp.route('/settings', methods=['POST'])
-@login_required
-def update_settings():
-    data = request.get_json()
-    try:
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-        return jsonify({"message": "Settings updated successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# @settings_bp.route('/settings', methods=['POST'])
+# @login_required
+# def update_settings_bp(): # Renamed to avoid conflict
+#     data = request.get_json()
+#     try:
+#         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+#             json.dump(data, f, indent=4)
+#         return jsonify({"message": "Settings updated successfully"}), 200
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 @views_bp.route('/settings', methods=['POST'])
+@login_required # Added login_required for consistency and security
 def save_settings_page():
     """Handle saving settings."""
     logger.info("Received request to save settings.")
