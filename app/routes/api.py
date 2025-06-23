@@ -15,6 +15,7 @@ from app.services.data_service import DataService
 # from app.services.training_service import TrainingService
 from app.config import Config # Added for VAPID public key
 from app.services import training_service # Import the module
+from app.decorators import permission_required
 
 # ImportExportService and ValidationService removed
 
