@@ -63,6 +63,36 @@ def index():
         if isinstance(ocm_data, dict):
             ocm_data = [ocm_data]
 
+        # Annotate each item with data_type and display fields for dashboard table
+        for item in ppm_data:
+            item['data_type'] = 'ppm'
+            # Status class for badge
+            status = item.get('Status', 'N/A').lower()
+            if status == 'overdue':
+                item['status_class'] = 'danger'
+            elif status == 'upcoming':
+                item['status_class'] = 'warning'
+            elif status == 'maintained':
+                item['status_class'] = 'success'
+            else:
+                item['status_class'] = 'secondary'
+            # Display next maintenance (use next upcoming quarter date)
+            next_dates = [q.get('quarter_date') for q in [item.get('PPM_Q_I', {}), item.get('PPM_Q_II', {}), item.get('PPM_Q_III', {}), item.get('PPM_Q_IV', {})] if q.get('quarter_date')]
+            item['display_next_maintenance'] = next_dates[0] if next_dates else 'N/A'
+        for item in ocm_data:
+            item['data_type'] = 'ocm'
+            status = item.get('Status', 'N/A').lower()
+            if status == 'overdue':
+                item['status_class'] = 'danger'
+            elif status == 'upcoming':
+                item['status_class'] = 'warning'
+            elif status == 'maintained':
+                item['status_class'] = 'success'
+            else:
+                item['status_class'] = 'secondary'
+            # Display next maintenance
+            item['display_next_maintenance'] = item.get('Next_Maintenance', 'N/A')
+
         all_equipment = ppm_data + ocm_data
 
         total_machines = len(all_equipment)
@@ -129,7 +159,7 @@ def index():
             'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
         }
 
-        return render_template('index.html', title="Dashboard", stats=stats)
+        return render_template('index.html', title="Dashboard", stats=stats, equipment=all_equipment)
     except Exception as e:
         logger.error(f"Error loading dashboard: {str(e)}")
         flash("Error loading dashboard data.", "danger")
@@ -141,7 +171,7 @@ def index():
             'upcoming_30_days': 0, 'upcoming_60_days': 0, 'upcoming_90_days': 0,
             'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
         }
-        return render_template('index.html', title="Dashboard", stats=default_stats)
+        return render_template('index.html', title="Dashboard", stats=default_stats, equipment=[])
 
 
 @views_bp.route('/healthz')
