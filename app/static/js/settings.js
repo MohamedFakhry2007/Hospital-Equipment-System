@@ -806,5 +806,234 @@ document.addEventListener('DOMContentLoaded', function () {
     // Make loadBackupList globally accessible
     window.loadBackupList = loadBackupList;
 
-    console.log('Settings page initialization complete');
+    // ============================================================================
+    // USER MANAGEMENT FUNCTIONALITY (Admin Only)
+    // ============================================================================
+    const createUserButton = document.getElementById('createUserButton');
+    const usersTableBody = document.querySelector('#usersTable tbody');
+
+    if (createUserButton) {
+        createUserButton.addEventListener('click', () => showUserModal());
+    }
+
+    function showUserModal(user = null) {
+        // Remove existing modal if any
+        const existingModal = document.getElementById('userManagementModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        const modalId = 'userManagementModal';
+        const isEditMode = user !== null;
+        const modalTitle = isEditMode ? 'Edit User' : 'Create New User';
+        const submitButtonText = isEditMode ? 'Save Changes' : 'Create User';
+
+        const modalHtml = `
+            <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="userModalLabel">${modalTitle}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="userForm">
+                                <input type="hidden" id="userId" value="${isEditMode ? user.id : ''}">
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="username" value="${isEditMode ? user.username : ''}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Password ${isEditMode ? '(Leave blank to keep current)' : ''}</label>
+                                    <input type="password" class="form-control" id="password" ${isEditMode ? '' : 'required'}>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="roleId" class="form-label">Role</label>
+                                    <select class="form-select" id="roleId" required>
+                                        <!-- Options will be populated by JS -->
+                                    </select>
+                                </div>
+                                <div id="userFormAlerts" class="mt-3"></div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" id="saveUserButton">${submitButtonText}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const userModal = new bootstrap.Modal(document.getElementById(modalId));
+
+        // Populate roles dropdown
+        populateRolesDropdown(isEditMode ? user.role_id : null);
+
+        document.getElementById('saveUserButton').addEventListener('click', async () => {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const roleId = document.getElementById('roleId').value;
+            const userId = document.getElementById('userId').value;
+
+            if (!username || (!isEditMode && !password) || !roleId) {
+                showUserFormAlert('All fields (except password on edit) are required.', 'danger');
+                return;
+            }
+
+            const userData = { username, role_id: parseInt(roleId) };
+            if (password) {
+                userData.password = password;
+            }
+
+            setButtonLoading(document.getElementById('saveUserButton'), true);
+            try {
+                const url = isEditMode ? `/admin/users/${userId}` : '/admin/users';
+                const method = isEditMode ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(result.message || `User ${isEditMode ? 'updated' : 'created'} successfully!`, 'success');
+                    userModal.hide();
+                    fetchUsers(); // Refresh table
+                } else {
+                    showUserFormAlert(result.error || `Failed to ${isEditMode ? 'update' : 'create'} user.`, 'danger');
+                }
+            } catch (error) {
+                console.error(`Error ${isEditMode ? 'updating' : 'creating'} user:`, error);
+                showUserFormAlert(`An error occurred: ${error.message}`, 'danger');
+            } finally {
+                setButtonLoading(document.getElementById('saveUserButton'), false);
+            }
+        });
+        userModal.show();
+    }
+
+    async function populateRolesDropdown(selectedRoleId = null) {
+        const roleSelect = document.getElementById('roleId');
+        if (!roleSelect) return;
+        roleSelect.innerHTML = '<option value="">Loading roles...</option>';
+        try {
+            const response = await fetch('/api/roles'); // Assuming an endpoint to get roles
+            if (!response.ok) throw new Error('Failed to fetch roles');
+            const roles = await response.json();
+
+            roleSelect.innerHTML = '<option value="">Select a role</option>';
+            roles.forEach(role => {
+                const option = document.createElement('option');
+                option.value = role.id;
+                option.textContent = role.name;
+                if (selectedRoleId && role.id === selectedRoleId) {
+                    option.selected = true;
+                }
+                roleSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error fetching roles:', error);
+            roleSelect.innerHTML = '<option value="">Error loading roles</option>';
+            showUserFormAlert('Could not load roles. Please try again.', 'warning');
+        }
+    }
+
+    function showUserFormAlert(message, type = 'danger') {
+        const alertContainer = document.getElementById('userFormAlerts');
+        if (alertContainer) {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        }
+    }
+
+    async function fetchUsers() {
+        if (!usersTableBody) return;
+        usersTableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading users...</td></tr>';
+        try {
+            const response = await fetch('/admin/users');
+            if (!response.ok) throw new Error('Failed to fetch users');
+            const users = await response.json();
+            renderUsersTable(users);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            usersTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error loading users.</td></tr>';
+        }
+    }
+
+    function renderUsersTable(users) {
+        if (!usersTableBody) return;
+        usersTableBody.innerHTML = ''; // Clear existing rows
+
+        if (users.length === 0) {
+            usersTableBody.innerHTML = '<tr><td colspan="4" class="text-center">No users found.</td></tr>';
+            return;
+        }
+
+        users.forEach(user => {
+            const row = usersTableBody.insertRow();
+            row.innerHTML = `
+                <td>${user.id}</td>
+                <td>${user.username}</td>
+                <td>${user.role_name || 'N/A'}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-primary me-1 editUserButton" data-user-id="${user.id}">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger deleteUserButton" data-user-id="${user.id}">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </td>
+            `;
+        });
+        attachUserActionListeners();
+    }
+
+    function attachUserActionListeners() {
+        document.querySelectorAll('.editUserButton').forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const userId = event.currentTarget.dataset.userId;
+                // Fetch user details to pre-fill the form
+                try {
+                    const response = await fetch(`/admin/users/${userId}`); // Need a GET by ID endpoint
+                    if (!response.ok) throw new Error('Failed to fetch user details');
+                    const user = await response.json();
+                    showUserModal(user);
+                } catch (error) {
+                    console.error('Error fetching user details for edit:', error);
+                    showToast('Could not load user details for editing.', 'danger');
+                }
+            });
+        });
+
+        document.querySelectorAll('.deleteUserButton').forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const userId = event.currentTarget.dataset.userId;
+                if (confirm(`Are you sure you want to delete user ID ${userId}? This action cannot be undone.`)) {
+                    try {
+                        const response = await fetch(`/admin/users/${userId}`, { method: 'DELETE' });
+                        const result = await response.json();
+                        if (response.ok) {
+                            showToast(result.message || 'User deleted successfully!', 'success');
+                            fetchUsers(); // Refresh table
+                        } else {
+                            showToast(result.error || 'Failed to delete user.', 'danger');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting user:', error);
+                        showToast(`An error occurred: ${error.message}`, 'danger');
+                    }
+                }
+            });
+        });
+    }
+
+    // Initial load of users if the table exists (i.e., user is Admin)
+    if (usersTableBody) {
+        fetchUsers();
+    }
+
+    console.log('Settings page initialization complete, including User Management.');
 });

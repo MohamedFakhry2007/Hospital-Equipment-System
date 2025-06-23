@@ -430,6 +430,65 @@
                 </div>
             </div>
         </div>
+
+        <!-- User Management Section (Admin Only) -->
+        {% if current_user.is_authenticated and current_user.role.name == 'Admin' %}
+        <div class="col-12">
+            <div class="modern-card user-management-card">
+                <div class="modern-card-header user-management-header">
+                    <div class="card-icon">
+                        <i class="fas fa-users-cog"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-1">User Management</h5>
+                        <small class="card-subtitle">Manage system users and roles</small>
+                    </div>
+                    <div class="ms-auto">
+                        <button type="button" class="btn-modern btn-success" id="createUserButton">
+                            <i class="fas fa-user-plus me-2"></i>Create User
+                        </button>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.role.name if user.role else 'N/A' }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary me-1 editUserButton" data-user-id="{{ user.id }}">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger deleteUserButton" data-user-id="{{ user.id }}">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No users found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <!-- End User Management Section -->
+
     </div>
 </div>
 
@@ -438,6 +497,8 @@
 :root {
     --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --user-management-gradient: linear-gradient(135deg, #434343 0%, #000000 100%); /* Added for User Management Card */
+    /* --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); */ /* Duplicate removed */
     --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     --backup-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
@@ -549,6 +610,10 @@
 
 .backup-header {
     background: var(--backup-gradient);
+}
+
+.user-management-header { /* Added for User Management Card */
+    background: var(--user-management-gradient);
 }
 
 .card-icon {
