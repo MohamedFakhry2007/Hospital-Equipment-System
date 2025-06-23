@@ -105,10 +105,13 @@ def create_app():
     from app.routes.api import api_bp
     # Import auth blueprint
     from app.routes.auth import auth_bp as auth_blueprint # Renamed to avoid conflict
+    # Import admin blueprint
+    from app.routes.admin import admin_bp
     
     app.register_blueprint(views_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(auth_blueprint, url_prefix='/auth') # Register auth blueprint
+    app.register_blueprint(admin_bp) # Register admin blueprint (url_prefix is set in Blueprint definition)
 
     # Start the scheduler in a background thread if enabled
     # This will be called when Gunicorn workers are initialized.
