@@ -1015,7 +1015,7 @@ def send_test_email():
 # Training Management Page
 @views_bp.route('/training')
 @login_required
-@permission_required('View Training Records')
+@permission_required('view_training')
 def training_management_page():
     """Display the training management page."""
     logger.info("Training management page accessed")
