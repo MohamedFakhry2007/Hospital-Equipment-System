@@ -17,6 +17,8 @@ class Config:
     # Flask configuration
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
     DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "postgresql://admin_user:admin_password@localhost/hospital_equipment_db")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # File paths
     DATA_DIR = os.path.join(BASE_DIR, "data")

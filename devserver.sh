@@ -6,7 +6,7 @@ poetry install
 # Set environment variables
 export FLASK_DEBUG=1
 export PORT=${PORT:-5001}
-export FLASK_APP="app.main:create_app"
+export FLASK_APP="app:create_app"
 
 echo "Development server starting on PORT: $PORT with DEBUG=$FLASK_DEBUG"
 
