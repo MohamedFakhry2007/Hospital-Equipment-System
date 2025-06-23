@@ -53,7 +53,6 @@ def allowed_file(filename):
 @login_required
 def index():
     """Display the dashboard with maintenance statistics."""
-    """Display the dashboard with maintenance statistics."""
     try:
         ppm_data = DataService.get_all_entries(data_type='ppm')
         ocm_data = DataService.get_all_entries(data_type='ocm')
@@ -130,7 +129,7 @@ def index():
             'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
         }
 
-        return render_template('dashboard/index.html', title="Dashboard", stats=stats)
+        return render_template('index.html', title="Dashboard", stats=stats)
     except Exception as e:
         logger.error(f"Error loading dashboard: {str(e)}")
         flash("Error loading dashboard data.", "danger")
@@ -142,7 +141,7 @@ def index():
             'upcoming_30_days': 0, 'upcoming_60_days': 0, 'upcoming_90_days': 0,
             'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
         }
-        return render_template('dashboard/index.html', title="Dashboard", stats=default_stats)
+        return render_template('index.html', title="Dashboard", stats=default_stats)
 
 
 @views_bp.route('/healthz')
