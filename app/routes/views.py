@@ -54,7 +54,7 @@ def allowed_file(filename):
 
 @views_bp.route('/')
 @login_required
-@permission_required('View Dashboard')
+@permission_required('view_equipment') # Task: "view_equipment: Granted to Admin, Editor, Viewer. Allows viewing equipment lists and details." Index is a list.
 def index():
     """Display the dashboard with maintenance statistics."""
     try:
@@ -189,9 +189,8 @@ def health_check():
 @login_required
 # This route handles both PPM and OCM. Applying a single static permission is problematic.
 # Ideally, this route should be split or the decorator made dynamic.
-# Applying 'View PPM Equipment' here. If 'data_type' is 'ocm', access depends on user having this PPM perm.
-# A user with only 'View OCM Equipment' would be denied if this is the only route.
-@permission_required('View PPM Equipment')
+# Applying 'view_equipment' as per task.
+@permission_required('view_equipment')
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
     # A more robust check if routes are not split:
@@ -279,7 +278,7 @@ def list_equipment(data_type):
 
 @views_bp.route('/equipment/ppm/add', methods=['GET', 'POST'])
 @login_required
-@permission_required('Create/Edit/Delete PPM Equipment (single & Bulkdelete )')
+@permission_required('manage_equipment')
 def add_ppm_equipment():
     """Handle adding new PPM equipment."""
     if request.method == 'POST':
@@ -337,7 +336,7 @@ def add_ppm_equipment():
 
 @views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
 @login_required
-@permission_required('Create/Edit/Delete OCM Equipment (single & Bulkdelete )')
+@permission_required('manage_equipment')
 def add_ocm_equipment():
     """Handle adding new OCM equipment."""
     if request.method == 'POST':
@@ -374,7 +373,7 @@ def add_ocm_equipment():
 
 @views_bp.route('/equipment/ppm/edit/<SERIAL>', methods=['GET', 'POST'])
 @login_required
-@permission_required('Create/Edit/Delete PPM Equipment (single & Bulkdelete )')
+@permission_required('manage_equipment')
 def edit_ppm_equipment(SERIAL):
     """Handle editing existing PPM equipment."""
     entry = DataService.get_entry('ppm', SERIAL)
@@ -440,7 +439,7 @@ def edit_ppm_equipment(SERIAL):
 
 @views_bp.route('/equipment/ocm/edit/<Serial>', methods=['GET', 'POST'])
 @login_required
-@permission_required('Create/Edit/Delete OCM Equipment (single & Bulkdelete )')
+@permission_required('manage_equipment')
 def edit_ocm_equipment(Serial):
     """Handle editing OCM equipment."""
     logger.info(f"Received {request.method} request to edit OCM equipment with Serial: {Serial}")
@@ -503,8 +502,7 @@ def edit_ocm_equipment(Serial):
 
 @views_bp.route('/equipment/<data_type>/delete/<path:SERIAL>', methods=['POST'])
 @login_required
-# Dynamic permission based on data_type. Applying PPM version.
-@permission_required('Create/Edit/Delete PPM Equipment (single & Bulkdelete )')
+@permission_required('manage_equipment')
 def delete_equipment(data_type, SERIAL):
     """Handle deleting existing equipment."""
     logger.info(f"Received request to delete {data_type} equipment with serial: {SERIAL}")
@@ -548,16 +546,14 @@ def delete_equipment(data_type, SERIAL):
 
 @views_bp.route('/import-export')
 @login_required
-@permission_required('Import/Export Data')
+@permission_required('manage_equipment') # As per task: "Apply @permission_required('manage_equipment') to: ... import_export_page"
 def import_export_page():
     """Display the import/export page."""
     return render_template('import_export/main.html')
 
 @views_bp.route('/import_equipment', methods=['POST'])
 @login_required
-@permission_required('Import/Export Data') # General permission for the import action itself.
-                                        # Specific data type import permissions ('Import in Bulk' for PPM/OCM)
-                                        # should be checked internally if finer control is needed.
+@permission_required('manage_equipment') # As per task: "Apply @permission_required('manage_equipment') to: ... import_equipment"
 def import_equipment():
     """Import equipment data from CSV file."""
     if 'file' not in request.files:
@@ -642,7 +638,7 @@ def import_equipment():
 
 @views_bp.route('/export/ppm')
 @login_required
-@permission_required('Export all ppm machines ')
+@permission_required('manage_equipment') # As per task: "Apply @permission_required('manage_equipment') to: ... export_equipment_ppm"
 def export_equipment_ppm():
     """Export PPM equipment data to CSV."""
     try:
@@ -672,7 +668,7 @@ def export_equipment_ppm():
 
 @views_bp.route('/export/ocm')
 @login_required
-@permission_required('Export all OCM machines ')
+@permission_required('manage_equipment') # As per task: "Apply @permission_required('manage_equipment') to: ... export_equipment_ocm"
 def export_equipment_ocm():
     """Export OCM equipment data to CSV."""
     try:
@@ -723,8 +719,7 @@ def export_equipment_training():
 
 @views_bp.route('/download/template/<template_type>')
 @login_required
-# Permission depends on template_type: 'Download Templet' for PPM/OCM.
-@permission_required('Download Templet') # General for templates, assumes it covers both
+@permission_required('manage_equipment') # As per task: "Apply @permission_required('manage_equipment') to: ... download_template"
 def download_template(template_type):
     """Download template files for data import."""
     # Specific permission check could be done here if 'Download Templet' is too broad
@@ -1048,7 +1043,7 @@ def training_management_page():
 # Barcode Generation Routes
 @views_bp.route('/equipment/<data_type>/<serial>/barcode')
 @login_required
-@permission_required('Genrate Bare code ')
+@permission_required('manage_equipment') # As per task for all barcode routes
 def generate_barcode(data_type, serial):
     """Generate and display barcode for a specific equipment."""
     # Dynamic check would be:
@@ -1077,8 +1072,7 @@ def generate_barcode(data_type, serial):
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode/download')
 @login_required
-# Using PPM permission name. OCM would be 'print OCM erevry machine Bare code'
-@permission_required('print ppm  erevry machine Bare code')
+@permission_required('manage_equipment') # As per task for all barcode routes
 def download_barcode(data_type, serial):
     """Download barcode image for a specific equipment."""
     from app.services.barcode_service import BarcodeService
@@ -1112,7 +1106,7 @@ def download_barcode(data_type, serial):
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk')
 @login_required
-@permission_required('Genrate Bare code ')
+@permission_required('manage_equipment') # As per task for all barcode routes
 def bulk_barcodes(data_type):
     """Generate bulk barcodes for all equipment of a specific type."""
     from app.services.barcode_service import BarcodeService
@@ -1144,7 +1138,7 @@ def bulk_barcodes(data_type):
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk/download')
 @login_required
-@permission_required('print ppm  erevry machine Bare code')
+@permission_required('manage_equipment') # As per task for all barcode routes
 def download_bulk_barcodes(data_type):
     """Download all barcodes as a ZIP file."""
     from app.services.barcode_service import BarcodeService

@@ -17,6 +17,7 @@
     </div>
     <!-- Action Buttons Row -->
     <div class="row mb-3">
+        {% if current_user_has_permission('manage_equipment') %}
         <div class="col-md-auto">
             {% if data_type == 'ppm' %}
                 <a href="{{ url_for('views.add_ppm_equipment') }}" class="btn btn-primary">Add New PPM</a>
@@ -32,16 +33,19 @@
                 <i class="fas fa-qrcode"></i> Bulk Barcodes
             </a>
         </div>
+        {% endif %}
         <div class="col-md-auto">
-            <a href="{{ url_for('views.machine_assignment') }}" class="btn btn-success">
+            <a href="{{ url_for('views.machine_assignment') }}" class="btn btn-success"> {# Assuming this doesn't require manage_equipment #}
                 <i class="fas fa-cogs"></i> Machine Assignment
             </a>
         </div>
+        {% if current_user_has_permission('manage_equipment') %}
         <div class="col-md-auto">
             <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">
                 Delete Selected (<span id="selectedCount">0</span>)
             </button>
         </div>
+        {% endif %}
         <div class="col-md-auto ms-auto">
             <button id="toggleFiltersBtn" class="btn btn-outline-primary">
                 <i class="fas fa-filter me-2"></i>Advanced Filters
@@ -464,18 +468,25 @@
                             {% endif %}
                             <td>
                                 <div class="d-flex align-items-center">
-                                    {% if data_type == 'ppm' %}
-                                        <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=entry.SERIAL) }}" class="btn btn-sm btn-warning me-1">Edit</a>
-                                    {% elif data_type == 'ocm' %}
-                                        <a href="{{ url_for('views.edit_ocm_equipment', Serial=entry.Serial) }}" class="btn btn-sm btn-warning me-1">Edit</a>
+                                    {% if current_user_has_permission('manage_equipment') %}
+                                        {% if data_type == 'ppm' %}
+                                            <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=entry.SERIAL) }}" class="btn btn-sm btn-warning me-1">Edit</a>
+                                        {% elif data_type == 'ocm' %}
+                                            <a href="{{ url_for('views.edit_ocm_equipment', Serial=entry.Serial) }}" class="btn btn-sm btn-warning me-1">Edit</a>
+                                        {% endif %}
                                     {% endif %}
+                                    {# Barcode generation link might be viewable by more roles, but manage_equipment is specified for barcode routes in task #}
+                                    {% if current_user_has_permission('manage_equipment') %}
                                     <a href="{{ url_for('views.generate_barcode', data_type=data_type, serial=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}"
-                                       class="btn btn-sm btn-info me-1">
+                                       class="btn btn-sm btn-info me-1" title="Generate Barcode">
                                         <i class="fas fa-qrcode"></i>
                                     </a>
-                                    <form action="{{ url_for('views.delete_equipment', data_type=data_type, SERIAL=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}" method="post">
-                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Delete</button>
+                                    {% endif %}
+                                    {% if current_user_has_permission('manage_equipment') %}
+                                    <form action="{{ url_for('views.delete_equipment', data_type=data_type, SERIAL=entry.SERIAL if data_type == 'ppm' else entry.Serial) }}" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');" title="Delete Equipment">Delete</button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

@@ -22,3 +22,9 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return f'<User {self.username}>'
+
+    def has_permission(self, permission_name):
+        """Check if the user's role has a specific permission."""
+        if self.role and self.role.permissions:
+            return any(permission.name == permission_name for permission in self.role.permissions)
+        return False

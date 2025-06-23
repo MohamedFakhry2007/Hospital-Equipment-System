@@ -154,5 +154,13 @@ def create_app():
         return User.query.get(int(user_id))
 
     migrate.init_app(app, db)
+
+    @app.context_processor
+    def inject_user_permissions():
+        from flask_login import current_user
+        if current_user.is_authenticated:
+            # Make has_permission available in templates
+            return {'current_user_has_permission': current_user.has_permission}
+        return {}
     
     return app
