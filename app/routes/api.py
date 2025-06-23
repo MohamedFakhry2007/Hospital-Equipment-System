@@ -28,6 +28,7 @@ if not logger.hasHandlers():
 
 @api_bp.route('/equipment/<data_type>', methods=['GET'])
 @login_required
+@permission_required('view_equipment')
 def get_equipment(data_type):
     """Get all equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -42,6 +43,7 @@ def get_equipment(data_type):
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['GET'])
 @login_required
+@permission_required('view_equipment') # Viewing details falls under 'view_equipment'
 def get_equipment_by_serial(data_type, SERIAL):
     """Get a specific equipment entry by SERIAL."""
     if data_type not in ('ppm', 'ocm'):
@@ -59,6 +61,7 @@ def get_equipment_by_serial(data_type, SERIAL):
 
 @api_bp.route('/equipment/<data_type>', methods=['POST'])
 @login_required
+@permission_required('manage_equipment')
 def add_equipment(data_type):
     """Add a new equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -87,6 +90,7 @@ def add_equipment(data_type):
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['PUT'])
 @login_required
+@permission_required('manage_equipment')
 def update_equipment(data_type, SERIAL):
     """Update an existing equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -117,6 +121,7 @@ def update_equipment(data_type, SERIAL):
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['DELETE'])
 @login_required
+@permission_required('manage_equipment')
 def delete_equipment(data_type, SERIAL):
     """Delete an equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -135,6 +140,7 @@ def delete_equipment(data_type, SERIAL):
 
 @api_bp.route('/export/<data_type>', methods=['GET'])
 @login_required
+@permission_required('manage_equipment')
 def export_data(data_type):
     """Export data to CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -162,6 +168,7 @@ def export_data(data_type):
 
 @api_bp.route('/import/<data_type>', methods=['POST'])
 @login_required
+@permission_required('manage_equipment')
 def import_data(data_type):
     """Import data from CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -204,6 +211,7 @@ def import_data(data_type):
 
 @api_bp.route('/bulk_delete/<data_type>', methods=['POST'])
 @login_required
+@permission_required('manage_equipment')
 def bulk_delete(data_type):
     """Handle bulk deletion of equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -594,6 +602,7 @@ def import_training_data():
 
 @api_bp.route('/import/auto', methods=['POST'])
 @login_required
+@permission_required('manage_equipment')
 def import_auto():
     """Auto-detect CSV type and import data."""
     if 'file' not in request.files:

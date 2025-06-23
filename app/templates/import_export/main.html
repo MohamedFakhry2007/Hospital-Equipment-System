@@ -28,6 +28,7 @@
             </div>
         </div>
         
+        {% if current_user_has_permission('manage_equipment') %}
         <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
             <div class="card h-100 shadow-sm border-0 hover-card">
                 <div class="card-header bg-info text-white text-center py-3">
@@ -111,6 +112,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Section Divider -->
@@ -131,6 +133,7 @@
             </div>
         </div>
         
+        {% if current_user_has_permission('manage_equipment') %}
         <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
             <div class="card h-100 shadow-sm border-0 hover-card">
                 <div class="card-header bg-info text-white text-center py-3">
@@ -214,6 +217,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Section Divider -->
@@ -224,6 +228,11 @@
     </div>
 
     <!-- Training Records Section -->
+    {# Assuming training import/export also requires 'manage_equipment' or a specific training management permission.
+       For this task, we'll wrap with 'manage_equipment' if it implies general data management.
+       If training has its own set of permissions, those should be used.
+       The task does not specify permissions for training import/export, so using manage_equipment as a general one. #}
+    {% if current_user_has_permission('manage_equipment') or current_user_has_permission('Create/Edit/Delete Training Records') %}
     <div class="row mb-6">
         <div class="col-12">
             <div class="section-header mb-4">
@@ -259,6 +268,8 @@
                 </div>
             </div>
         </div>
+    </div>
+    {% endif %}
 
         <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
             <div class="card h-100 shadow-sm border-0 hover-card">
