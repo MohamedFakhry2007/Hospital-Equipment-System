@@ -5,8 +5,9 @@ Main entry point for the Hospital Equipment Maintenance Management System.
 
 import logging
 import os
-from app import create_app # create_app now handles scheduler initialization
 from app.config import Config
+from app import create_app, db
+from flask_migrate import Migrate
 
 logger = logging.getLogger(__name__)
 
@@ -49,3 +50,5 @@ if __name__ == '__main__':
     # This ensures that if someone runs `python app/main.py`, it starts the dev server.
     # Gunicorn does not use this; it uses the `app:create_app()` factory.
     main()
+
+app = create_app()
