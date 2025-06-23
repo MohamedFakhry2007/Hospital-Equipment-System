@@ -3,128 +3,264 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">Dashboard</h1>
-    <p class="lead mb-5">Monitor and manage your equipment maintenance schedule.</p>
-
-    <div class="date-display mb-4">
+<div class="px-3">
+    <!-- Header Section with Live Clock -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="page-title mb-2">Dashboard</h1>
+            <p class="lead mb-0">Monitor and manage your equipment maintenance schedule.</p>
+        </div>
+        <div class="text-end">
+            <div id="live-clock" class="h4 mb-0 text-primary fw-bold">
         {{ current_date }}
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body">
-                    <h5 class="card-title">Total Equipment</h5>
-                    <h2 class="card-text">{{ total_machines }}</h2>
-                    <p>PPM: {{ ppm_machine_count }} | OCM: {{ ocm_machine_count }}</p>
-                </div>
             </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-danger text-white">
-                <div class="card-body">
-                    <h5 class="card-title">Overdue</h5>
-                    <h2 class="card-text">{{ overdue_count }}</h2>
-                    <p>Require immediate attention</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark"> {# Changed text to dark for better contrast on warning #}
-                <div class="card-body">
-                    <h5 class="card-title">Upcoming</h5>
-                    <h2 class="card-text">{{ upcoming_count }}</h2>
-                    <p>Due for maintenance soon</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body">
-                    <h5 class="card-title">Maintained</h5>
-                    <h2 class="card-text">{{ maintained_count }}</h2>
-                    <p>Recently serviced or up-to-date</p>
-                </div>
-            </div>
+            <button id="refresh-dashboard" class="btn btn-outline-primary btn-sm mt-2">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
         </div>
     </div>
 
-    {# Removed old upcoming_counts by specific days block #}
-    {# Removed old quarterly/yearly frequency block as it was PPM specific and based on old 'PPM' field #}
+    <!-- Main Statistics Cards -->
+    <div class="row g-4 mb-5">
+        <!-- Total Equipment Card -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100 border-0 shadow-lg modern-card">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-primary bg-gradient me-3">
+                            <i class="fas fa-cogs text-white"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Total Equipment</h6>
+                            <h2 class="card-title mb-0 fw-bold" id="total-machines">{{ total_machines }}</h2>
+                        </div>
+                    </div>
+                    <div class="mt-3 pt-3 border-top">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <small class="text-muted d-block">PPM</small>
+                                <span class="fw-bold text-info" id="ppm-count">{{ ppm_machine_count }}</span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">OCM</small>
+                                <span class="fw-bold text-success" id="ocm-count">{{ ocm_machine_count }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
+        <!-- Overdue Maintenance Card -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100 border-0 shadow-lg modern-card border-danger">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-danger bg-gradient me-3">
+                            <i class="fas fa-exclamation-triangle text-white"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Overdue Maintenance</h6>
+                            <h2 class="card-title mb-0 fw-bold text-danger" id="overdue-count">{{ overdue_count }}</h2>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">Requires immediate attention</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Maintenance Card -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100 border-0 shadow-lg modern-card border-warning">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-warning bg-gradient me-3">
+                            <i class="fas fa-calendar-clock text-white"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Upcoming Maintenance</h6>
+                            <h2 class="card-title mb-0 fw-bold text-warning" id="upcoming-count">{{ upcoming_count }}</h2>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">Due for maintenance soon</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Maintained Equipment Card -->
+        <div class="col-lg-3 col-md-6">
+            <div class="card h-100 border-0 shadow-lg modern-card border-success">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-wrapper bg-success bg-gradient me-3">
+                            <i class="fas fa-check-circle text-white"></i>
+                        </div>
+                        <div>
+                            <h6 class="card-subtitle mb-1 text-muted">Maintained</h6>
+                            <h2 class="card-title mb-0 fw-bold text-success" id="maintained-count">{{ maintained_count }}</h2>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">Recently serviced or up-to-date</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Maintenance Breakdown -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-gradient text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>
+                        Upcoming Maintenance Timeline
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-danger fw-bold" id="upcoming-7-days">{{ upcoming_7_days }}</div>
+                                <small class="text-muted">Next 7 Days</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-warning fw-bold" id="upcoming-14-days">{{ upcoming_14_days }}</div>
+                                <small class="text-muted">Next 14 Days</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-info fw-bold" id="upcoming-21-days">{{ upcoming_21_days }}</div>
+                                <small class="text-muted">Next 21 Days</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-primary fw-bold" id="upcoming-30-days">{{ upcoming_30_days }}</div>
+                                <small class="text-muted">Next 30 Days</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-secondary fw-bold" id="upcoming-60-days">{{ upcoming_60_days }}</div>
+                                <small class="text-muted">Next 60 Days</small>
+                            </div>
+                        </div>
+                        <div class="col-lg-2 col-md-4 col-6">
+                            <div class="text-center p-3 bg-light rounded">
+                                <div class="h4 mb-1 text-dark fw-bold" id="upcoming-90-days">{{ upcoming_90_days }}</div>
+                                <small class="text-muted">Next 90 Days</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Overview Table -->
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title">Equipment Overview</h5>
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-gradient text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Equipment Overview
+                        </h5>
                         <div class="d-flex gap-2">
-                            <input type="text" id="searchInput" class="form-control" placeholder="Search equipment...">
-                            <select id="statusFilter" class="form-select">
+                            <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search equipment..." style="width: 200px;">
+                            <select id="statusFilter" class="form-select form-select-sm" title="Filter equipment by status" style="width: 150px;">
                                 <option value="">Filter by Status</option>
                                 <option value="Overdue">Overdue</option>
                                 <option value="Upcoming">Upcoming</option>
                                 <option value="Maintained">Maintained</option>
                                 <option value="N/A">N/A or Other</option>
                             </select>
-                             <select id="typeFilter" class="form-select">
+                            <select id="typeFilter" class="form-select form-select-sm" title="Filter equipment by type" style="width: 120px;">
                                 <option value="">Filter by Type</option>
                                 <option value="PPM">PPM</option>
                                 <option value="OCM">OCM</option>
                             </select>
-                            <button id="resetFilters" class="btn btn-secondary">Reset</button>
+                            <button id="resetFilters" class="btn btn-light btn-sm">Reset</button>
                         </div>
                     </div>
-
+                </div>
+                <div class="card-body p-0">
                     {% if equipment %}
                     <div class="table-responsive">
-                        <table class="table table-hover equipment-table"> {# Added class for JS targeting #}
-                            <thead>
+                        <table class="table table-hover equipment-table mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Type</th>
-                                    <th>Equipment</th>
-                                    <th>Model</th>
-                                    <th>Serial No.</th>
-                                    <th>Next Maintenance</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
+                                    <th class="px-4 py-3">Type</th>
+                                    <th class="px-4 py-3">Equipment</th>
+                                    <th class="px-4 py-3">Model</th>
+                                    <th class="px-4 py-3">Serial No.</th>
+                                    <th class="px-4 py-3">Next Maintenance</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for item in equipment %}
-                                <tr data-status="{{ item.Status.lower() if item.Status else 'n/a' }}" data-type="{{ item.data_type.upper() }}">
-                                    <td><span class="badge bg-info text-dark">{{ item.data_type.upper() }}</span></td>                                    <td>
+                                <tr data-status="{{ item.Status.lower() if item.Status else 'n/a' }}" data-type="{{ item.data_type.upper() }}" class="align-middle">
+                                    <td class="px-4 py-3">
+                                        <span class="badge bg-{{ 'info' if item.data_type == 'ppm' else 'success' }} text-white">
+                                            {{ item.data_type.upper() }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 fw-medium">
                                         {% if item.data_type == 'ppm' %}
                                             {{ item.Name }}
                                         {% else %}
                                             {{ item.Name }}
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="px-4 py-3">
                                         {% if item.data_type == 'ppm' %}
                                             {{ item.MODEL }}
                                         {% else %}
                                             {{ item.Model }}
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="px-4 py-3 font-monospace">
                                         {% if item.data_type == 'ppm' %}
                                             {{ item.SERIAL }}
                                         {% else %}
                                             {{ item.Serial }}
                                         {% endif %}
                                     </td>
-                                    <td>{{ item.display_next_maintenance }}</td>
-                                    <td><span class="badge bg-{{ item.status_class }}">{{ item.Status }}</span></td>
-                                    <td>
+                                    <td class="px-4 py-3">{{ item.display_next_maintenance }}</td>
+                                    <td class="px-4 py-3">
+                                        <span class="badge bg-{{ item.status_class }} text-white">
+                                            {{ item.Status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div class="btn-group" role="group">
                                         {% if item.data_type == 'ppm' %}
-                                            <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=item.SERIAL) }}" class="btn btn-sm btn-warning">Edit</a>
+                                                <a href="{{ url_for('views.edit_ppm_equipment', SERIAL=item.SERIAL) }}" class="btn btn-sm btn-outline-warning">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
                                         {% elif item.data_type == 'ocm' %}
-                                            <a href="{{ url_for('views.edit_ocm_equipment', Serial=item.Serial) }}" class="btn btn-sm btn-warning">Edit</a>
-                                        {% endif %}                                         <form action="{{ url_for('views.delete_equipment', data_type=item.data_type, SERIAL=item.SERIAL if item.data_type == 'ppm' else item.Serial) }}" method="post" style="display: inline;">
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?');">Del</button>
+                                                <a href="{{ url_for('views.edit_ocm_equipment', Serial=item.Serial) }}" class="btn btn-sm btn-outline-warning">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            {% endif %}
+                                            <form action="{{ url_for('views.delete_equipment', data_type=item.data_type, SERIAL=item.SERIAL if item.data_type == 'ppm' else item.Serial) }}" method="post" style="display: inline;">
+                                                                                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete equipment" onclick="return confirm('Are you sure you want to delete this item?');">
+                                                     <i class="fas fa-trash"></i>
+                                                 </button>
                                         </form>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -132,7 +268,8 @@
                         </table>
                     </div>
                     {% else %}
-                    <div class="text-center py-4">
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
                         <h4>No equipment found</h4>
                         <p class="text-muted">There is no equipment data available at the moment.</p>
                     </div>
@@ -142,12 +279,169 @@
         </div>
     </div>
 </div>
+
+<!-- Custom Styles -->
+<style>
+.modern-card {
+    border-radius: 16px !important;
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent !important;
+}
+
+.modern-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+}
+
+.modern-card.border-danger {
+    border-left-color: #dc3545 !important;
+}
+
+.modern-card.border-warning {
+    border-left-color: #ffc107 !important;
+}
+
+.modern-card.border-success {
+    border-left-color: #198754 !important;
+}
+
+.icon-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.card-header.bg-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+#live-clock {
+    font-family: 'Segoe UI', monospace;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge {
+    font-size: 0.75rem;
+    padding: 0.5em 0.75em;
+}
+
+.btn-group .btn {
+    border-radius: 6px !important;
+    margin-right: 2px;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.refreshing {
+    animation: pulse 1s infinite;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Live Clock Functionality
+    function updateClock() {
+        const now = new Date();
+        const options = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        };
+        
+        const timeString = now.toLocaleDateString('en-US', options).replace(/,/g, ',').replace(/ at /, ' — ');
+        document.getElementById('live-clock').textContent = timeString;
+    }
+
+    // Update clock every second
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Dashboard Refresh Functionality
+    const refreshBtn = document.getElementById('refresh-dashboard');
+    refreshBtn.addEventListener('click', function() {
+        refreshBtn.classList.add('refreshing');
+        refreshBtn.disabled = true;
+        
+        fetch('/refresh-dashboard')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update all dashboard statistics
+                    document.getElementById('total-machines').textContent = data.data.total_machines;
+                    document.getElementById('ppm-count').textContent = data.data.ppm_machine_count;
+                    document.getElementById('ocm-count').textContent = data.data.ocm_machine_count;
+                    document.getElementById('overdue-count').textContent = data.data.overdue_count;
+                    document.getElementById('upcoming-count').textContent = data.data.upcoming_count;
+                    document.getElementById('maintained-count').textContent = data.data.maintained_count;
+                    
+                    // Update upcoming timeline
+                    document.getElementById('upcoming-7-days').textContent = data.data.upcoming_7_days;
+                    document.getElementById('upcoming-14-days').textContent = data.data.upcoming_14_days;
+                    document.getElementById('upcoming-21-days').textContent = data.data.upcoming_21_days;
+                    document.getElementById('upcoming-30-days').textContent = data.data.upcoming_30_days;
+                    document.getElementById('upcoming-60-days').textContent = data.data.upcoming_60_days;
+                    document.getElementById('upcoming-90-days').textContent = data.data.upcoming_90_days;
+                    
+                    // Show success feedback
+                    const toast = document.createElement('div');
+                    toast.className = 'toast position-fixed top-0 end-0 m-3';
+                    toast.style.zIndex = '9999';
+                    toast.innerHTML = `
+                        <div class="toast-header bg-success text-white">
+                            <strong class="me-auto">Dashboard Updated</strong>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                        </div>
+                        <div class="toast-body">
+                            Dashboard data refreshed successfully!
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+                    const bsToast = new bootstrap.Toast(toast);
+                    bsToast.show();
+                    
+                    // Remove toast after showing
+                    toast.addEventListener('hidden.bs.toast', () => {
+                        document.body.removeChild(toast);
+                    });
+                } else {
+                    console.error('Failed to refresh dashboard:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing dashboard:', error);
+            })
+            .finally(() => {
+                refreshBtn.classList.remove('refreshing');
+                refreshBtn.disabled = false;
+            });
+    });
+
+    // Table Filtering Functionality
     const searchInput = document.getElementById('searchInput');
     const statusFilter = document.getElementById('statusFilter');
     const typeFilter = document.getElementById('typeFilter');

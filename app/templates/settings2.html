@@ -1,0 +1,1059 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <!-- Modern Header Section -->
+    <div class="hero-header mb-5">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="modern-title mb-2">
+                    <i class="fas fa-cog text-gradient me-3"></i>
+                    System Settings
+                </h1>
+                <p class="hero-subtitle mb-0">Configure your hospital equipment management system</p>
+            </div>
+            <div class="text-end">
+                <button type="button" class="btn btn-outline-modern" id="resetAllSettings">
+                    <i class="fas fa-undo me-2"></i>Reset Defaults
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert container -->
+    <div id="alertContainer" class="mb-4"></div>
+
+    <div class="row g-4">
+        <!-- Reminder Settings Card -->
+        <div class="col-xl-6 col-lg-12">
+            <div class="modern-card reminder-card h-100">
+                <div class="modern-card-header reminder-header">
+                    <div class="card-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-1">Reminder Settings</h5>
+                        <small class="card-subtitle">Configure maintenance notification system</small>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <!-- Multi-Threshold System Info -->
+                    <div class="info-panel mb-4">
+                        <div class="info-header">
+                            <i class="fas fa-magic me-2"></i>
+                            <span>Smart Alert System</span>
+                        </div>
+                        <div class="threshold-grid">
+                            <div class="threshold-item urgent">
+                                <div class="threshold-badge">🚨 URGENT</div>
+                                <div class="threshold-desc">Due today</div>
+                            </div>
+                            <div class="threshold-item high">
+                                <div class="threshold-badge">⚠️ HIGH</div>
+                                <div class="threshold-desc">2-7 days</div>
+                            </div>
+                            <div class="threshold-item medium">
+                                <div class="threshold-badge">⏰ MEDIUM</div>
+                                <div class="threshold-desc">8-15 days</div>
+                            </div>
+                            <div class="threshold-item low">
+                                <div class="threshold-badge">📅 LOW</div>
+                                <div class="threshold-desc">16-30 days</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduler Settings -->
+                    <div class="form-group-modern mb-4">
+                        <label class="modern-label">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Check Interval
+                        </label>
+                        <div class="input-group-modern">
+                            <input type="number" class="form-control-modern" id="schedulerInterval" 
+                                   name="scheduler_interval_hours" value="{{ settings.scheduler_interval_hours | default(24) }}" 
+                                   placeholder="24" min="1" max="168">
+                            <span class="input-suffix">hours</span>
+                        </div>
+                        <small class="form-hint">System checks for maintenance tasks every N hours</small>
+                    </div>
+
+                    <!-- Auto Reminders Toggle -->
+                    <div class="toggle-group mb-4">
+                        <div class="toggle-card">
+                            <div class="toggle-info">
+                                <div class="toggle-title">
+                                    <i class="fas fa-robot me-2"></i>
+                                    Automatic Reminders
+                                </div>
+                                <div class="toggle-desc">Enable automated notification system</div>
+                            </div>
+                            <div class="modern-switch">
+                                <input class="switch-input" type="checkbox" id="enableAutomaticReminders" 
+                                       name="enable_automatic_reminders" {% if settings.enable_automatic_reminders %}checked{% endif %}>
+                                <label class="switch-label" for="enableAutomaticReminders"></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn-modern btn-reminder w-100" id="saveReminderSettings">
+                        <i class="fas fa-save me-2"></i>Save Reminder Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Settings Card -->
+        <div class="col-xl-6 col-lg-12">
+            <div class="modern-card email-card h-100">
+                <div class="modern-card-header email-header">
+                    <div class="card-icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-1">Email Configuration</h5>
+                        <small class="card-subtitle">Manage notification recipients</small>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <!-- Primary Email -->
+                    <div class="form-group-modern mb-4">
+                        <label class="modern-label">
+                            <i class="fas fa-user me-2"></i>
+                            Primary Recipient
+                        </label>
+                        <div class="input-group-modern">
+                            <span class="input-prefix">
+                                <i class="fas fa-at"></i>
+                            </span>
+                            <input type="email" class="form-control-modern" id="receiverEmail" name="recipient_email" 
+                                   value="{{ settings.recipient_email | default('') }}" 
+                                   placeholder="admin@hospital.com">
+                        </div>
+                    </div>
+
+                    <!-- CC Emails -->
+                    <div class="form-group-modern mb-4">
+                        <label class="modern-label">
+                            <i class="fas fa-users me-2"></i>
+                            CC Recipients
+                        </label>
+                        <div class="input-group-modern">
+                            <span class="input-prefix">
+                                <i class="fas fa-copy"></i>
+                            </span>
+                            <input type="text" class="form-control-modern" id="ccEmails" name="cc_emails" 
+                                   value="{{ settings.cc_emails | default('') }}" 
+                                   placeholder="manager@hospital.com, tech@hospital.com">
+                        </div>
+                        <small class="form-hint">Separate multiple emails with commas</small>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="button-group">
+                        <button type="button" class="btn-modern btn-email" id="saveEmailSettings">
+                            <i class="fas fa-save me-2"></i>Save Settings
+                        </button>
+                        <button type="button" class="btn-modern btn-test" id="sendTestEmail">
+                            <i class="fas fa-paper-plane me-2"></i>Send Test
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Settings Card -->
+        <div class="col-12">
+            <div class="modern-card system-card">
+                <div class="modern-card-header system-header">
+                    <div class="card-icon">
+                        <i class="fas fa-cogs"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-1">Advanced Configuration</h5>
+                        <small class="card-subtitle">System-wide notification preferences</small>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <form id="settingsForm">
+                        <div class="row g-4">
+                            <!-- Email Notifications Section -->
+                            <div class="col-lg-6">
+                                <div class="settings-panel email-panel">
+                                    <div class="panel-header">
+                                        <i class="fas fa-envelope-open-text me-2"></i>
+                                        <span>Email Notifications</span>
+                                    </div>
+                                    
+                                    <!-- Email Toggle -->
+                                    <div class="toggle-group mb-3">
+                                        <div class="toggle-card">
+                                            <div class="toggle-info">
+                                                <div class="toggle-title">Email Notifications</div>
+                                                <div class="toggle-desc">Send maintenance alerts via email</div>
+                                            </div>
+                                            <div class="modern-switch">
+                                                <input class="switch-input" type="checkbox" id="emailNotificationsToggle" 
+                                                       name="email_notifications_enabled" 
+                                                       {% if settings.email_notifications_enabled %}checked{% endif %}>
+                                                <label class="switch-label" for="emailNotificationsToggle"></label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Email Send Time -->
+                                    <div class="form-group-modern mb-3">
+                                        <label class="modern-label">
+                                            <i class="fas fa-clock me-2"></i>
+                                            Daily Send Time
+                                        </label>
+                                        <div class="input-group-modern">
+                                            <span class="input-prefix">
+                                                <i class="fas fa-sun"></i>
+                                            </span>
+                                                                                         <select class="form-control-modern" id="emailSendTime" name="email_send_time_hour" title="Select daily email send time">
+                                                {% for hour in range(24) %}
+                                                <option value="{{ hour }}" {% if settings.email_send_time_hour == hour %}selected{% endif %}>
+                                                    {{ "%02d:00"|format(hour) }} ({{ "AM" if hour < 12 else "PM" }})
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <small class="form-hint">Emails sent daily at this time</small>
+                                    </div>
+
+                                    <!-- Email Interval (Legacy) -->
+                                    <div class="form-group-modern mb-3">
+                                        <label class="modern-label">
+                                            <i class="fas fa-history me-2"></i>
+                                            Legacy Interval
+                                        </label>
+                                        <div class="input-group-modern">
+                                            <input type="number" class="form-control-modern" id="emailInterval" 
+                                                   name="email_reminder_interval_minutes" 
+                                                   value="{{ settings.email_reminder_interval_minutes | default(1440) }}" 
+                                                   placeholder="1440" min="1" readonly>
+                                            <span class="input-suffix">minutes</span>
+                                        </div>
+                                        <small class="form-hint">Legacy setting - now uses daily schedule</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Push Notifications Section -->
+                            <div class="col-lg-6">
+                                <div class="settings-panel push-panel">
+                                    <div class="panel-header">
+                                        <i class="fas fa-bell me-2"></i>
+                                        <span>Push Notifications</span>
+                                    </div>
+                                    
+                                    <!-- Push Toggle -->
+                                    <div class="toggle-group mb-3">
+                                        <div class="toggle-card">
+                                            <div class="toggle-info">
+                                                <div class="toggle-title">Desktop Notifications</div>
+                                                <div class="toggle-desc">Browser push notifications</div>
+                                            </div>
+                                            <div class="modern-switch">
+                                                <input class="switch-input" type="checkbox" id="pushNotificationsToggle" 
+                                                       name="push_notifications_enabled" 
+                                                       {% if settings.push_notifications_enabled %}checked{% endif %}>
+                                                <label class="switch-label" for="pushNotificationsToggle"></label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Push Interval -->
+                                    <div class="form-group-modern mb-3">
+                                        <label class="modern-label">
+                                            <i class="fas fa-clock me-2"></i>
+                                            Check Interval
+                                        </label>
+                                        <div class="input-group-modern">
+                                            <input type="number" class="form-control-modern" id="pushInterval" 
+                                                   name="push_notification_interval_minutes" 
+                                                   value="{{ settings.push_notification_interval_minutes | default(60) }}" 
+                                                   placeholder="60" min="1">
+                                            <span class="input-suffix">minutes</span>
+                                        </div>
+                                        <small class="form-hint">Push notification check frequency</small>
+                                    </div>
+                                    
+                                    <!-- Test Push Button -->
+                                    <div class="form-group-modern">
+                                        <button type="button" class="btn-modern btn-test w-100" id="sendTestPush">
+                                            <i class="fas fa-bell me-2"></i>Test Push Notification
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <div class="form-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Changes take effect immediately
+                            </div>
+                            <button type="submit" class="btn-modern btn-system" id="saveSettingsButton">
+                                <i class="fas fa-save me-2"></i>Save System Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backup & Restore Section -->
+        <div class="col-12">
+            <div class="modern-card backup-card">
+                <div class="modern-card-header backup-header">
+                    <div class="card-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div>
+                        <h5 class="card-title mb-1">Backup & Restore</h5>
+                        <small class="card-subtitle">Protect your data with automated and manual backups</small>
+                    </div>
+                </div>
+                <div class="modern-card-body">
+                    <div class="row g-4">
+                        <!-- Manual Backup Options -->
+                        <div class="col-md-6">
+                            <div class="settings-panel backup-manual-panel">
+                                <div class="panel-header">
+                                    <i class="fas fa-download me-2"></i>
+                                    <span>Manual Backup</span>
+                                </div>
+                                
+                                <!-- Full Backup -->
+                                <div class="backup-option mb-3">
+                                    <div class="backup-info">
+                                        <div class="backup-title">
+                                            <i class="fas fa-archive me-2"></i>
+                                            Full Application Backup
+                                        </div>
+                                        <div class="backup-desc">Complete system backup including all files and data</div>
+                                    </div>
+                                    <form action="{{ url_for('views.create_full_backup') }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn-modern btn-backup-full" id="createFullBackup">
+                                            <i class="fas fa-download me-2"></i>Create Full Backup
+                                        </button>
+                                    </form>
+                                </div>
+                                
+                                <!-- Settings Backup -->
+                                <div class="backup-option">
+                                    <div class="backup-info">
+                                        <div class="backup-title">
+                                            <i class="fas fa-cog me-2"></i>
+                                            Settings Backup
+                                        </div>
+                                        <div class="backup-desc">Backup only system configuration and settings</div>
+                                    </div>
+                                    <form action="{{ url_for('views.create_settings_backup') }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn-modern btn-backup-settings" id="createSettingsBackup">
+                                            <i class="fas fa-cog me-2"></i>Create Settings Backup
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Automatic Backup Configuration -->
+                        <div class="col-md-6">
+                            <div class="settings-panel backup-auto-panel">
+                                <div class="panel-header">
+                                    <i class="fas fa-magic me-2"></i>
+                                    <span>Automatic Backup</span>
+                                </div>
+                                
+                                <form action="{{ url_for('views.save_settings_page') }}" method="POST">
+                                    <!-- Enable Automatic Backup -->
+                                    <div class="toggle-group mb-3">
+                                        <div class="toggle-card">
+                                            <div class="toggle-info">
+                                                <div class="toggle-title">Auto Backup</div>
+                                                <div class="toggle-desc">Scheduled automatic backups</div>
+                                            </div>
+                                            <div class="modern-switch">
+                                                <input class="switch-input" type="checkbox" id="automaticBackupToggle" 
+                                                       name="automatic_backup_enabled" 
+                                                       {% if settings.automatic_backup_enabled %}checked{% endif %}>
+                                                <label class="switch-label" for="automaticBackupToggle"></label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Backup Interval -->
+                                    <div class="form-group-modern mb-3">
+                                        <label class="modern-label">
+                                            <i class="fas fa-clock me-2"></i>
+                                            Backup Interval
+                                        </label>
+                                        <div class="input-group-modern">
+                                            <input type="number" class="form-control-modern" id="backupInterval" 
+                                                   name="automatic_backup_interval_hours" 
+                                                   value="{{ settings.automatic_backup_interval_hours | default(24) }}" 
+                                                   placeholder="24" min="1" max="168">
+                                            <span class="input-suffix">hours</span>
+                                        </div>
+                                        <small class="form-hint">Automatic backup frequency (1-168 hours)</small>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn-modern btn-backup-auto w-100">
+                                        <i class="fas fa-save me-2"></i>Save Backup Settings
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup List -->
+                    <div class="backup-list-section">
+                        <div class="section-divider"></div>
+                        <div class="backup-list-header">
+                            <div class="backup-list-title">
+                                <i class="fas fa-list me-2"></i>
+                                Available Backups
+                            </div>
+                            <button type="button" class="btn-modern btn-refresh" id="refreshBackups">
+                                <i class="fas fa-sync me-2"></i>Refresh
+                            </button>
+                        </div>
+                        
+                        <div id="backupList" class="backup-list-container">
+                            <div class="loading-state">
+                                <div class="loading-spinner"></div>
+                                <p class="loading-text">Loading backups...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modern Styles -->
+<style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --backup-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    
+    --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    --card-shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.15);
+    --border-radius: 20px;
+    --border-radius-small: 12px;
+    
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --text-muted: #a0aec0;
+    
+    --bg-light: #f8fafc;
+    --bg-white: #ffffff;
+}
+
+/* Hero Header */
+.hero-header {
+    background: var(--primary-gradient);
+    padding: 2rem;
+    border-radius: var(--border-radius);
+    color: white;
+    margin-bottom: 2rem;
+    box-shadow: var(--card-shadow);
+}
+
+.modern-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.hero-subtitle {
+    font-size: 1.2rem;
+    opacity: 0.9;
+}
+
+.text-gradient {
+    background: linear-gradient(45deg, #fff, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.btn-outline-modern {
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius-small);
+    transition: all 0.3s ease;
+}
+
+.btn-outline-modern:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Modern Cards */
+.modern-card {
+    background: var(--bg-white);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border: none;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.modern-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.modern-card-header {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: white;
+    position: relative;
+    overflow: hidden;
+}
+
+.modern-card-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.1;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), transparent);
+}
+
+.reminder-header {
+    background: var(--primary-gradient);
+}
+
+.email-header {
+    background: var(--success-gradient);
+}
+
+.system-header {
+    background: var(--info-gradient);
+}
+
+.backup-header {
+    background: var(--backup-gradient);
+}
+
+.card-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.card-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.card-subtitle {
+    opacity: 0.9;
+    font-size: 0.9rem;
+}
+
+.modern-card-body {
+    padding: 2rem;
+}
+
+/* Info Panel */
+.info-panel {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: var(--border-radius-small);
+    padding: 1.5rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.info-header {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.threshold-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+}
+
+.threshold-item {
+    text-align: center;
+    padding: 1rem;
+    border-radius: var(--border-radius-small);
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease;
+}
+
+.threshold-item:hover {
+    transform: translateY(-2px);
+}
+
+.threshold-badge {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.threshold-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.urgent { border-left: 4px solid #e53e3e; }
+.high { border-left: 4px solid #dd6b20; }
+.medium { border-left: 4px solid #d69e2e; }
+.low { border-left: 4px solid #38a169; }
+
+/* Form Elements */
+.form-group-modern {
+    margin-bottom: 1.5rem;
+}
+
+.modern-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    display: block;
+    font-size: 1rem;
+}
+
+.input-group-modern {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.form-control-modern {
+    flex: 1;
+    padding: 0.875rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: var(--border-radius-small);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.form-control-modern:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-prefix, .input-suffix {
+    padding: 0.875rem 1rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.input-prefix {
+    border-right: none;
+    border-radius: var(--border-radius-small) 0 0 var(--border-radius-small);
+}
+
+.input-suffix {
+    border-left: none;
+    border-radius: 0 var(--border-radius-small) var(--border-radius-small) 0;
+}
+
+.form-hint {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    display: block;
+}
+
+/* Modern Switches */
+.toggle-group {
+    margin-bottom: 1rem;
+}
+
+.toggle-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem;
+    background: #f8fafc;
+    border-radius: var(--border-radius-small);
+    border: 2px solid #e2e8f0;
+    transition: all 0.3s ease;
+}
+
+.toggle-card:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e0;
+}
+
+.toggle-info {
+    flex: 1;
+}
+
+.toggle-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.toggle-desc {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.modern-switch {
+    position: relative;
+}
+
+.switch-input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-label {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 32px;
+    background: #cbd5e0;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.switch-label::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.switch-input:checked + .switch-label {
+    background: var(--primary-gradient);
+}
+
+.switch-input:checked + .switch-label::after {
+    transform: translateX(28px);
+}
+
+/* Modern Buttons */
+.btn-modern {
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius-small);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-modern:hover::before {
+    left: 100%;
+}
+
+.btn-reminder {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.btn-email {
+    background: var(--success-gradient);
+    color: white;
+}
+
+.btn-test {
+    background: var(--warning-gradient);
+    color: white;
+}
+
+.btn-system {
+    background: var(--info-gradient);
+    color: white;
+}
+
+.btn-backup-full {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-backup-settings {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.btn-backup-auto {
+    background: var(--backup-gradient);
+    color: white;
+}
+
+.btn-refresh {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Settings Panels */
+.settings-panel {
+    background: #f8fafc;
+    border-radius: var(--border-radius-small);
+    padding: 1.5rem;
+    border: 2px solid #e2e8f0;
+    height: 100%;
+}
+
+.panel-header {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e2e8f0;
+}
+
+.form-info {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* Backup Specific Styles */
+.backup-option {
+    padding: 1rem;
+    background: white;
+    border-radius: var(--border-radius-small);
+    border: 2px solid #e2e8f0;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.backup-option:hover {
+    border-color: #cbd5e0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.backup-info {
+    margin-bottom: 1rem;
+}
+
+.backup-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.backup-desc {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.backup-list-section {
+    margin-top: 2rem;
+}
+
+.section-divider {
+    height: 2px;
+    background: linear-gradient(90deg, #e2e8f0, #cbd5e0, #e2e8f0);
+    margin: 2rem 0;
+    border-radius: 1px;
+}
+
+.backup-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.backup-list-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.backup-list-container {
+    background: white;
+    border-radius: var(--border-radius-small);
+    border: 2px solid #e2e8f0;
+    min-height: 200px;
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-text {
+    margin-top: 1rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .modern-title {
+        font-size: 2rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+    
+    .modern-card-body {
+        padding: 1.5rem;
+    }
+    
+    .threshold-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .button-group {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .backup-list-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+}
+
+/* Animation for alerts */
+.alert {
+    animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Loading state for buttons */
+.btn-modern.loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.btn-modern.loading::after {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    margin-left: -10px;
+    margin-top: -10px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/settings.js') }}?v={{ range(1, 10000) | random }}"></script>
+{% endblock %}

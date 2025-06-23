@@ -5,7 +5,17 @@
 {% endblock %}
 
 {% block content %}
-    <h2>{{ data_type.upper() }} Equipment List</h2>
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="page-title me-3">{{ data_type.upper() }} Equipment List</h1>
+        <div class="record-counter-wrapper">
+            <span class="badge record-counter" id="totalRecordsBadge">
+                <i class="fas fa-database me-1"></i>
+                <span id="totalRecordsCount">{{ equipment|length if equipment else 0 }}</span>
+                <span class="counter-label">records</span>
+            </span>
+        </div>
+    </div>
+    <!-- Action Buttons Row -->
     <div class="row mb-3">
         <div class="col-md-auto">
             {% if data_type == 'ppm' %}
@@ -32,25 +42,260 @@
                 Delete Selected (<span id="selectedCount">0</span>)
             </button>
         </div>
-        <div class="col-md-auto">
-            <select id="filterSelect" class="form-select d-inline-block" style="width: auto;">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="inactive">Inactive</option>
-            </select>
-        </div>
-        <div class="col-md-auto">
-            <select id="sortSelect" class="form-select d-inline-block" style="width: auto;">
-                <option value="">Sort By...</option>
-                <option value="EQUIPMENT">Equipment</option>
-                <option value="MODEL">Model</option>
-                <option value="SERIAL">Serial</option>
-                <option value="MANUFACTURER">Manufacturer</option>
-            </select>
-        </div>
         <div class="col-md-auto ms-auto">
-            <input type="text" id="searchInput" class="form-control d-inline-block" style="width: auto;" placeholder="Search...">
+            <button id="toggleFiltersBtn" class="btn btn-outline-primary">
+                <i class="fas fa-filter me-2"></i>Advanced Filters
+                <i class="fas fa-chevron-down filter-toggle-icon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Advanced Filters Panel -->
+    <div id="advancedFiltersPanel" class="card mb-4" style="display: none;">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Column Filters
+                </h5>
+                <div>
+                    <button id="clearAllFilters" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="fas fa-times me-1"></i>Clear All
+                    </button>
+                    <button id="applyFilters" class="btn btn-sm btn-primary">
+                        <i class="fas fa-check me-1"></i>Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Basic Information Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterDepartment" class="form-label fw-semibold">Department</label>
+                    <select id="filterDepartment" class="form-select column-filter" data-column="Department">
+                        <option value="">All Departments</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterName" class="form-label fw-semibold">Equipment Name</label>
+                    <input type="text" id="filterName" class="form-control column-filter" data-column="Name" placeholder="Filter by name...">
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterModel" class="form-label fw-semibold">Model</label>
+                    <input type="text" id="filterModel" class="form-control column-filter" data-column="Model" placeholder="Filter by model...">
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterSerial" class="form-label fw-semibold">Serial Number</label>
+                    <input type="text" id="filterSerial" class="form-control column-filter" data-column="Serial" placeholder="Filter by serial...">
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterManufacturer" class="form-label fw-semibold">Manufacturer</label>
+                    <select id="filterManufacturer" class="form-select column-filter" data-column="Manufacturer">
+                        <option value="">All Manufacturers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterLogNumber" class="form-label fw-semibold">Log Number</label>
+                    <input type="text" id="filterLogNumber" class="form-control column-filter" data-column="Log_Number" placeholder="Filter by log number...">
+                </div>
+                
+                <!-- Date Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterInstallationDate" class="form-label fw-semibold">
+                        <i class="fas fa-tools me-2 text-info"></i>Installation Date
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar-alt text-info"></i>
+                        </span>
+                        <input type="text" id="filterInstallationDate" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Installation_Date" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterWarrantyEnd" class="form-label fw-semibold">
+                        <i class="fas fa-shield-alt me-2 text-warning"></i>Warranty End
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar-times text-warning"></i>
+                        </span>
+                        <input type="text" id="filterWarrantyEnd" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Warranty_End" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+
+                {% if data_type == 'ppm' %}
+                <!-- PPM Quarter Filters -->
+                <div class="col-12">
+                    <hr class="my-3">
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-calendar-alt me-2"></i>Quarter Filters
+                    </h6>
+                </div>
+                
+                <!-- Q1 Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ1Date" class="form-label fw-semibold">
+                        <i class="fas fa-calendar-day me-2 text-primary"></i>Q1 Date
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar text-primary"></i>
+                        </span>
+                        <input type="text" id="filterQ1Date" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Q1" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ1Engineer" class="form-label fw-semibold">Q1 Engineer</label>
+                    <select id="filterQ1Engineer" class="form-select column-filter" data-column="Eng1">
+                        <option value="">All Engineers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ1Status" class="form-label fw-semibold">Q1 Status</label>
+                    <select id="filterQ1Status" class="form-select column-filter" data-column="Q1_Status">
+                        <option value="">All Status</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+                
+                <!-- Q2 Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ2Date" class="form-label fw-semibold">
+                        <i class="fas fa-calendar-day me-2 text-success"></i>Q2 Date
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar text-success"></i>
+                        </span>
+                        <input type="text" id="filterQ2Date" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Q2" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ2Engineer" class="form-label fw-semibold">Q2 Engineer</label>
+                    <select id="filterQ2Engineer" class="form-select column-filter" data-column="Eng2">
+                        <option value="">All Engineers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ2Status" class="form-label fw-semibold">Q2 Status</label>
+                    <select id="filterQ2Status" class="form-select column-filter" data-column="Q2_Status">
+                        <option value="">All Status</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+                
+                <!-- Q3 Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ3Date" class="form-label fw-semibold">
+                        <i class="fas fa-calendar-day me-2 text-warning"></i>Q3 Date
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar text-warning"></i>
+                        </span>
+                        <input type="text" id="filterQ3Date" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Q3" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ3Engineer" class="form-label fw-semibold">Q3 Engineer</label>
+                    <select id="filterQ3Engineer" class="form-select column-filter" data-column="Eng3">
+                        <option value="">All Engineers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ3Status" class="form-label fw-semibold">Q3 Status</label>
+                    <select id="filterQ3Status" class="form-select column-filter" data-column="Q3_Status">
+                        <option value="">All Status</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+                
+                <!-- Q4 Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ4Date" class="form-label fw-semibold">
+                        <i class="fas fa-calendar-day me-2 text-danger"></i>Q4 Date
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0">
+                            <i class="fas fa-calendar text-danger"></i>
+                        </span>
+                        <input type="text" id="filterQ4Date" 
+                               class="form-control border-start-0 column-filter modern-date-picker" 
+                               data-column="Q4" placeholder="dd/mm/yyyy" autocomplete="off">
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ4Engineer" class="form-label fw-semibold">Q4 Engineer</label>
+                    <select id="filterQ4Engineer" class="form-select column-filter" data-column="Eng4">
+                        <option value="">All Engineers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterQ4Status" class="form-label fw-semibold">Q4 Status</label>
+                    <select id="filterQ4Status" class="form-select column-filter" data-column="Q4_Status">
+                        <option value="">All Status</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+                {% elif data_type == 'ocm' %}
+                <!-- OCM Specific Filters -->
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterServiceDate" class="form-label fw-semibold">Service Date</label>
+                    <input type="date" id="filterServiceDate" class="form-control column-filter" data-column="Service_Date">
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterNextMaintenance" class="form-label fw-semibold">Next Maintenance</label>
+                    <input type="date" id="filterNextMaintenance" class="form-control column-filter" data-column="Next_Maintenance">
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterEngineer" class="form-label fw-semibold">Engineer</label>
+                    <select id="filterEngineer" class="form-select column-filter" data-column="Engineer">
+                        <option value="">All Engineers</option>
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-4 col-xl-3">
+                    <label for="filterStatus" class="form-label fw-semibold">Status</label>
+                    <select id="filterStatus" class="form-select column-filter" data-column="Status">
+                        <option value="">All Status</option>
+                        <option value="Active">Active</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Filter Summary -->
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div id="filterSummary" class="alert alert-info" style="display: none;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <span id="filterSummaryText">No filters applied</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -61,36 +306,112 @@
                     <tr>
                         <th class="text-center">
                             <div class="form-check">
-                                <input type="checkbox" class="form-check-input" id="selectAll">
+                                <input type="checkbox" class="form-check-input" id="selectAll" aria-label="Select all items">
                                 <label class="form-check-label" for="selectAll"></label>
                             </div>
                         </th>
-                        <th>NO</th>
-                        <th>Department</th>
-                        <th>Name</th>
-                        <th>Model</th>
-                        <th>Serial</th>
-                        <th>Manufacturer</th>
-                        <th>Log Number</th>
-                        <th>Installation Date</th>
-                        <th>Warranty End</th>
+                        <th class="sortable" data-sort="NO">
+                            NO
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Department">
+                            Department
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Name">
+                            Name
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Model">
+                            Model
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Serial">
+                            Serial
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Manufacturer">
+                            Manufacturer
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Log_Number">
+                            Log Number
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Installation_Date">
+                            Installation Date
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
+                        <th class="sortable" data-sort="Warranty_End">
+                            Warranty End
+                            <i class="fas fa-sort sort-icon"></i>
+                        </th>
                         {% if data_type == 'ppm' %}
-                            <th>Q1</th>
-                            <th>Eng1</th>
-                            <th>Q1 Status</th>
-                            <th>Q2</th>
-                            <th>Eng2</th>
-                            <th>Q2 Status</th>
-                            <th>Q3</th>
-                            <th>Eng3</th>
-                            <th>Q3 Status</th>
-                            <th>Q4</th>
-                            <th>Eng4</th>
-                            <th>Q4 Status</th>                        {% elif data_type == 'ocm' %}
-                            <th>Service Date</th>
-                            <th>Next Maintenance</th>
-                            <th>Engineer</th>
-                            <th>Status</th>
+                            <th class="sortable" data-sort="Q1">
+                                Q1
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Eng1">
+                                Eng1
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q1_Status">
+                                Q1 Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q2">
+                                Q2
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Eng2">
+                                Eng2
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q2_Status">
+                                Q2 Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q3">
+                                Q3
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Eng3">
+                                Eng3
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q3_Status">
+                                Q3 Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q4">
+                                Q4
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Eng4">
+                                Eng4
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Q4_Status">
+                                Q4 Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                        {% elif data_type == 'ocm' %}
+                            <th class="sortable" data-sort="Service_Date">
+                                Service Date
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Next_Maintenance">
+                                Next Maintenance
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Engineer">
+                                Engineer
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
+                            <th class="sortable" data-sort="Status">
+                                Status
+                                <i class="fas fa-sort sort-icon"></i>
+                            </th>
                         {% endif %}
                         <th>Actions</th>
                     </tr>
@@ -104,42 +425,41 @@
                                 </div>
                             </td>                            {% if data_type == 'ppm' %}
                                 <td>{{ entry.NO }}</td>
-                                <td>{{ entry.get('Department', '') }}</td>
-                                <td>{{ entry.get('Name', '') }}</td>
-                                <td>{{ entry.get('MODEL', '') }}</td>
-                                <td>{{ entry.get('SERIAL', '') }}</td>
-                                <td>{{ entry.get('MANUFACTURER', '') }}</td>
-                                <td>{{ entry.get('LOG_Number', '') }}</td>
-                                <td>{{ entry.get('Installation_Date', '') }}</td>                            {% else %}
+                                <td>{{ entry.get('Department', 'N/A') if entry.get('Department') else 'N/A' }}</td>
+                                <td>{{ entry.get('Name', 'N/A') if entry.get('Name') else 'N/A' }}</td>
+                                <td>{{ entry.get('MODEL', 'N/A') if entry.get('MODEL') else 'N/A' }}</td>
+                                <td>{{ entry.get('SERIAL', 'N/A') if entry.get('SERIAL') else 'N/A' }}</td>
+                                <td>{{ entry.get('MANUFACTURER', 'N/A') if entry.get('MANUFACTURER') else 'N/A' }}</td>
+                                <td>{{ entry.get('LOG_Number', 'N/A') if entry.get('LOG_Number') else 'N/A' }}</td>
+                                <td>{{ entry.get('Installation_Date', 'N/A') if entry.get('Installation_Date') else 'N/A' }}</td>                            {% else %}
                                 <td>{{ entry.get('NO', loop.index) }}</td>
-                                <td>{{ entry.get('Department', '') }}</td>
-                                <td>{{ entry.get('Name', '') }}</td>
-                                <td>{{ entry.get('Model', '') }}</td>
-                                <td>{{ entry.get('Serial', '') }}</td>
-                                <td>{{ entry.get('Manufacturer', '') }}</td>
-                                <td>{{ entry.get('Log_Number', '') }}</td>
-                                <td>{{ entry.get('Installation_Date', '') }}</td>
+                                <td>{{ entry.get('Department', 'N/A') if entry.get('Department') else 'N/A' }}</td>
+                                <td>{{ entry.get('Name', 'N/A') if entry.get('Name') else 'N/A' }}</td>
+                                <td>{{ entry.get('Model', 'N/A') if entry.get('Model') else 'N/A' }}</td>
+                                <td>{{ entry.get('Serial', 'N/A') if entry.get('Serial') else 'N/A' }}</td>
+                                <td>{{ entry.get('Manufacturer', 'N/A') if entry.get('Manufacturer') else 'N/A' }}</td>
+                                <td>{{ entry.get('Log_Number', 'N/A') if entry.get('Log_Number') else 'N/A' }}</td>
+                                <td>{{ entry.get('Installation_Date', 'N/A') if entry.get('Installation_Date') else 'N/A' }}</td>
                             {% endif %}                            
-                            <td>{{ entry.get('Warranty_End', '') }}</td>
+                            <td>{{ entry.get('Warranty_End', 'N/A') if entry.get('Warranty_End') else 'N/A' }}</td>
 
                             {% if data_type == 'ppm' %}
-                                <td>{{ entry.get('PPM_Q_I', {}).get('quarter_date', '') }}</td>
-                                <td>{{ entry.get('PPM_Q_I', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_I', {}).get('quarter_date', 'N/A') if entry.get('PPM_Q_I', {}).get('quarter_date') else 'N/A' }}</td>
+                                <td>{{ entry.get('PPM_Q_I', {}).get('engineer', 'N/A') if entry.get('PPM_Q_I', {}).get('engineer') else 'N/A' }}</td>
                                 <td><span class="badge bg-{{ entry.get('PPM_Q_I', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_I', {}).get('status', 'N/A') }}</span></td>
-                                <td>{{ entry.get('PPM_Q_II', {}).get('quarter_date', '') }}</td>
-                                <td>{{ entry.get('PPM_Q_II', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_II', {}).get('quarter_date', 'N/A') if entry.get('PPM_Q_II', {}).get('quarter_date') else 'N/A' }}</td>
+                                <td>{{ entry.get('PPM_Q_II', {}).get('engineer', 'N/A') if entry.get('PPM_Q_II', {}).get('engineer') else 'N/A' }}</td>
                                 <td><span class="badge bg-{{ entry.get('PPM_Q_II', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_II', {}).get('status', 'N/A') }}</span></td>
-                                <td>{{ entry.get('PPM_Q_III', {}).get('quarter_date', '') }}</td>
-                                <td>{{ entry.get('PPM_Q_III', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_III', {}).get('quarter_date', 'N/A') if entry.get('PPM_Q_III', {}).get('quarter_date') else 'N/A' }}</td>
+                                <td>{{ entry.get('PPM_Q_III', {}).get('engineer', 'N/A') if entry.get('PPM_Q_III', {}).get('engineer') else 'N/A' }}</td>
                                 <td><span class="badge bg-{{ entry.get('PPM_Q_III', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_III', {}).get('status', 'N/A') }}</span></td>
-                                <td>{{ entry.get('PPM_Q_IV', {}).get('quarter_date', '') }}</td>
-                                <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', '') }}</td>
+                                <td>{{ entry.get('PPM_Q_IV', {}).get('quarter_date', 'N/A') if entry.get('PPM_Q_IV', {}).get('quarter_date') else 'N/A' }}</td>
+                                <td>{{ entry.get('PPM_Q_IV', {}).get('engineer', 'N/A') if entry.get('PPM_Q_IV', {}).get('engineer') else 'N/A' }}</td>
                                 <td><span class="badge bg-{{ entry.get('PPM_Q_IV', {}).get('status_class', 'secondary') }}">{{ entry.get('PPM_Q_IV', {}).get('status', 'N/A') }}</span></td>
-                                <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
                             {% elif data_type == 'ocm' %}
-                                <td>{{ entry.get('Service_Date', '') }}</td>
-                                <td>{{ entry.get('Next_Maintenance', '') }}</td>
-                                <td>{{ entry.get('Engineer', '') }}</td>
+                                <td>{{ entry.get('Service_Date', 'N/A') if entry.get('Service_Date') else 'N/A' }}</td>
+                                <td>{{ entry.get('Next_Maintenance', 'N/A') if entry.get('Next_Maintenance') else 'N/A' }}</td>
+                                <td>{{ entry.get('Engineer', 'N/A') if entry.get('Engineer') else 'N/A' }}</td>
                                 <td><span class="badge bg-{{ entry.get('status_class', 'secondary') }}">{{ entry.get('Status', 'N/A') }}</span></td>
                             {% endif %}
                             <td>
@@ -172,4 +492,960 @@
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/equipment_list.js') }}"></script>
+
+<style>
+/* Record Counter Styles */
+.record-counter-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.record-counter {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    border-radius: 25px;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    transition: all 0.3s ease;
+    animation: pulse-glow 2s infinite alternate;
+}
+
+.record-counter:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+.record-counter i {
+    margin-right: 6px;
+    font-size: 0.8rem;
+}
+
+.counter-label {
+    margin-left: 4px;
+    font-weight: 500;
+    opacity: 0.9;
+}
+
+#totalRecordsCount {
+    font-weight: 700;
+    font-size: 1rem;
+    margin: 0 2px;
+}
+
+/* Pulse glow animation */
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    }
+    100% {
+        box-shadow: 0 2px 12px rgba(0, 123, 255, 0.5);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .d-flex.align-items-center.mb-4 {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .page-title {
+        margin-bottom: 10px !important;
+        margin-right: 0 !important;
+    }
+    
+    .record-counter-wrapper {
+        align-self: flex-start;
+    }
+    
+    .record-counter {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+    }
+}
+
+/* Update counter when table changes */
+.table-update-animation {
+    animation: tableUpdate 0.5s ease-in-out;
+}
+
+@keyframes tableUpdate {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Counter update animation */
+.counter-update {
+    animation: counterBounce 0.6s ease-in-out;
+}
+
+@keyframes counterBounce {
+    0% { transform: scale(1); }
+    25% { transform: scale(1.1); }
+    50% { transform: scale(0.95); }
+    75% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Enhanced Table Header Styles */
+.equipment-table {
+    font-size: 0.9rem;
+}
+
+.equipment-table thead th {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-align: center;
+    vertical-align: middle;
+    border-bottom: 3px solid #4f46e5;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    
+    /* Single line text - no wrapping */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    
+    /* Dynamic padding based on content */
+    padding: 15px 10px;
+    min-width: -webkit-fill-available; /* Samsung Internet support */
+    min-width: fit-content;
+    
+    /* Modern gradient border */
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Sortable column styles */
+.equipment-table thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+    position: relative;
+    padding-right: 25px; /* Space for sort icon */
+}
+
+.equipment-table thead th.sortable:hover {
+    background: linear-gradient(135deg, #5a67d8, #667eea);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.equipment-table thead th.sortable:active {
+    transform: translateY(0);
+}
+
+/* Sort icon styles */
+.sort-icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+}
+
+.equipment-table thead th.sortable:hover .sort-icon {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* Active sort states */
+.equipment-table thead th.sortable.sort-asc {
+    background: linear-gradient(135deg, #48bb78, #38a169);
+}
+
+.equipment-table thead th.sortable.sort-asc .sort-icon::before {
+    content: "\f0de"; /* fa-sort-up */
+    opacity: 1;
+}
+
+.equipment-table thead th.sortable.sort-desc {
+    background: linear-gradient(135deg, #ed8936, #dd6b20);
+}
+
+.equipment-table thead th.sortable.sort-desc .sort-icon::before {
+    content: "\f0dd"; /* fa-sort-down */
+    opacity: 1;
+}
+
+/* Specific column width adjustments */
+.equipment-table thead th:nth-child(1) { /* Checkbox */
+    width: 50px;
+    padding: 12px 4px;
+}
+
+.equipment-table thead th:nth-child(2) { /* NO */
+    width: 60px;
+    padding: 12px 6px;
+}
+
+.equipment-table thead th:nth-child(3) { /* Department */
+    min-width: 100px;
+    padding: 12px 10px;
+}
+
+.equipment-table thead th:nth-child(4) { /* Name */
+    min-width: 120px;
+    padding: 12px 12px;
+}
+
+.equipment-table thead th:nth-child(5) { /* Model */
+    min-width: 100px;
+    padding: 12px 10px;
+}
+
+.equipment-table thead th:nth-child(6) { /* Serial */
+    min-width: 100px;
+    padding: 12px 10px;
+}
+
+.equipment-table thead th:nth-child(7) { /* Manufacturer */
+    min-width: 120px;
+    padding: 12px 12px;
+}
+
+.equipment-table thead th:nth-child(8) { /* Log Number */
+    min-width: 110px;
+    padding: 12px 12px;
+}
+
+.equipment-table thead th:nth-child(9) { /* Installation Date */
+    min-width: 130px;
+    padding: 12px 14px;
+}
+
+.equipment-table thead th:nth-child(10) { /* Warranty End */
+    min-width: 120px;
+    padding: 12px 12px;
+}
+
+/* Quarter columns (Q1, Q2, Q3, Q4) */
+.equipment-table thead th:nth-child(11),
+.equipment-table thead th:nth-child(14),
+.equipment-table thead th:nth-child(17),
+.equipment-table thead th:nth-child(20) {
+    width: 80px;
+    padding: 12px 8px;
+}
+
+/* Engineer columns */
+.equipment-table thead th:nth-child(12),
+.equipment-table thead th:nth-child(15),
+.equipment-table thead th:nth-child(18),
+.equipment-table thead th:nth-child(21) {
+    min-width: 90px;
+    padding: 12px 10px;
+}
+
+/* Status columns */
+.equipment-table thead th:nth-child(13),
+.equipment-table thead th:nth-child(16),
+.equipment-table thead th:nth-child(19),
+.equipment-table thead th:nth-child(22) {
+    min-width: 95px;
+    padding: 12px 10px;
+}
+
+/* Actions column */
+.equipment-table thead th:last-child {
+    min-width: 120px;
+    padding: 12px 12px;
+}
+
+/* Table body cell alignment */
+.equipment-table tbody td {
+    vertical-align: middle;
+    padding: 12px 10px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+    transition: background-color 0.2s ease;
+}
+
+/* Modern table row hover effect */
+.equipment-table tbody tr:hover {
+    background: linear-gradient(135deg, #f7fafc, #edf2f7);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Alternating row colors */
+.equipment-table tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.equipment-table tbody tr:nth-child(even):hover {
+    background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+}
+
+/* Responsive table improvements */
+@media (max-width: 1200px) {
+    .equipment-table {
+        font-size: 0.8rem;
+    }
+    
+    .equipment-table thead th {
+        font-size: 0.75rem;
+        padding: 10px 6px;
+    }
+    
+    .equipment-table tbody td {
+        padding: 8px 6px;
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 992px) {
+    .equipment-table thead th {
+        font-size: 0.7rem;
+        padding: 8px 4px;
+    }
+    
+    .equipment-table tbody td {
+        padding: 6px 4px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Tooltip for truncated text */
+.equipment-table thead th[title] {
+    cursor: help;
+}
+
+/* Better scrollbar for table */
+.table-responsive {
+    scrollbar-width: thin;
+    scrollbar-color: #007bff #f8f9fa;
+}
+
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #007bff;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #0056b3;
+}
+
+/* Advanced Filters Panel Styling */
+#advancedFiltersPanel {
+    border: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+#advancedFiltersPanel .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-bottom: none;
+    color: white;
+}
+
+#advancedFiltersPanel .card-header h5 {
+    font-weight: 600;
+    margin: 0;
+}
+
+#advancedFiltersPanel .card-body {
+    background: #f8f9fa;
+    padding: 2rem;
+}
+
+.column-filter {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.column-filter:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    outline: none;
+}
+
+.column-filter:hover {
+    border-color: #ced4da;
+}
+
+#filterSummary {
+    border-radius: 8px;
+    border: none;
+    font-weight: 500;
+}
+
+#filterSummary.alert-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+    border-left: 4px solid #28a745;
+}
+
+#filterSummary.alert-info {
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    color: #0c5460;
+    border-left: 4px solid #17a2b8;
+}
+
+/* Filter Toggle Button */
+#toggleFiltersBtn {
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: 2px solid #667eea;
+}
+
+#toggleFiltersBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+#toggleFiltersBtn.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+}
+
+.filter-toggle-icon {
+    transition: transform 0.2s ease;
+}
+
+/* Responsive adjustments for filters */
+@media (max-width: 768px) {
+    #advancedFiltersPanel .card-body {
+        padding: 1rem;
+    }
+    
+    .column-filter {
+        font-size: 0.85rem;
+    }
+    
+    #toggleFiltersBtn {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+}
+</style>
+
+<script>
+// Advanced Filtering System
+let activeFilters = {};
+let isFilterPanelOpen = false;
+
+// Function to update the record counter
+function updateRecordCounter() {
+    const visibleRows = document.querySelectorAll('.equipment-table tbody tr:not([style*="display: none"])');
+    const totalCount = visibleRows.length;
+    const counterElement = document.getElementById('totalRecordsCount');
+    const badgeElement = document.getElementById('totalRecordsBadge');
+    
+    if (counterElement) {
+        // Add animation class
+        badgeElement.classList.add('counter-update');
+        
+        // Update the count
+        counterElement.textContent = totalCount;
+        
+        // Remove animation class after animation completes
+        setTimeout(() => {
+            badgeElement.classList.remove('counter-update');
+        }, 600);
+    }
+}
+
+// Toggle advanced filters panel
+function toggleFiltersPanel() {
+    const panel = document.getElementById('advancedFiltersPanel');
+    const button = document.getElementById('toggleFiltersBtn');
+    const icon = button.querySelector('.filter-toggle-icon');
+    
+    if (isFilterPanelOpen) {
+        panel.style.display = 'none';
+        icon.classList.remove('fa-chevron-up');
+        icon.classList.add('fa-chevron-down');
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-outline-primary');
+        isFilterPanelOpen = false;
+    } else {
+        panel.style.display = 'block';
+        icon.classList.remove('fa-chevron-down');
+        icon.classList.add('fa-chevron-up');
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-primary');
+        isFilterPanelOpen = true;
+        
+        // Populate dropdown options when panel opens
+        populateFilterDropdowns();
+    }
+}
+
+// Populate dropdown filter options from table data
+function populateFilterDropdowns() {
+    const rows = document.querySelectorAll('.equipment-table tbody tr');
+    const dropdowns = {
+        'filterDepartment': new Set(),
+        'filterManufacturer': new Set(),
+        'filterQ1Engineer': new Set(),
+        'filterQ2Engineer': new Set(),
+        'filterQ3Engineer': new Set(),
+        'filterQ4Engineer': new Set(),
+        'filterEngineer': new Set() // For OCM
+    };
+    
+    // Column mappings for data extraction
+    const columnMappings = {
+        'Department': 2,
+        'Manufacturer': 6,
+        'Q1_Engineer': 11,
+        'Q2_Engineer': 14,
+        'Q3_Engineer': 17,
+        'Q4_Engineer': 20,
+        'Engineer': 14 // For OCM
+    };
+    
+    rows.forEach(row => {
+        // Department
+        const deptCell = row.cells[columnMappings.Department];
+        if (deptCell && deptCell.textContent.trim() !== 'N/A') {
+            dropdowns.filterDepartment.add(deptCell.textContent.trim());
+        }
+        
+        // Manufacturer
+        const mfgCell = row.cells[columnMappings.Manufacturer];
+        if (mfgCell && mfgCell.textContent.trim() !== 'N/A') {
+            dropdowns.filterManufacturer.add(mfgCell.textContent.trim());
+        }
+        
+        // Engineers (PPM)
+        if (row.cells.length > 20) { // PPM table
+            [11, 14, 17, 20].forEach((colIndex, qIndex) => {
+                const engCell = row.cells[colIndex];
+                if (engCell && engCell.textContent.trim() !== 'N/A') {
+                    const dropdownKey = ['filterQ1Engineer', 'filterQ2Engineer', 'filterQ3Engineer', 'filterQ4Engineer'][qIndex];
+                    dropdowns[dropdownKey].add(engCell.textContent.trim());
+                }
+            });
+        } else if (row.cells.length > 14) { // OCM table
+            const engCell = row.cells[14];
+            if (engCell && engCell.textContent.trim() !== 'N/A') {
+                dropdowns.filterEngineer.add(engCell.textContent.trim());
+            }
+        }
+    });
+    
+    // Populate dropdowns
+    Object.keys(dropdowns).forEach(dropdownId => {
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown && dropdowns[dropdownId].size > 0) {
+            // Clear existing options (except the first "All" option)
+            while (dropdown.children.length > 1) {
+                dropdown.removeChild(dropdown.lastChild);
+            }
+            
+            // Add sorted options
+            Array.from(dropdowns[dropdownId]).sort().forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                dropdown.appendChild(option);
+            });
+        }
+    });
+}
+
+// Apply all active filters
+function applyFilters() {
+    const rows = document.querySelectorAll('.equipment-table tbody tr');
+    let visibleCount = 0;
+    let activeFilterCount = 0;
+    const filterSummary = [];
+    
+    // Collect all active filters
+    const filters = document.querySelectorAll('.column-filter');
+    activeFilters = {};
+    
+    filters.forEach(filter => {
+        const value = filter.value.trim();
+        if (value) {
+            activeFilters[filter.dataset.column] = {
+                value: value,
+                type: filter.type || 'text',
+                element: filter
+            };
+            activeFilterCount++;
+        }
+    });
+    
+    // Apply filters to each row
+    rows.forEach(row => {
+        let shouldShow = true;
+        
+        Object.keys(activeFilters).forEach(column => {
+            const filter = activeFilters[column];
+            const cellValue = getCellValueForFilter(row, column);
+            
+            if (!matchesFilter(cellValue, filter)) {
+                shouldShow = false;
+            }
+        });
+        
+        if (shouldShow) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update filter summary
+    updateFilterSummary(activeFilterCount, visibleCount);
+    
+    // Update record counter
+    updateRecordCounter();
+    
+    // Close filter panel if filters were applied
+    if (activeFilterCount > 0) {
+        toggleFiltersPanel();
+    }
+}
+
+// Get cell value for filtering based on column name
+function getCellValueForFilter(row, column) {
+    const columnMappings = {
+        'Department': 2,
+        'Name': 3,
+        'Model': 4,
+        'Serial': 5,
+        'Manufacturer': 6,
+        'Log_Number': 7,
+        'Installation_Date': 8,
+        'Warranty_End': 9,
+        'Q1': 10,
+        'Eng1': 11,
+        'Q1_Status': 12,
+        'Q2': 13,
+        'Eng2': 14,
+        'Q2_Status': 15,
+        'Q3': 16,
+        'Eng3': 17,
+        'Q3_Status': 18,
+        'Q4': 19,
+        'Eng4': 20,
+        'Q4_Status': 21,
+        'Service_Date': 10, // OCM
+        'Next_Maintenance': 11, // OCM
+        'Engineer': 12, // OCM
+        'Status': 13 // OCM
+    };
+    
+    const columnIndex = columnMappings[column];
+    if (columnIndex === undefined || !row.cells[columnIndex]) {
+        return '';
+    }
+    
+    const cell = row.cells[columnIndex];
+    
+    // Handle badge elements (status columns)
+    const badge = cell.querySelector('.badge');
+    if (badge) {
+        return badge.textContent.trim();
+    }
+    
+    return cell.textContent.trim();
+}
+
+// Check if cell value matches filter criteria
+function matchesFilter(cellValue, filter) {
+    if (!cellValue || cellValue === 'N/A') {
+        return filter.value === '' || filter.value === 'N/A';
+    }
+    
+    switch (filter.type) {
+        case 'date':
+            if (filter.value === '') return true;
+            // Convert both dates to comparable format
+            const cellDate = parseDate(cellValue);
+            const filterDate = new Date(filter.value);
+            return cellDate && cellDate.toDateString() === filterDate.toDateString();
+            
+        case 'select':
+        case 'select-one':
+            return filter.value === '' || cellValue.toLowerCase() === filter.value.toLowerCase();
+            
+        default: // text input
+            return filter.value === '' || cellValue.toLowerCase().includes(filter.value.toLowerCase());
+    }
+}
+
+// Parse date from various formats
+function parseDate(dateString) {
+    if (!dateString || dateString === 'N/A') return null;
+    
+    // Try different date formats
+    const formats = [
+        /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/, // DD/MM/YYYY or MM/DD/YYYY
+        /^(\d{4})-(\d{1,2})-(\d{1,2})$/, // YYYY-MM-DD
+        /^(\d{1,2})-(\d{1,2})-(\d{4})$/ // DD-MM-YYYY
+    ];
+    
+    for (let format of formats) {
+        const match = dateString.match(format);
+        if (match) {
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                return date;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// Clear all filters
+function clearAllFilters() {
+    const filters = document.querySelectorAll('.column-filter');
+    filters.forEach(filter => {
+        filter.value = '';
+    });
+    
+    activeFilters = {};
+    
+    // Show all rows
+    const rows = document.querySelectorAll('.equipment-table tbody tr');
+    rows.forEach(row => {
+        row.style.display = '';
+    });
+    
+    // Update UI
+    updateFilterSummary(0, rows.length);
+    updateRecordCounter();
+}
+
+// Update filter summary display
+function updateFilterSummary(activeCount, visibleCount) {
+    const summary = document.getElementById('filterSummary');
+    const summaryText = document.getElementById('filterSummaryText');
+    
+    if (activeCount > 0) {
+        summaryText.textContent = `${activeCount} filter${activeCount > 1 ? 's' : ''} applied - Showing ${visibleCount} record${visibleCount !== 1 ? 's' : ''}`;
+        summary.style.display = 'block';
+        summary.className = 'alert alert-success';
+    } else {
+        summaryText.textContent = 'No filters applied';
+        summary.style.display = 'none';
+    }
+}
+
+// Table sorting functionality
+let currentSort = { column: null, direction: 'asc' };
+
+function sortTable(column) {
+    const table = document.querySelector('.equipment-table tbody');
+    const rows = Array.from(table.querySelectorAll('tr'));
+    
+    // Determine sort direction
+    if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.direction = 'asc';
+        currentSort.column = column;
+    }
+    
+    // Update header visual states
+    updateSortHeaders(column, currentSort.direction);
+    
+    // Get column index for sorting
+    const headers = Array.from(document.querySelectorAll('.equipment-table thead th'));
+    const columnIndex = headers.findIndex(header => header.dataset.sort === column);
+    
+    if (columnIndex === -1) return;
+    
+    // Sort rows
+    rows.sort((a, b) => {
+        const aValue = getCellValue(a, columnIndex);
+        const bValue = getCellValue(b, columnIndex);
+        
+        // Handle different data types
+        const aNum = parseFloat(aValue);
+        const bNum = parseFloat(bValue);
+        
+        let comparison = 0;
+        
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            // Numeric comparison
+            comparison = aNum - bNum;
+        } else if (isValidDate(aValue) && isValidDate(bValue)) {
+            // Date comparison
+            comparison = new Date(aValue) - new Date(bValue);
+        } else {
+            // String comparison
+            comparison = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        
+        return currentSort.direction === 'asc' ? comparison : -comparison;
+    });
+    
+    // Reorder DOM elements
+    rows.forEach(row => table.appendChild(row));
+    
+    // Update record counter after sorting
+    updateRecordCounter();
+}
+
+function getCellValue(row, columnIndex) {
+    const cell = row.cells[columnIndex];
+    if (!cell) return '';
+    
+    // Handle badge elements (status columns)
+    const badge = cell.querySelector('.badge');
+    if (badge) {
+        return badge.textContent.trim();
+    }
+    
+    return cell.textContent.trim();
+}
+
+function isValidDate(dateString) {
+    if (!dateString || dateString === 'N/A') return false;
+    const date = new Date(dateString);
+    return !isNaN(date.getTime());
+}
+
+function updateSortHeaders(activeColumn, direction) {
+    // Remove all sort classes
+    document.querySelectorAll('.equipment-table thead th.sortable').forEach(header => {
+        header.classList.remove('sort-asc', 'sort-desc');
+    });
+    
+    // Add sort class to active column
+    const activeHeader = document.querySelector(`[data-sort="${activeColumn}"]`);
+    if (activeHeader) {
+        activeHeader.classList.add(direction === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+}
+
+// Initialize all functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if page was loaded after an import
+    const urlParams = new URLSearchParams(window.location.search);
+    const importedTimestamp = urlParams.get('imported');
+    
+    // Initial count update
+    updateRecordCounter();
+    
+    // If loaded after import, show success animation
+    if (importedTimestamp) {
+        const badgeElement = document.getElementById('totalRecordsBadge');
+        if (badgeElement) {
+            // Add special import success animation
+            badgeElement.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+            badgeElement.style.animation = 'none';
+            badgeElement.style.boxShadow = '0 2px 12px rgba(40, 167, 69, 0.5)';
+            
+            setTimeout(() => {
+                badgeElement.style.background = 'linear-gradient(135deg, #007bff, #0056b3)';
+                badgeElement.style.animation = 'pulse-glow 2s infinite alternate';
+                badgeElement.style.boxShadow = '0 2px 8px rgba(0, 123, 255, 0.3)';
+            }, 3000);
+        }
+        
+        // Clean up URL
+        if (window.history.replaceState) {
+            const newUrl = window.location.pathname + window.location.search.replace(/[?&]imported=\d+/, '').replace(/^&/, '?');
+            window.history.replaceState(null, '', newUrl === window.location.pathname + '?' ? window.location.pathname : newUrl);
+        }
+    }
+    
+    // Initialize advanced filtering
+    const toggleFiltersBtn = document.getElementById('toggleFiltersBtn');
+    if (toggleFiltersBtn) {
+        toggleFiltersBtn.addEventListener('click', toggleFiltersPanel);
+    }
+    
+    const applyFiltersBtn = document.getElementById('applyFilters');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', applyFilters);
+    }
+    
+    const clearAllFiltersBtn = document.getElementById('clearAllFilters');
+    if (clearAllFiltersBtn) {
+        clearAllFiltersBtn.addEventListener('click', clearAllFilters);
+    }
+    
+    // Add real-time filtering for text inputs
+    const textFilters = document.querySelectorAll('.column-filter[type="text"], .column-filter:not([type])');
+    textFilters.forEach(filter => {
+        filter.addEventListener('input', function() {
+            // Auto-apply filters after short delay
+            clearTimeout(this.filterTimeout);
+            this.filterTimeout = setTimeout(() => {
+                applyFilters();
+            }, 500);
+        });
+    });
+    
+    // Add change event for select and date filters
+    const selectFilters = document.querySelectorAll('.column-filter[type="date"], .column-filter select');
+    selectFilters.forEach(filter => {
+        filter.addEventListener('change', function() {
+            applyFilters();
+        });
+    });
+    
+    // Initialize sorting event listeners
+    document.querySelectorAll('.equipment-table thead th.sortable').forEach(header => {
+        header.addEventListener('click', function() {
+            const column = this.dataset.sort;
+            sortTable(column);
+        });
+    });
+    
+    // Observer to watch for table changes (for dynamic content)
+    const tableBody = document.querySelector('.equipment-table tbody');
+    if (tableBody) {
+        const observer = new MutationObserver(function(mutations) {
+            let shouldUpdate = false;
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' || 
+                    (mutation.type === 'attributes' && mutation.attributeName === 'style')) {
+                    shouldUpdate = true;
+                }
+            });
+            if (shouldUpdate) {
+                updateRecordCounter();
+            }
+        });
+        
+        observer.observe(tableBody, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
+});
+
+// Function to be called after successful import (can be called from import pages)
+window.refreshRecordCounter = updateRecordCounter;
+</script>
 {% endblock %}

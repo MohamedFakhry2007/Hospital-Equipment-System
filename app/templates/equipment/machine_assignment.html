@@ -66,9 +66,7 @@
                     <div class="col-md-6">
                         <select class="form-select trainer-select" name="trainer" disabled>
                             <option value="">Select Trainer</option>
-                            {% for module in training_modules %}
-                                <option value="{{ module }}">{{ module }}</option>
-                            {% endfor %}
+                            <!-- Trainer options will be populated dynamically by JavaScript -->
                         </select>
                     </div>
                 </div>
@@ -100,6 +98,7 @@
 {{ super() }}
 <script>
 const devicesByDepartment = {{ devices_by_department|tojson }};
+const trainers = {{ trainers|tojson }};
 
 document.addEventListener('DOMContentLoaded', function() {
     const departmentSelect = document.getElementById('departmentSelect');
@@ -138,6 +137,15 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set label for attribute
             const label = template.querySelector('.form-check-label');
             label.setAttribute('for', checkbox.id);
+            
+            // Populate trainer options
+            const trainerSelect = template.querySelector('.trainer-select');
+            trainers.forEach(trainer => {
+                const option = document.createElement('option');
+                option.value = trainer;
+                option.textContent = trainer;
+                trainerSelect.appendChild(option);
+            });
             
             // Add event listener to checkbox
             checkbox.addEventListener('change', function() {

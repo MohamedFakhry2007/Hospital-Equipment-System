@@ -5,50 +5,631 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container mt-4">
-        <h2>Import/Export Equipment Data</h2>
-        <p class="lead">Use the options below to import or export equipment data in CSV format.</p>
+<div class="container-fluid px-4">
+    <!-- Page Header -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="text-center">
+                <h1 class="page-title mb-3">Import/Export Equipment Data</h1>
+                <p class="lead text-muted">Manage your equipment data efficiently with our import and export tools</p>
+                <hr class="my-4 mx-auto" style="width: 60%; opacity: 0.3;">
+            </div>
+        </div>
+    </div>
 
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Import Data</h3>
+    <!-- PPM Equipment Section -->
+    <div class="row mb-6">
+        <div class="col-12">
+            <div class="section-header mb-4">
+                <h2 class="h3 text-primary mb-2">
+                    <i class="fas fa-cogs me-2"></i>PPM Equipment Management
+                </h2>
+                <p class="text-muted mb-0">Preventive Maintenance Program data management tools</p>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-info text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-download me-2"></i>PPM Templates
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Download standardized template files for PPM equipment data formatting.</p>
                     </div>
-                    <div class="card-body">
-                        <p>Select a CSV file to import equipment data. The system will attempt to determine if it's PPM or OCM data based on the headers.</p>
-                        <form method="post" action="{{ url_for('views.import_equipment') }}" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="file" class="form-label">CSV File</label>
-                                <input type="file" class="form-control" name="file" id="file" accept=".csv" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Upload and Import</button>
-                        </form>
-                    </div>
-                    <div class="card-footer">
-                        <small class="text-muted">Ensure your CSV file has the correct headers and data format. Refer to documentation for templates.</small>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.download_template', template_type='ppm') }}" 
+                           class="btn btn-info btn-lg px-4 py-2">
+                            <i class="fas fa-file-download me-2"></i>Download Template
+                        </a>
                     </div>
                 </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Export Data</h3>
-                    </div>
-                    <div class="card-body">
-                        <p>Export existing equipment data to a CSV file.</p>
-                        <div class="d-grid gap-2">
-                             <a href="{{ url_for('views.export_equipment_ppm') }}" class="btn btn-secondary">Export All PPM Data</a>
-                             <a href="{{ url_for('views.export_equipment_ocm') }}" class="btn btn-secondary">Export All OCM Data</a>
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <small class="text-muted">Exports will include all current data for the selected type.</small>
-                    </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>Essential for proper data formatting
+                    </small>
                 </div>
             </div>
         </div>
 
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>Import PPM Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Upload and import PPM equipment data from CSV files.</p>
+                    </div>
+                    <form method="post" action="{{ url_for('views.import_equipment') }}" enctype="multipart/form-data" id="ppmImportForm">
+                        <div class="mb-3">
+                            <label for="ppm_file" class="form-label fw-semibold">Select PPM CSV File</label>
+                            <input type="file" class="form-control form-control-lg" name="file" id="ppm_file" accept=".csv" required>
+                            <input type="hidden" name="data_type" value="ppm">
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary btn-lg px-4 py-2">
+                                <i class="fas fa-upload me-2"></i>Upload & Import
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-exclamation-triangle me-1"></i>File must follow template format
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-secondary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-file-export me-2"></i>Export PPM Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Export all existing PPM equipment data to CSV format.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.export_equipment_ppm') }}" 
+                           class="btn btn-secondary btn-lg px-4 py-2">
+                            <i class="fas fa-download me-2"></i>Export All Data
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-database me-1"></i>Includes all current PPM records
+                    </small>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Section Divider -->
+    <div class="row my-5">
+        <div class="col-12">
+            <hr class="section-divider">
+        </div>
+    </div>
+
+    <!-- OCM Equipment Section -->
+    <div class="row mb-6">
+        <div class="col-12">
+            <div class="section-header mb-4">
+                <h2 class="h3 text-success mb-2">
+                    <i class="fas fa-tools me-2"></i>OCM Equipment Management
+                </h2>
+                <p class="text-muted mb-0">Operational Care and Maintenance data management tools</p>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-info text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-download me-2"></i>OCM Templates
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Download standardized template files for OCM equipment data formatting.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.download_template', template_type='ocm') }}" 
+                           class="btn btn-info btn-lg px-4 py-2">
+                            <i class="fas fa-file-download me-2"></i>Download Template
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>Essential for proper data formatting
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>Import OCM Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Upload and import OCM equipment data from CSV files.</p>
+                    </div>
+                    <form method="post" action="{{ url_for('views.import_equipment') }}" enctype="multipart/form-data" id="ocmImportForm">
+                        <div class="mb-3">
+                            <label for="ocm_file" class="form-label fw-semibold">Select OCM CSV File</label>
+                            <input type="file" class="form-control form-control-lg" name="file" id="ocm_file" accept=".csv" required>
+                            <input type="hidden" name="data_type" value="ocm">
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary btn-lg px-4 py-2">
+                                <i class="fas fa-upload me-2"></i>Upload & Import
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-exclamation-triangle me-1"></i>File must follow template format
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-secondary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-file-export me-2"></i>Export OCM Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Export all existing OCM equipment data to CSV format.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.export_equipment_ocm') }}" 
+                           class="btn btn-secondary btn-lg px-4 py-2">
+                            <i class="fas fa-download me-2"></i>Export All Data
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-database me-1"></i>Includes all current OCM records
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Divider -->
+    <div class="row my-5">
+        <div class="col-12">
+            <hr class="section-divider">
+        </div>
+    </div>
+
+    <!-- Training Records Section -->
+    <div class="row mb-6">
+        <div class="col-12">
+            <div class="section-header mb-4">
+                <h2 class="h3 text-warning mb-2">
+                    <i class="fas fa-graduation-cap me-2"></i>Training Records Management
+                </h2>
+                <p class="text-muted mb-0">Employee training data management and tracking tools</p>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-info text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-download me-2"></i>Training Templates
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Download standardized template files for training data formatting.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.download_template', template_type='training') }}" 
+                           class="btn btn-info btn-lg px-4 py-2">
+                            <i class="fas fa-file-download me-2"></i>Download Template
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>Essential for proper data formatting
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-upload me-2"></i>Import Training Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Upload and import training records from CSV files.</p>
+                    </div>
+                    <form method="post" action="{{ url_for('views.import_equipment') }}" enctype="multipart/form-data" id="trainingImportForm">
+                        <div class="mb-3">
+                            <label for="training_file" class="form-label fw-semibold">Select Training CSV File</label>
+                            <input type="file" class="form-control form-control-lg" name="file" id="training_file" accept=".csv" required>
+                            <input type="hidden" name="data_type" value="training">
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary btn-lg px-4 py-2" id="trainingImportBtn">
+                                <i class="fas fa-upload me-2"></i>Upload & Import
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-exclamation-triangle me-1"></i>File must follow template format
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+            <div class="card h-100 shadow-sm border-0 hover-card">
+                <div class="card-header bg-secondary text-white text-center py-3">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-file-export me-2"></i>Export Training Data
+                    </h4>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between p-4">
+                    <div>
+                        <p class="card-text text-center mb-4">Export all existing training records to CSV format.</p>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ url_for('views.export_equipment_training') }}" 
+                           class="btn btn-secondary btn-lg px-4 py-2">
+                            <i class="fas fa-download me-2"></i>Export All Data
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <small class="text-muted">
+                        <i class="fas fa-database me-1"></i>Includes all current training records
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Spacing -->
+    <div class="row">
+        <div class="col-12">
+            <div class="mb-5"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.mb-6 {
+    margin-bottom: 4rem !important;
+}
+
+.hover-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.section-header {
+    border-left: 4px solid var(--bs-primary);
+    padding-left: 1rem;
+    margin-left: 0.5rem;
+}
+
+.section-divider {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, 
+        var(--bs-primary) 0%, 
+        var(--bs-secondary) 50%, 
+        var(--bs-success) 100%);
+    opacity: 0.3;
+    margin: 3rem auto;
+    width: 80%;
+}
+
+.card-title {
+    font-weight: 600;
+}
+
+.form-control-lg {
+    border-radius: 0.5rem;
+}
+
+.btn-lg {
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+.page-title {
+    font-weight: 700;
+    color: var(--bs-primary);
+}
+
+.card-header {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.card-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+    }
+    
+    .section-divider {
+        width: 90%;
+        margin: 2rem auto;
+    }
+}
+
+/* Import feedback styles */
+.import-feedback {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    max-width: 350px;
+}
+
+.import-progress {
+    display: none;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add import progress feedback
+    const importForms = ['ppmImportForm', 'ocmImportForm', 'trainingImportForm'];
+    
+    importForms.forEach(formId => {
+        const form = document.getElementById(formId);
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const dataType = form.querySelector('input[name="data_type"]').value;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                
+                // Special handling for training import using AJAX
+                if (dataType === 'training') {
+                    e.preventDefault(); // Prevent default form submission
+                    
+                    const fileInput = form.querySelector('input[type="file"]');
+                    const file = fileInput.files[0];
+                    
+                    if (!file) {
+                        alert('Please select a file to import.');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing...';
+                    
+                    // Create progress notification
+                    const progressDiv = document.createElement('div');
+                    progressDiv.className = 'alert alert-info import-feedback';
+                    progressDiv.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            <div>
+                                <strong>Importing TRAINING data...</strong><br>
+                                <small>Please wait while we process your file...</small>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(progressDiv);
+                    
+                    // Prepare form data for AJAX
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('data_type', 'training');
+                    
+                    // Send AJAX request to the existing import endpoint
+                    fetch('/import_equipment', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        console.log('Import response status:', response.status);
+                        console.log('Response headers:', response.headers);
+                        console.log('Response Content-Type:', response.headers.get('Content-Type'));
+                        
+                        if (response.ok) {
+                            return response.json();
+                        } else {
+                            throw new Error('Import failed with status: ' + response.status);
+                        }
+                    })
+                    .then(data => {
+                        console.log('Import response received:', data);
+                        
+                        // Remove progress notification
+                        if (progressDiv && progressDiv.parentNode) {
+                            progressDiv.remove();
+                        }
+                        
+                        // Reset button
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                        
+                        if (data.success) {
+                            // Show success message and redirect
+                            const successDiv = document.createElement('div');
+                            successDiv.className = 'alert alert-success import-feedback';
+                            successDiv.innerHTML = `
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <strong><i class="fas fa-check-circle me-2"></i>Training data imported successfully!</strong><br>
+                                        <small>${data.message}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-success" onclick="window.location.href='${data.redirect_url}'">
+                                        <i class="fas fa-eye me-1"></i>View Now
+                                    </button>
+                                </div>
+                            `;
+                            document.body.appendChild(successDiv);
+                            
+                            // Auto-redirect after 2 seconds
+                            setTimeout(() => {
+                                console.log('Redirecting to:', data.redirect_url);
+                                // Add timestamp to force page refresh and counter update
+                                const redirectUrl = data.redirect_url + (data.redirect_url.includes('?') ? '&' : '?') + 'imported=' + Date.now();
+                                window.location.href = redirectUrl;
+                            }, 2000);
+                        } else {
+                            throw new Error(data.error || 'Import failed');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Import error:', error);
+                        // Remove progress notification
+                        if (progressDiv && progressDiv.parentNode) {
+                            progressDiv.remove();
+                        }
+                        
+                        // Reset button
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalText;
+                        
+                        // Show error message
+                        const errorDiv = document.createElement('div');
+                        errorDiv.className = 'alert alert-danger import-feedback';
+                        errorDiv.innerHTML = `
+                            <strong><i class="fas fa-exclamation-triangle me-2"></i>Import failed!</strong><br>
+                            <small>Error: ${error.message}</small>
+                        `;
+                        document.body.appendChild(errorDiv);
+                        
+                        // Auto-remove error after 10 seconds
+                        setTimeout(() => {
+                            if (errorDiv && errorDiv.parentNode) {
+                                errorDiv.remove();
+                            }
+                        }, 10000);
+                    });
+                    
+                    return; // Exit early for training
+                }
+                
+                // Standard form submission for PPM and OCM
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Importing...';
+                
+                // Create progress notification
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'alert alert-info import-feedback';
+                progressDiv.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <div>
+                            <strong>Importing ${dataType.toUpperCase()} data...</strong><br>
+                            <small>You will be redirected to view the imported data when complete.</small>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(progressDiv);
+                
+                // Cleanup function (in case user navigates away)
+                setTimeout(() => {
+                    if (progressDiv && progressDiv.parentNode) {
+                        progressDiv.remove();
+                    }
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }, 30000); // 30 second timeout
+            });
+        }
+    });
+    
+    // Show success message if redirected back with success flash
+    const flashMessages = document.querySelectorAll('.alert-success');
+    flashMessages.forEach(message => {
+        if (message.textContent.includes('TRAINING import successful')) {
+            // Add navigation hint with redirect option
+            const hint = document.createElement('div');
+            hint.className = 'mt-3';
+            hint.innerHTML = `
+                <div class="d-flex align-items-center justify-content-between">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Training data imported successfully!
+                    </small>
+                    <button class="btn btn-sm btn-primary ms-2" onclick="window.location.href='/training'">
+                        <i class="fas fa-eye me-1"></i>View Training Data
+                    </button>
+                </div>
+            `;
+            message.appendChild(hint);
+            
+            // Auto-redirect after 3 seconds as fallback
+            setTimeout(() => {
+                if (confirm('Training import successful! Would you like to view the imported data?')) {
+                    window.location.href = '/training';
+                }
+            }, 3000);
+        } else if (message.textContent.includes('import successful')) {
+            // Add navigation hint for other imports
+            const hint = document.createElement('div');
+            hint.className = 'mt-2';
+            hint.innerHTML = `
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Visit the appropriate management page to view your imported data.
+                </small>
+            `;
+            message.appendChild(hint);
+        }
+    });
+});
+</script>
 {% endblock %}

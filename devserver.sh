@@ -1,20 +1,14 @@
-#!/bin/sh
-export PATH="$HOME/.local/bin:$PATH"
+#!/bin/bash
 
+# Ensure we're using poetry-managed environment
 poetry install
-source .venv/bin/activate
 
-if ! grep -q "$PATH" /home/user/.bashrc; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> /home/user/.bashrc
-fi
+# Set environment variables
+export FLASK_DEBUG=1
+export PORT=${PORT:-5001}
+export FLASK_APP="app.main:create_app"
 
-# Set DEBUG mode for development
-export DEBUG=True
+echo "Development server starting on PORT: $PORT with DEBUG=$FLASK_DEBUG"
 
-# Get the port number from environment variable, default to 5001 for dev server
-PORT=${PORT:-5001}
-echo "Development server starting on PORT: $PORT with DEBUG=True"
-
-# Run Flask development server
-# Assuming 'create_app' is the factory function in 'app.main'
-python -m flask --app app.main:create_app run -p $PORT --debug
+# Run Flask app using Poetry's environment
+poetry run python -m flask run -p $PORT --debug

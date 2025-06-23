@@ -139,11 +139,11 @@ class DataService:
             raise ValueError("Failed to save settings due to an unexpected error.") from e
 
     @staticmethod
-    def load_data(data_type: Literal['ppm', 'ocm']) -> List[Dict[str, Any]]:
+    def load_data(data_type: Literal['ppm', 'ocm', 'training']) -> List[Dict[str, Any]]:
         """Load data from JSON file.
 
         Args:
-            data_type: Type of data to load ('ppm' or 'ocm')
+            data_type: Type of data to load ('ppm', 'ocm', or 'training')
 
         Returns:
             List of data entries
@@ -158,9 +158,12 @@ class DataService:
             if data_type == 'ppm':
                 file_path = Config.PPM_JSON_PATH
                 logger.debug("Selected PPM file path: %s", file_path)
-            else:
+            elif data_type == 'ocm':
                 file_path = Config.OCM_JSON_PATH
                 logger.debug("Selected OCM file path: %s", file_path)
+            else:  # training
+                file_path = Path(Config.DATA_DIR) / "training.json"
+                logger.debug("Selected Training file path: %s", file_path)
 
             logger.debug("Opening file for reading: %s", file_path)
             with open(file_path, 'r') as f:
@@ -193,17 +196,23 @@ class DataService:
             return []
     
     @staticmethod
-    def save_data(data: List[Dict[str, Any]], data_type: Literal['ppm', 'ocm']):
+    def save_data(data: List[Dict[str, Any]], data_type: Literal['ppm', 'ocm', 'training']):
         """Save data to JSON file.
 
         Args:
             data: List of data entries to save
-            data_type: Type of data to save ('ppm' or 'ocm')
+            data_type: Type of data to save ('ppm', 'ocm', or 'training')
         """
         try:
             DataService.ensure_data_files_exist()
 
-            file_path = Config.PPM_JSON_PATH if data_type == 'ppm' else Config.OCM_JSON_PATH
+            if data_type == 'ppm':
+                file_path = Config.PPM_JSON_PATH
+            elif data_type == 'ocm':
+                file_path = Config.OCM_JSON_PATH
+            else:  # training
+                file_path = Path(Config.DATA_DIR) / "training.json"
+                
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except IOError as e:
@@ -906,7 +915,7 @@ class DataService:
                 "errors": errors
             }
     @classmethod
-    def export_data(cls, data_type: Literal['ppm', 'ocm']) -> str:
+    def export_data(cls, data_type: Literal['ppm', 'ocm', 'training']) -> str:
         """Export data to CSV format."""
         logger.debug(f"DataService.export_data called for {data_type}")
         try:

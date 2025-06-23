@@ -1,0 +1,674 @@
+[
+  {
+    "id": 1,
+    "timestamp": "2025-06-22 10:15:30",
+    "event_type": "System Startup",
+    "performed_by": "System",
+    "description": "Hospital Equipment Management System started successfully",
+    "status": "Success",
+    "details": {
+      "version": "1.0.0",
+      "modules": [
+        "PPM",
+        "OCM",
+        "Training",
+        "Notifications"
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "timestamp": "2025-06-22 10:30:45",
+    "event_type": "Equipment Added",
+    "performed_by": "Admin User",
+    "description": "New PPM equipment added: Ventilator (Serial: VNT-2025-001)",
+    "status": "Success",
+    "details": {
+      "equipment_type": "PPM",
+      "serial": "VNT-2025-001",
+      "department": "ICU"
+    }
+  },
+  {
+    "id": 3,
+    "timestamp": "2025-06-22 11:45:12",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 15 equipment maintenance tasks (7-day threshold)",
+    "status": "Success",
+    "details": {
+      "threshold": "7 days",
+      "equipment_count": 15,
+      "recipient": "maintenance@hospital.com"
+    }
+  },
+  {
+    "id": 4,
+    "timestamp": "2025-06-22 14:20:18",
+    "event_type": "Bulk Import",
+    "performed_by": "Maintenance Manager",
+    "description": "Bulk import of 25 OCM equipment records from CSV file",
+    "status": "Success",
+    "details": {
+      "file_type": "CSV",
+      "records_imported": 25,
+      "records_failed": 0,
+      "equipment_type": "OCM"
+    }
+  },
+  {
+    "id": 5,
+    "timestamp": "2025-06-22 15:10:33",
+    "event_type": "Setting Changed",
+    "performed_by": "Admin User",
+    "description": "Push notification interval changed from 60 to 5 minutes",
+    "status": "Success",
+    "details": {
+      "setting": "push_notification_interval_minutes",
+      "old_value": 60,
+      "new_value": 5
+    }
+  },
+  {
+    "id": 6,
+    "timestamp": "2025-06-22 16:31:05",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 2 equipment maintenance tasks (1-day threshold, URGENT priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 1,
+      "priority_level": "URGENT",
+      "equipment_count": 2,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 7,
+    "timestamp": "2025-06-22 16:31:06",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 12 equipment maintenance tasks (7-day threshold, HIGH priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 7,
+      "priority_level": "HIGH",
+      "equipment_count": 12,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 8,
+    "timestamp": "2025-06-22 16:31:06",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 16 equipment maintenance tasks (15-day threshold, MEDIUM priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 15,
+      "priority_level": "MEDIUM",
+      "equipment_count": 16,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 9,
+    "timestamp": "2025-06-22 16:31:07",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 30 equipment maintenance tasks (30-day threshold, LOW priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 30,
+      "priority_level": "LOW",
+      "equipment_count": 30,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 10,
+    "timestamp": "2025-06-22 16:34:14",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 11,
+    "timestamp": "2025-06-22 16:34:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 12,
+    "timestamp": "2025-06-22 16:34:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 13,
+    "timestamp": "2025-06-22 16:34:17",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 2 equipment maintenance tasks (1-day threshold, URGENT priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 1,
+      "priority_level": "URGENT",
+      "equipment_count": 2,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 14,
+    "timestamp": "2025-06-22 16:34:18",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 12 equipment maintenance tasks (7-day threshold, HIGH priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 7,
+      "priority_level": "HIGH",
+      "equipment_count": 12,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 15,
+    "timestamp": "2025-06-22 16:34:18",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 16 equipment maintenance tasks (15-day threshold, MEDIUM priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 15,
+      "priority_level": "MEDIUM",
+      "equipment_count": 16,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 16,
+    "timestamp": "2025-06-22 16:34:19",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 30 equipment maintenance tasks (30-day threshold, LOW priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 30,
+      "priority_level": "LOW",
+      "equipment_count": 30,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 17,
+    "timestamp": "2025-06-22 16:35:25",
+    "event_type": "Data Export",
+    "performed_by": "User",
+    "description": "Exported 16 audit log entries to CSV",
+    "status": "Success",
+    "details": {
+      "export_format": "CSV",
+      "record_count": 16
+    }
+  },
+  {
+    "id": 18,
+    "timestamp": "2025-06-22 16:35:50",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 2 equipment maintenance tasks (1-day threshold, URGENT priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 1,
+      "priority_level": "URGENT",
+      "equipment_count": 2,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 19,
+    "timestamp": "2025-06-22 16:35:50",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 12 equipment maintenance tasks (7-day threshold, HIGH priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 7,
+      "priority_level": "HIGH",
+      "equipment_count": 12,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 20,
+    "timestamp": "2025-06-22 16:35:51",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 16 equipment maintenance tasks (15-day threshold, MEDIUM priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 15,
+      "priority_level": "MEDIUM",
+      "equipment_count": 16,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 21,
+    "timestamp": "2025-06-22 16:35:52",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 30 equipment maintenance tasks (30-day threshold, LOW priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 30,
+      "priority_level": "LOW",
+      "equipment_count": 30,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 22,
+    "timestamp": "2025-06-22 16:36:33",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 2 equipment maintenance tasks (1-day threshold, URGENT priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 1,
+      "priority_level": "URGENT",
+      "equipment_count": 2,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 23,
+    "timestamp": "2025-06-22 16:36:33",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 12 equipment maintenance tasks (7-day threshold, HIGH priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 7,
+      "priority_level": "HIGH",
+      "equipment_count": 12,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 24,
+    "timestamp": "2025-06-22 16:36:34",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 16 equipment maintenance tasks (15-day threshold, MEDIUM priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 15,
+      "priority_level": "MEDIUM",
+      "equipment_count": 16,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 25,
+    "timestamp": "2025-06-22 16:36:34",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 30 equipment maintenance tasks (30-day threshold, LOW priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 30,
+      "priority_level": "LOW",
+      "equipment_count": 30,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 26,
+    "timestamp": "2025-06-22 16:38:54",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 27,
+    "timestamp": "2025-06-22 16:38:55",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 28,
+    "timestamp": "2025-06-22 16:38:56",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 29,
+    "timestamp": "2025-06-22 16:41:51",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 2 equipment maintenance tasks (1-day threshold, URGENT priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 1,
+      "priority_level": "URGENT",
+      "equipment_count": 2,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 30,
+    "timestamp": "2025-06-22 16:41:52",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 12 equipment maintenance tasks (7-day threshold, HIGH priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 7,
+      "priority_level": "HIGH",
+      "equipment_count": 12,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 31,
+    "timestamp": "2025-06-22 16:41:53",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 16 equipment maintenance tasks (15-day threshold, MEDIUM priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 15,
+      "priority_level": "MEDIUM",
+      "equipment_count": 16,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 32,
+    "timestamp": "2025-06-22 16:41:53",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 33,
+    "timestamp": "2025-06-22 16:41:53",
+    "event_type": "Reminder Sent",
+    "performed_by": "System",
+    "description": "Email reminder sent for 30 equipment maintenance tasks (30-day threshold, LOW priority)",
+    "status": "Success",
+    "details": {
+      "threshold_days": 30,
+      "priority_level": "LOW",
+      "equipment_count": 30,
+      "recipient": "Alorfbiomed@gmail.com",
+      "email_type": "threshold_reminder"
+    }
+  },
+  {
+    "id": 34,
+    "timestamp": "2025-06-22 16:41:54",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 35,
+    "timestamp": "2025-06-22 16:41:54",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 36,
+    "timestamp": "2025-06-22 16:42:09",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 37,
+    "timestamp": "2025-06-22 16:42:10",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 38,
+    "timestamp": "2025-06-22 16:42:10",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 39,
+    "timestamp": "2025-06-22 16:51:00",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 40,
+    "timestamp": "2025-06-22 16:51:01",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 41,
+    "timestamp": "2025-06-22 16:51:02",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 42,
+    "timestamp": "2025-06-22 17:06:24",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 43,
+    "timestamp": "2025-06-22 17:06:25",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 44,
+    "timestamp": "2025-06-22 17:06:26",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 45,
+    "timestamp": "2025-06-22 17:14:58",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 46,
+    "timestamp": "2025-06-22 17:14:59",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 47,
+    "timestamp": "2025-06-22 17:14:59",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 48,
+    "timestamp": "2025-06-22 17:39:56",
+    "event_type": "Backup Created",
+    "performed_by": "System",
+    "description": "Settings backup created: settings_backup_20250622_173956.json",
+    "status": "Success",
+    "details": {
+      "backup_type": "settings",
+      "filename": "settings_backup_20250622_173956.json",
+      "size_kb": 0.71,
+      "settings_count": 12
+    }
+  },
+  {
+    "id": 50,
+    "timestamp": "2025-06-22 17:40:41",
+    "event_type": "Backup Created",
+    "performed_by": "System",
+    "description": "Full application backup failed",
+    "status": "Failed",
+    "details": {
+      "backup_type": "full",
+      "error": "File size too large, try using force_zip64"
+    }
+  },
+  {
+    "id": 51,
+    "timestamp": "2025-06-22 18:58:14",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 52,
+    "timestamp": "2025-06-22 18:58:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 53,
+    "timestamp": "2025-06-22 18:58:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 54,
+    "timestamp": "2025-06-22 19:05:04",
+    "event_type": "Backup Deleted",
+    "performed_by": "User",
+    "description": "Backup deleted: settings_backup_20250622_173956.json",
+    "status": "Success",
+    "details": {
+      "backup_type": "settings",
+      "filename": "settings_backup_20250622_173956.json"
+    }
+  },
+  {
+    "id": 55,
+    "timestamp": "2025-06-22 19:07:14",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 56,
+    "timestamp": "2025-06-22 19:07:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 57,
+    "timestamp": "2025-06-22 19:07:15",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  },
+  {
+    "id": 58,
+    "timestamp": "2025-06-23 11:18:45",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
+  }
+]

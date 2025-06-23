@@ -1,32 +1,37 @@
 console.log('equipment_list.js loaded');
 
-// Add selected class style
-const style = document.createElement('style');
-style.textContent = `
-    .equipment-table tr.selected {
-        background-color: #e2e6ea !important;
-    }
-    .item-checkbox:checked {
-        background-color: #0d6efd;
-        border-color: #0d6efd;
-    }
-`;
-document.head.appendChild(style);
+// Add selected class style only if not already added
+if (!document.getElementById('equipment-table-styles')) {
+    const style = document.createElement('style');
+    style.id = 'equipment-table-styles';
+    style.textContent = `
+        .equipment-table tr.selected {
+            background-color: #e2e6ea !important;
+        }
+        .item-checkbox:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're on a page with equipment table
+    const tableBody = document.querySelector('.equipment-table tbody');
+    
+    if (!tableBody) {
+        console.log('No equipment table found on this page, skipping equipment_list.js initialization');
+        return;
+    }
+    
     // UI Elements
     const searchInput = document.getElementById('searchInput');
     const filterSelect = document.getElementById('filterSelect');
     const sortSelect = document.getElementById('sortSelect');
-    const tableBody = document.querySelector('.equipment-table tbody');
     const selectAllCheckbox = document.getElementById('selectAll');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
     const selectedCountSpan = document.getElementById('selectedCount');
-    
-    if (!tableBody) {
-        console.error('Table body not found');
-        return;
-    }
     
     let sortDirection = 1;
     let lastSortColumn = '';
@@ -210,15 +215,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ serials: selectedSerials })
             });
 
-            if (response.ok) {
-                window.location.reload();
+            const result = await response.json();
+
+            if (result.success) {
+                // Remove deleted rows from the table
+                checkedBoxes.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    if (row) {
+                        row.remove();
+                    }
+                });
+
+                // Update counters
+                updateBulkDeleteButton();
+                
+                // Show success message
+                const message = `Successfully deleted ${result.deleted_count} record(s).` +
+                    (result.not_found > 0 ? ` ${result.not_found} record(s) were not found.` : '');
+                alert(message);
             } else {
-                const errorData = await response.json();
-                alert('Error: ' + (errorData.error || 'Failed to delete items'));
+                alert(`Failed to delete records: ${result.message || 'Unknown error'}`);
             }
         } catch (error) {
-            console.error('Error:', error);
-            alert('An error occurred while deleting items');
+            console.error('Error during bulk delete:', error);
+            alert('Error occurred while deleting records. Please try again.');
         }
     });
 });

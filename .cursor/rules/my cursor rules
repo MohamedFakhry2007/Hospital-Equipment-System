@@ -1,0 +1,254 @@
+# Hospital Equipment System - My Cursor Rules
+
+## Project Overview
+This is a Flask-based Hospital Equipment Maintenance Management System that tracks PPM (Planned Preventive Maintenance) and OCM (Operational Clinical Management) for medical equipment.
+
+## 🏗️ Project Structure Rules
+
+### Directory Organization
+- `app/` - Main application code
+  - `models/` - Data models (ocm.py, ppm.py, training.py)
+  - `routes/` - API and view routes (api.py, views.py)
+  - `services/` - Business logic (data_service.py, email_service.py, etc.)
+  - `static/` - CSS, JS, images
+  - `templates/` - HTML templates
+  - `utils/` - Utility functions
+- `data/` - JSON data files
+- `tests/` - Test files
+- `Cursor/rules/` - Project configuration and rules
+
+### File Naming Conventions
+- Python files: `snake_case.py`
+- HTML templates: `snake_case.html`
+- CSS files: `kebab-case.css`
+- JavaScript files: `snake_case.js`
+- JSON data files: `snake_case.json`
+
+## 🐍 Python Coding Standards
+
+### Flask Application Structure
+- Use Flask factory pattern with `create_app()`
+- Organize routes in blueprints (`views_bp`, `api_bp`)
+- Keep business logic in services, not routes
+- Use proper error handling with try-catch blocks
+
+### Data Models
+- PPM data structure: `{'NO', 'Name', 'MODEL', 'SERIAL', 'MANUFACTURER', 'PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV'}`
+- OCM data structure: `{'NO', 'Name', 'Model', 'Serial', 'Manufacturer', 'Service_Date', 'Next_Maintenance'}`
+- Always validate data before processing
+- Use proper status mapping: `{'Overdue': 'danger', 'Upcoming': 'warning', 'Maintained': 'success'}`
+
+### Service Layer Guidelines
+- `DataService` - Handles JSON file operations
+- `EmailService` - Manages email notifications with scheduler
+- `PushNotificationService` - Handles push notifications
+- `ValidationService` - Input validation
+- All services should have proper logging
+- Use async/await patterns for schedulers
+
+### Error Handling
+```python
+try:
+    # Your code here
+    logger.info("Operation successful")
+except Exception as e:
+    logger.error(f"Error description: {str(e)}", exc_info=True)
+    # Handle gracefully
+```
+
+### Logging Standards
+- Use the configured logger: `logger = logging.getLogger(__name__)`
+- Info level for normal operations
+- Error level for exceptions with `exc_info=True`
+- Debug level for development debugging
+
+## 🎨 Frontend Standards
+
+### HTML Templates
+- Extend `base.html` for consistent layout
+- Use Bootstrap 5.3.2 classes
+- Full-screen layout with `container-fluid-custom`
+- Responsive design with proper breakpoints
+- Semantic HTML structure
+
+### CSS Rules
+- Use custom CSS in `main.css` for project-specific styles
+- Full-screen optimizations applied
+- Responsive tables with sticky headers
+- Consistent color scheme: `#007bff` (primary), `#f8f9fa` (background)
+- Mobile-first approach with media queries
+
+### JavaScript Standards
+- Use modern ES6+ features
+- Modular approach with separate JS files for different features
+- Event delegation for dynamic content
+- Proper error handling in async operations
+- Service worker implementation for PWA features
+
+## 📊 Database & Data Management
+
+### JSON Data Files
+- `data/ppm.json` - PPM equipment data
+- `data/ocm.json` - OCM equipment data
+- `data/settings.json` - Application settings
+- `data/training.json` - Training records
+- `data/push_subscriptions.json` - Push notification subscriptions
+
+### Data Validation
+- Always validate user inputs
+- Sanitize data before storage
+- Use proper date formats
+- Validate email addresses
+- Check for required fields
+
+## 🔧 Configuration & Settings
+
+### Environment Variables
+- `PORT` - Application port (default: 5001)
+- `DEBUG` - Debug mode flag
+- `SCHEDULER_ENABLED` - Enable/disable schedulers
+- `VAPID_PRIVATE_KEY` - For push notifications
+- `VAPID_SUBJECT` - Push notification subject
+
+### Application Settings
+```json
+{
+    "email_notifications_enabled": true,
+    "email_reminder_interval_minutes": 1,
+    "recipient_email": "admin@hospital.com",
+    "push_notifications_enabled": true,
+    "push_notification_interval_minutes": 5
+}
+```
+
+## 🧪 Testing Standards
+
+### Test Structure
+- Unit tests for models and services
+- Integration tests for API endpoints
+- View tests for template rendering
+- Use pytest framework
+- Maintain test coverage above 80%
+
+### Test File Naming
+- `test_*.py` for all test files
+- Mirror the app structure in tests/
+- Use descriptive test method names
+
+## 🚀 Deployment & Production
+
+### Development Server
+```bash
+poetry run python app/main.py
+```
+
+### Production Server
+```bash
+poetry run gunicorn 'app:create_app()' --bind 0.0.0.0:5000 --workers 2
+```
+
+### Pre-deployment Checklist
+- [ ] All tests passing
+- [ ] Linting checks passed
+- [ ] Environment variables configured
+- [ ] Data files backed up
+- [ ] Scheduler settings verified
+
+## 🔐 Security Guidelines
+
+### Input Validation
+- Validate all user inputs
+- Sanitize HTML content
+- Use parameterized queries (if using SQL)
+- Validate file uploads
+- Check email formats
+
+### Authentication & Authorization
+- Implement proper session management
+- Use HTTPS in production
+- Secure API endpoints
+- Validate user permissions
+
+## 📱 Performance & Optimization
+
+### Full-Screen Layout
+- Use `container-fluid-custom` for full-width layouts
+- Optimize table responsiveness
+- Implement sticky headers for large datasets
+- Use efficient CSS selectors
+- Minimize HTTP requests
+
+### Data Handling
+- Implement pagination for large datasets
+- Use caching where appropriate
+- Optimize JSON file operations
+- Implement proper error handling
+
+## 🛠️ Development Workflow
+
+### Git Workflow
+- Use descriptive commit messages
+- Feature branches for new functionality
+- Code review before merging
+- Tag releases appropriately
+
+### Code Quality
+- Follow PEP 8 for Python
+- Use consistent indentation (4 spaces)
+- Write self-documenting code
+- Add comments for complex logic
+- Regular code reviews
+
+## 📋 Maintenance Tasks
+
+### Regular Maintenance
+- Update dependencies monthly
+- Review and update documentation
+- Monitor application logs
+- Backup data files regularly
+- Test email and push notifications
+
+### Monitoring
+- Track scheduler performance
+- Monitor disk space usage
+- Check error logs regularly
+- Verify data integrity
+
+## 🎯 Project-Specific Notes
+
+### Equipment Management
+- PPM equipment uses quarterly maintenance schedules
+- OCM equipment uses date-based maintenance
+- Status calculation based on maintenance dates
+- Barcode generation for equipment tracking
+
+### Notification System
+- Email notifications for maintenance reminders
+- Push notifications for real-time alerts
+- Configurable notification intervals
+- Support for multiple notification types
+
+### Import/Export
+- CSV template support
+- Bulk operations for equipment management
+- Data validation during import
+- Export functionality for reporting
+
+## 🚨 Common Issues & Solutions
+
+### Push Notifications
+- Ensure VAPID keys are configured
+- Check service worker registration
+- Verify subscription handling
+
+### Email Notifications
+- Configure SMTP settings properly
+- Handle email service errors gracefully
+- Test email delivery in development
+
+### Data Integrity
+- Regular backups of JSON files
+- Validate data consistency
+- Handle concurrent access properly
+
+Remember: This is a medical equipment management system, so data accuracy and reliability are crucial. Always test thoroughly before deploying changes! 

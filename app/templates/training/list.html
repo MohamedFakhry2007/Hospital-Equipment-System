@@ -4,14 +4,52 @@
 
 {% block content %}
 <div class="container-fluid mt-4">
+    <div class="d-flex align-items-center mb-4">
+        <h1 class="page-title me-3 mb-0">Training Management</h1>
+        <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill shadow-sm">
+            <i class="fas fa-users me-1"></i>
+            <span id="totalEmployeeCount">{{ trainings|length if trainings else 0 }}</span> employees
+        </span>
+    </div>
+    
+    <!-- Controls Row -->
     <div class="row mb-3">
-        <div class="col">
-            <h2>Training Management</h2>
-        </div>
-        <div class="col text-end">
+        <div class="col-md-auto">
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTrainingModal">
                 <i class="fas fa-plus"></i> Add New Training
             </button>
+        </div>
+        <div class="col-md-auto">
+            <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">
+                <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+            </button>
+        </div>
+        <div class="col-md-auto">
+            <select id="filterEmployeeId" class="form-select d-inline-block" style="width: auto;" title="Filter by Employee ID">
+                <option value="">All Employees</option>
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <select id="filterDepartment" class="form-select d-inline-block" style="width: auto;" title="Filter by Department">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                    <option value="{{ dept }}">{{ dept }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <select id="sortSelect" class="form-select d-inline-block" style="width: auto;" title="Sort records">
+                <option value="">Sort By...</option>
+                <option value="employee_id">Employee ID</option>
+                <option value="name">Name</option>
+                <option value="department">Department</option>
+                <option value="training_percentage">Training %</option>
+                <option value="last_trained_date">Last Trained Date</option>
+                <option value="next_due_date">Next Due Date</option>
+            </select>
+        </div>
+        <div class="col-md-auto ms-auto">
+            <input type="text" id="searchInput" class="form-control d-inline-block" style="width: auto;" placeholder="Search...">
         </div>
     </div>
 
@@ -19,34 +57,70 @@
         <table class="table table-striped table-hover" id="trainingTable">
             <thead class="table-dark">
                 <tr>
+                    <th>
+                        <input type="checkbox" id="selectAll" title="Select all records">
+                    </th>
                     <th>#</th>
-                    <th>Employee ID</th>
-                    <th>Name</th>
-                    <th>Department</th>
+                    <th class="sortable" data-sort="employee_id">
+                        Employee ID <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="sortable" data-sort="name">
+                        Name <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="sortable" data-sort="department">
+                        Department <i class="fas fa-sort"></i>
+                    </th>
                     <th>Trained On Machines / Trainers</th>
-                    <th>Last Trained</th>
-                    <th>Next Due</th>
+                    <th class="sortable" data-sort="training_percentage">
+                        Training % <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="sortable" data-sort="last_trained_date">
+                        Last Trained <i class="fas fa-sort"></i>
+                    </th>
+                    <th class="sortable" data-sort="next_due_date">
+                        Next Due <i class="fas fa-sort"></i>
+                    </th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% if trainings %}
                     {% for training in trainings %}
-                    <tr id="training-row-{{ training.id }}">
+                    <tr id="training-row-{{ training.id }}" data-training-id="{{ training.id }}">
+                        <td>
+                            <input type="checkbox" class="row-select" value="{{ training.id }}" title="Select this record">
+                        </td>
                         <td>{{ loop.index }}</td>
                         <td>{{ training.employee_id }}</td>
                         <td>{{ training.name }}</td>
                         <td>{{ training.department }}</td>
-                        <td>{{ training.trainer }}</td>
                         <td>
                             {% if training.machine_trainer_assignments and training.machine_trainer_assignments|length > 0 %}
                                 <ul class="list-unstyled mb-0">
                                 {% for assignment in training.machine_trainer_assignments %}
-                                    <li>{{ assignment.machine }}{% if assignment.trainer %} ({{ assignment.trainer }}){% endif %}</li>
+                                    <li>
+                                        <span class="machine-number" style="font-weight: 600; color: #6c757d;">{{ loop.index }}-</span>
+                                        <span class="machine-name" style="font-weight: 500; color: #212529;">{{ assignment.machine }}</span>
+                                        {% if assignment.trainer %}
+                                            <span class="trainer-name" style="font-weight: bold; color: #dc3545;"> ({{ assignment.trainer }})</span>
+                                        {% endif %}
+                                    </li>
                                 {% endfor %}
                                 </ul>
                             {% else %}
                                 N/A
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set trained_machines = training.machine_trainer_assignments|length if training.machine_trainer_assignments else 0 %}
+                            {% set total_machines = devices_by_department[training.department]|length if training.department and devices_by_department[training.department] else 0 %}
+                            {% if total_machines > 0 %}
+                                {% set percentage = ((trained_machines / total_machines) * 100)|round(1) %}
+                                <span class="badge bg-{% if percentage >= 80 %}success{% elif percentage >= 60 %}warning{% elif percentage >= 40 %}info{% else %}danger{% endif %} training-percentage">
+                                    {{ percentage }}%
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary training-percentage">N/A</span>
                             {% endif %}
                         </td>
                         <td>{{ training.last_trained_date if training.last_trained_date else 'N/A' }}</td>
@@ -71,7 +145,7 @@
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="9" class="text-center">No training records found.</td>
+                        <td colspan="11" class="text-center">No training records found.</td>
                     </tr>
                 {% endif %}
             </tbody>
@@ -109,15 +183,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="addTrainer" class="form-label">Training Module</label>
-                            <select class="form-select" id="addTrainer" name="trainer">
-                                <option value="">Select Training Module</option>
-                                {% for module in training_modules %}
-                                    <option value="{{ module }}">{{ module }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Machine Training Assignments</label>
@@ -129,12 +194,30 @@
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="addLastTrainedDate" class="form-label">Last Trained Date</label>
-                            <input type="date" class="form-control" id="addLastTrainedDate" name="last_trained_date">
+                            <label for="addLastTrainedDate" class="form-label">
+                                <i class="fas fa-calendar-alt me-2 text-primary"></i>Last Trained Date
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-check text-primary"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0 modern-date-picker" 
+                                       id="addLastTrainedDate" name="last_trained_date"
+                                       placeholder="dd/mm/yyyy" autocomplete="off">
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="addNextDueDate" class="form-label">Next Due Date</label>
-                            <input type="date" class="form-control" id="addNextDueDate" name="next_due_date">
+                            <label for="addNextDueDate" class="form-label">
+                                <i class="fas fa-calendar-plus me-2 text-success"></i>Next Due Date
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-week text-success"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0 modern-date-picker" 
+                                       id="addNextDueDate" name="next_due_date"
+                                       placeholder="dd/mm/yyyy" autocomplete="off">
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -177,15 +260,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editTrainer" class="form-label">Training Module</label>
-                            <select class="form-select" id="editTrainer" name="trainer">
-                                <option value="">Select Training Module</option>
-                                {% for module in training_modules %}
-                                    <option value="{{ module }}">{{ module }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Machine Training Assignments</label>
@@ -197,12 +271,30 @@
                     </div>
                      <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="editLastTrainedDate" class="form-label">Last Trained Date</label>
-                            <input type="date" class="form-control" id="editLastTrainedDate" name="last_trained_date">
+                            <label for="editLastTrainedDate" class="form-label">
+                                <i class="fas fa-calendar-alt me-2 text-primary"></i>Last Trained Date
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-check text-primary"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0 modern-date-picker" 
+                                       id="editLastTrainedDate" name="last_trained_date"
+                                       placeholder="dd/mm/yyyy" autocomplete="off">
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="editNextDueDate" class="form-label">Next Due Date</label>
-                            <input type="date" class="form-control" id="editNextDueDate" name="next_due_date">
+                            <label for="editNextDueDate" class="form-label">
+                                <i class="fas fa-calendar-plus me-2 text-success"></i>Next Due Date
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0">
+                                    <i class="fas fa-calendar-week text-success"></i>
+                                </span>
+                                <input type="text" class="form-control border-start-0 modern-date-picker" 
+                                       id="editNextDueDate" name="next_due_date"
+                                       placeholder="dd/mm/yyyy" autocomplete="off">
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -217,80 +309,303 @@
 
 {% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+/* Sortable column styles */
+.sortable {
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    position: relative;
+}
+
+.sortable:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sortable i {
+    margin-left: 5px;
+    opacity: 0.5;
+}
+
+.sortable.asc i:before {
+    content: "\f0de"; /* fa-sort-up */
+    opacity: 1;
+}
+
+.sortable.desc i:before {
+    content: "\f0dd"; /* fa-sort-down */
+    opacity: 1;
+}
+
+/* Control buttons styling */
+.controls-row {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+/* Bulk delete button styling */
+#bulkDeleteBtn {
+    transition: all 0.3s ease;
+}
+
+/* Table row selection highlight */
+.table tbody tr.selected {
+    background-color: #e3f2fd !important;
+}
+
+/* Filter and search controls */
+.form-select, .form-control {
+    min-width: 150px;
+}
+
+/* Machine/Trainer styling */
+.table td .machine-number {
+    font-weight: 600 !important;
+    color: #6c757d !important;
+}
+
+.table td .machine-name {
+    font-weight: 500 !important;
+    color: #212529 !important;
+}
+
+.table td .trainer-name {
+    font-weight: bold !important;
+    color: #dc3545 !important;
+}
+
+/* Additional specificity for trainer names */
+.table tbody tr td .trainer-name,
+.table tbody tr td span.trainer-name {
+    font-weight: bold !important;
+    color: #dc3545 !important;
+}
+
+/* Training percentage badge styling */
+.training-percentage {
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    padding: 0.5em 0.75em !important;
+    border-radius: 0.5rem !important;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Employee count badge styling */
+.badge.bg-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    animation: pulse-glow 2s infinite;
+}
+
+.badge.bg-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4) !important;
+}
+
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(0, 123, 255, 0.5);
+    }
+}
+
+/* Responsive controls for smaller screens */
+@media (max-width: 768px) {
+    .col-md-auto {
+        margin-bottom: 10px;
+    }
+    
+    .form-select, .form-control {
+        min-width: 120px;
+    }
+    
+    .d-flex.align-items-center {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .badge.bg-primary {
+        margin-top: 10px;
+        font-size: 0.9rem !important;
+    }
+}
+
+/* Modern Date Picker Styles */
+.modern-date-picker {
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.modern-date-picker:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    transform: translateY(-1px);
+}
+
+.input-group .input-group-text {
+    border-radius: 0.5rem 0 0 0.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #ced4da;
+    transition: all 0.3s ease;
+}
+
+.input-group:focus-within .input-group-text {
+    border-color: #0d6efd;
+    background: linear-gradient(135deg, #e7f1ff 0%, #cce7ff 100%);
+}
+
+.input-group .modern-date-picker {
+    border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Flatpickr customization */
+.flatpickr-calendar {
+    border-radius: 0.75rem !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid #e9ecef !important;
+}
+
+.flatpickr-day {
+    border-radius: 0.5rem !important;
+    transition: all 0.2s ease !important;
+}
+
+.flatpickr-day:hover {
+    background: #e7f1ff !important;
+    border-color: #0d6efd !important;
+    transform: scale(1.05) !important;
+}
+
+.flatpickr-day.selected {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+    border-color: #0d6efd !important;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3) !important;
+}
+
+.flatpickr-day.today {
+    border-color: #fd7e14 !important;
+    background: #fff3cd !important;
+    color: #664d03 !important;
+}
+
+.flatpickr-months .flatpickr-month {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+    color: white !important;
+    border-radius: 0.75rem 0.75rem 0 0 !important;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-current-month .numInputWrapper {
+    color: white !important;
+}
+
+.flatpickr-prev-month,
+.flatpickr-next-month {
+    color: white !important;
+}
+
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover {
+    color: #cce7ff !important;
+}
+</style>
+{% endblock %}
+
 {% block scripts %}
 {{ super() }}
 <script>
 const devicesByDepartment = {{ devices_by_department|tojson }};
-const trainingModules = {{ training_modules|tojson }}; // Assuming training_modules are passed to template
+const trainers = {{ trainers|tojson }}; // Use trainers for machine assignment dropdowns
 
-function populateMachineAssignments(departmentValue, containerId, placeholderId, existingAssignments = []) {
+// Working implementation copied from machine_assignment.html
+function generateMachineAssignments(department, containerId, existingAssignments = []) {
+    console.log('=== generateMachineAssignments called ===');
+    console.log('Department:', department, 'Container:', containerId);
+    console.log('Available devicesByDepartment:', devicesByDepartment);
+    
     const container = document.getElementById(containerId);
-    const placeholder = document.getElementById(placeholderId);
-    container.innerHTML = ''; // Clear previous content
-
-    if (!departmentValue) {
-        placeholder.textContent = 'Select a department to see available machines.';
-        placeholder.style.display = 'block';
-        container.appendChild(placeholder);
-        return;
-    }
-
-    const machinesInDepartment = devicesByDepartment[departmentValue] || [];
-
-    if (machinesInDepartment.length === 0) {
-        placeholder.textContent = 'No machines found for this department.';
-        placeholder.style.display = 'block';
-        container.appendChild(placeholder);
+    if (!container) {
+        console.error('Container not found:', containerId);
         return;
     }
     
-    placeholder.style.display = 'none';
-
-    machinesInDepartment.forEach(machineName => {
-        const assignmentRow = document.createElement('div');
-        assignmentRow.classList.add('row', 'mb-2', 'align-items-center', 'machine-assignment-entry');
-        assignmentRow.dataset.machineName = machineName;
-
+    // Clear existing content
+    container.innerHTML = '';
+    
+    if (!department) {
+        container.innerHTML = '<p class="text-muted">Select a department to see available machines.</p>';
+        return;
+    }
+    
+    const machines = devicesByDepartment[department] || [];
+    console.log('Machines for department', department, ':', machines);
+    
+    if (machines.length === 0) {
+        container.innerHTML = '<p class="text-muted">No machines found for this department.</p>';
+        return;
+    }
+    
+    // Create machine assignments using the working approach
+    machines.forEach(machineName => {
         const existingAssignment = existingAssignments.find(a => a.machine === machineName);
-
-        // Checkbox column
-        const colCheckbox = document.createElement('div');
-        colCheckbox.classList.add('col-md-1');
+        const isEdit = containerId.includes('edit');
+        const checkboxId = `${isEdit ? 'edit' : 'add'}_checkbox_${machineName.replace(/\s+/g, '_')}`;
+        
+        // Create the row element
+        const row = document.createElement('div');
+        row.className = 'row mb-2 align-items-center machine-assignment-entry';
+        row.dataset.machineName = machineName;
+        
+        // Create checkbox column
+        const checkboxCol = document.createElement('div');
+        checkboxCol.className = 'col-md-1';
         const checkboxDiv = document.createElement('div');
-        checkboxDiv.classList.add('form-check');
+        checkboxDiv.className = 'form-check';
         const checkbox = document.createElement('input');
-        checkbox.classList.add('form-check-input', 'machine-select-checkbox');
+        checkbox.className = 'form-check-input machine-select-checkbox';
         checkbox.type = 'checkbox';
         checkbox.value = machineName;
-        checkbox.id = `${containerId}_checkbox_${machineName.replace(/\s+/g, '_')}`;
-        if (existingAssignment) {
-            checkbox.checked = true;
-        }
+        checkbox.id = checkboxId;
+        checkbox.checked = !!existingAssignment;
         checkboxDiv.appendChild(checkbox);
-        colCheckbox.appendChild(checkboxDiv);
-
-        // Machine name column
-        const colMachineName = document.createElement('div');
-        colMachineName.classList.add('col-md-5');
-        const machineLabel = document.createElement('label');
-        machineLabel.classList.add('form-check-label');
-        machineLabel.setAttribute('for', checkbox.id);
-        machineLabel.textContent = machineName;
-        colMachineName.appendChild(machineLabel);
-
-        // Trainer select column
-        const colTrainerSelect = document.createElement('div');
-        colTrainerSelect.classList.add('col-md-6');
+        checkboxCol.appendChild(checkboxDiv);
+        
+        // Create label column
+        const labelCol = document.createElement('div');
+        labelCol.className = 'col-md-5';
+        const label = document.createElement('label');
+        label.className = 'form-check-label';
+        label.setAttribute('for', checkboxId);
+        label.textContent = machineName;
+        labelCol.appendChild(label);
+        
+        // Create trainer select column
+        const selectCol = document.createElement('div');
+        selectCol.className = 'col-md-6';
         const trainerSelect = document.createElement('select');
-        trainerSelect.classList.add('form-select', 'trainer-assign-select');
-        trainerSelect.disabled = !checkbox.checked;
-
+        trainerSelect.className = 'form-select trainer-assign-select';
+        trainerSelect.disabled = !existingAssignment;
+        
+        // Add trainer options
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = 'Select Trainer...';
         trainerSelect.appendChild(defaultOption);
-
-        trainingModules.forEach(trainer => {
+        
+        trainers.forEach(trainer => {
             const option = document.createElement('option');
             option.value = trainer;
             option.textContent = trainer;
@@ -299,55 +614,62 @@ function populateMachineAssignments(departmentValue, containerId, placeholderId,
             }
             trainerSelect.appendChild(option);
         });
-        colTrainerSelect.appendChild(trainerSelect);
-
+        
+        selectCol.appendChild(trainerSelect);
+        
+        // Add event listener for checkbox (same as working implementation)
         checkbox.addEventListener('change', function() {
             trainerSelect.disabled = !this.checked;
             if (!this.checked) {
-                trainerSelect.value = ''; // Clear trainer selection if machine is deselected
+                trainerSelect.value = '';
             }
         });
-
-        assignmentRow.appendChild(colCheckbox);
-        assignmentRow.appendChild(colMachineName);
-        assignmentRow.appendChild(colTrainerSelect);
-        container.appendChild(assignmentRow);
+        
+        // Assemble the row
+        row.appendChild(checkboxCol);
+        row.appendChild(labelCol);
+        row.appendChild(selectCol);
+        
+        // Add to container
+        container.appendChild(row);
     });
 }
 
-
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM Content Loaded - Training Page ===');
+    console.log('Available data:');
+    console.log('- devicesByDepartment:', devicesByDepartment);
+    console.log('- trainers:', trainers);
+    
+    // Simple event listeners like in machine_assignment.html
     const addDepartmentSelect = document.getElementById('addDepartment');
-    const addMachineContainerId = 'addMachineAssignmentsContainer';
-    const addMachinePlaceholderId = 'addMachinePlaceholder';
-
     const editDepartmentSelect = document.getElementById('editDepartment');
-    const editMachineContainerId = 'editMachineAssignmentsContainer';
-    const editMachinePlaceholderId = 'editMachinePlaceholder';
 
+    // Add department change handler (same as working implementation)
     if (addDepartmentSelect) {
+        console.log('Setting up Add department handler');
         addDepartmentSelect.addEventListener('change', function() {
-            populateMachineAssignments(this.value, addMachineContainerId, addMachinePlaceholderId, []);
+            const selectedDepartment = this.value;
+            console.log('Add department changed to:', selectedDepartment);
+            generateMachineAssignments(selectedDepartment, 'addMachineAssignmentsContainer', []);
         });
-        // Initial population if a department is already selected (e.g. form validation fail)
-        if(addDepartmentSelect.value) {
-             populateMachineAssignments(addDepartmentSelect.value, addMachineContainerId, addMachinePlaceholderId, []);
-        } else {
-             populateMachineAssignments(null, addMachineContainerId, addMachinePlaceholderId, []); // Show placeholder
-        }
     }
 
+    // Edit department change handler (same as working implementation)
     if (editDepartmentSelect) {
+        console.log('Setting up Edit department handler');
         editDepartmentSelect.addEventListener('change', function() {
-            // When department changes in edit mode, we pass empty assignments
-            // as user is expected to re-select if department changes.
-            // Or, we could try to preserve selections if machines still exist. For now, clear.
-            populateMachineAssignments(this.value, editMachineContainerId, editMachinePlaceholderId, []);
+            const selectedDepartment = this.value;
+            console.log('Edit department changed to:', selectedDepartment);
+            generateMachineAssignments(selectedDepartment, 'editMachineAssignmentsContainer', []);
         });
-        // Initial population for edit modal will be handled when modal is shown,
-        // using existing training data. See training.js modifications.
-         populateMachineAssignments(null, editMachineContainerId, editMachinePlaceholderId, []); // Show placeholder initially
     }
+
+    console.log('Event handlers setup complete');
+    
+    // Modern date pickers are automatically initialized by the shared module
+    // Just ensure they refresh when modals are shown
+    console.log('Training page: Modern date pickers will be handled by shared module');
 });
 </script>
 <script src="{{ url_for('static', filename='js/training.js') }}"></script>

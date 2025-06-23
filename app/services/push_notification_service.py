@@ -255,7 +255,7 @@ class PushNotificationService:
             if upcoming_all:
                 logger.debug("Sorting all upcoming tasks by date...")
                 # Sort by date if needed, though summary doesn't strictly require it
-                upcoming_all.sort(key=lambda x: datetime.strptime(x[4], '%d/%m/%Y'))
+                upcoming_all.sort(key=lambda x: EmailService.parse_date_flexible(x[4]))
                 logger.debug("Tasks sorted.")
 
             logger.debug("Summarizing all upcoming tasks...")

@@ -3,9 +3,19 @@
 {% block title %}Add OCM Equipment{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Add OCM Equipment</h2>
-    <form action="{{ url_for('views.add_ocm_equipment') }}" method="post">
+<div class="container mt-4">
+    <h1>Add OCM Equipment</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <form method="post" action="{{ url_for('views.add_ocm_equipment') }}">
+        <h5 class="mt-4 mb-3">Basic Information</h5>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
@@ -41,22 +51,70 @@
                 <input type="text" class="form-control" id="Log_Number" name="Log_Number" value="{{ form_data.Log_Number or '' }}" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="Installation_Date" class="form-label">Installation Date <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Installation_Date" name="Installation_Date" value="{{ form_data.Installation_Date or '' }}" placeholder="MM/DD/YYYY" required>
+                <label for="Installation_Date" class="form-label">
+                    <i class="fas fa-calendar-alt text-primary me-2"></i>Installation Date <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Installation_Date" name="Installation_Date" 
+                           value="{{ form_data.Installation_Date or '' }}" placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="Warranty_End" class="form-label">Warranty End <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Warranty_End" name="Warranty_End" value="{{ form_data.Warranty_End or '' }}" placeholder="MM/DD/YYYY" required>
+                <label for="Warranty_End" class="form-label">
+                    <i class="fas fa-shield-alt text-warning me-2"></i>Warranty End <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-times"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Warranty_End" name="Warranty_End" 
+                           value="{{ form_data.Warranty_End or '' }}" placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
+        </div>
+
+        <hr>
+        <h5 class="mt-4 mb-3">Maintenance Information</h5>
+        <div class="alert alert-info mb-3">
+            <i class="fas fa-magic text-primary me-2"></i>
+            <strong>Auto-Generation:</strong> When you enter the Service Date, the Next Maintenance date will be automatically set to one year later, and the Status will be determined based on whether the maintenance is due or overdue.
         </div>
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label for="Service_Date" class="form-label">Service Date <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Service_Date" name="Service_Date" value="{{ form_data.Service_Date or '' }}" placeholder="MM/DD/YYYY" required>
+                <label for="Service_Date" class="form-label">
+                    <i class="fas fa-tools text-success me-2"></i>Service Date <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-check"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Service_Date" name="Service_Date" 
+                           value="{{ form_data.Service_Date or '' }}" placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
-            <div class="col-md-4 mb-3">
-                <label for="Next_Maintenance" class="form-label">Next Maintenance <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Next_Maintenance" name="Next_Maintenance" value="{{ form_data.Next_Maintenance or '' }}" placeholder="MM/DD/YYYY" required>
+                        <div class="col-md-4 mb-3">
+                <label for="Next_Maintenance" class="form-label">
+                    <i class="fas fa-calendar-plus text-info me-2"></i>Next Maintenance <span class="text-danger">*</span>
+                    <small class="text-muted">(Auto-generated from Service Date)</small>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-week"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Next_Maintenance" name="Next_Maintenance" 
+                       value="{{ form_data.Next_Maintenance or '' }}" placeholder="Auto-generated (+1 year)" 
+                       pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                       title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="Engineer" class="form-label">Engineer <span class="text-danger">*</span></label>
@@ -64,10 +122,13 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-md-4 mb-3">
-                <label for="Status" class="form-label">Status <span class="text-danger">*</span></label>
+            <div class="col-md-6 mb-3">
+                <label for="Status" class="form-label">
+                    Status <span class="text-danger">*</span>
+                    <small class="text-muted">(Auto-generated based on Next Maintenance vs Current Date)</small>
+                </label>
                 <select class="form-select" id="Status" name="Status" required>
-                    <option value="">Select Status</option>
+                    <option value="">Auto-generated</option>
                     {% for status in general_status_options %}
                         <option value="{{ status }}" {% if form_data.Status == status %}selected{% endif %}>{{ status }}</option>
                     {% endfor %}
@@ -91,19 +152,315 @@
         <a href="{{ url_for('views.list_equipment', data_type='ocm') }}" class="btn btn-secondary mt-3">Cancel</a>
     </form>
 </div>
+{% endblock %}
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize flatpickr date pickers
-        const dateInputs = document.querySelectorAll('.datepicker');
-        dateInputs.forEach(input => {
-            flatpickr(input, {
-                dateFormat: "m/d/Y",
-                allowInput: true
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== OCM ADD PAGE INITIALIZATION ===');
+    console.log('OCM Add Page: DOM loaded, starting initialization...');
+    
+    // Enhanced library checking
+    const checkLibraries = () => {
+        const flatpickrLoaded = typeof flatpickr !== 'undefined';
+        const modernDatePickerLoaded = typeof window.ModernDatePicker !== 'undefined';
+        
+        console.log('OCM Add Page: Library status:');
+        console.log('  - Flatpickr loaded:', flatpickrLoaded);
+        console.log('  - ModernDatePicker loaded:', modernDatePickerLoaded);
+        
+        return flatpickrLoaded && modernDatePickerLoaded;
+    };
+    
+    // Retry mechanism for library loading
+    const initializeWithRetry = (attempt = 1, maxAttempts = 5) => {
+        console.log(`OCM Add Page: Initialization attempt ${attempt}/${maxAttempts}`);
+        
+        if (checkLibraries()) {
+            console.log('OCM Add Page: All libraries loaded successfully');
+            initializeDatePickers();
+        } else if (attempt < maxAttempts) {
+            console.log(`OCM Add Page: Libraries not ready, retrying in ${attempt * 500}ms...`);
+            setTimeout(() => initializeWithRetry(attempt + 1, maxAttempts), attempt * 500);
+        } else {
+            console.error('OCM Add Page: Failed to load required libraries after', maxAttempts, 'attempts');
+            fallbackInitialization();
+        }
+    };
+    
+    // Main date picker initialization
+    const initializeDatePickers = () => {
+        console.log('OCM Add Page: Starting date picker initialization...');
+        
+        // Find all date picker inputs
+        const dateInputs = document.querySelectorAll('.modern-date-picker');
+        console.log(`OCM Add Page: Found ${dateInputs.length} date picker inputs:`);
+        
+        dateInputs.forEach((input, index) => {
+            console.log(`  ${index + 1}. ${input.id || input.name || 'unnamed'} (${input.tagName})`);
         });
-    });
+        
+        // Initialize using ModernDatePicker
+        if (window.ModernDatePicker) {
+            console.log('OCM Add Page: Calling ModernDatePicker.initialize()...');
+            window.ModernDatePicker.initialize();
+            
+            // Verify initialization after a delay
+            setTimeout(() => {
+                verifyInitialization(dateInputs);
+            }, 1500);
+        } else {
+            console.error('OCM Add Page: ModernDatePicker not available for initialization');
+            fallbackInitialization();
+        }
+        
+        // Setup form validation
+        setupFormValidation();
+        
+        // Setup automatic generation for Next Maintenance and Status
+        setupServiceDateAutoGeneration();
+    };
+    
+    // Verify that date pickers were initialized
+    const verifyInitialization = (dateInputs) => {
+        console.log('OCM Add Page: Verifying date picker initialization...');
+        let initializedCount = 0;
+        let uninitializedCount = 0;
+        
+        dateInputs.forEach((input, index) => {
+            if (input._flatpickr || input.dataset.flatpickrInitialized) {
+                initializedCount++;
+                console.log(`  ✓ Input ${index + 1} (${input.id || input.name}) is initialized`);
+            } else {
+                uninitializedCount++;
+                console.log(`  ✗ Input ${index + 1} (${input.id || input.name}) is NOT initialized`);
+            }
+        });
+        
+        console.log(`OCM Add Page: Initialization summary: ${initializedCount} initialized, ${uninitializedCount} failed`);
+        
+        if (uninitializedCount > 0) {
+            console.log('OCM Add Page: Some inputs failed to initialize, trying manual initialization...');
+            manualInitialization(dateInputs);
+        } else {
+            console.log('OCM Add Page: All date pickers initialized successfully! ✓');
+        }
+    };
+    
+    // Manual initialization for failed inputs
+    const manualInitialization = (dateInputs) => {
+        dateInputs.forEach((input, index) => {
+            if (!input._flatpickr && !input.dataset.flatpickrInitialized) {
+                console.log(`OCM Add Page: Manually initializing input ${index + 1} (${input.id || input.name})...`);
+                try {
+                    const instance = flatpickr(input, {
+                        dateFormat: "d/m/Y",
+                        allowInput: true,
+                        theme: "material_blue",
+                        animate: true,
+                        position: "auto center"
+                    });
+                    
+                    if (instance) {
+                        console.log(`  ✓ Manual initialization successful for ${input.id || input.name}`);
+                        input.dataset.flatpickrInitialized = 'true';
+                    }
+                } catch (error) {
+                    console.error(`  ✗ Manual initialization failed for ${input.id || input.name}:`, error);
+                }
+            }
+        });
+    };
+    
+    // Fallback initialization when libraries are not available
+    const fallbackInitialization = () => {
+        console.log('OCM Add Page: Using fallback initialization (basic date inputs)...');
+        const dateInputs = document.querySelectorAll('.modern-date-picker');
+        
+        dateInputs.forEach((input, index) => {
+            input.type = 'date'; // Fallback to HTML5 date input
+            input.addEventListener('change', function() {
+                // Convert from YYYY-MM-DD to DD/MM/YYYY
+                if (this.value) {
+                    const date = new Date(this.value);
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    this.setAttribute('data-formatted-value', `${day}/${month}/${year}`);
+                }
+            });
+            console.log(`  ✓ Fallback setup for input ${index + 1} (${input.id || input.name})`);
+        });
+    };
+    
+    // Form validation setup
+    const setupFormValidation = () => {
+        console.log('OCM Add Page: Setting up form validation...');
+        
+        const dateInputs = ['Installation_Date', 'Warranty_End', 'Service_Date', 'Next_Maintenance'];
+        
+        dateInputs.forEach(inputId => {
+            const input = document.getElementById(inputId);
+            if (input) {
+                input.addEventListener('blur', function() {
+                    validateDateInput(this);
+                });
+                console.log(`  ✓ Validation setup for ${inputId}`);
+            } else {
+                console.warn(`  ✗ Input ${inputId} not found for validation setup`);
+            }
+        });
+        
+        console.log('OCM Add Page: Form validation setup complete');
+    };
+    
+    // Date validation function
+    const validateDateInput = (input) => {
+        const value = input.value.trim();
+        if (!value) {
+            input.setCustomValidity('');
+            return;
+        }
+        
+        // Check DD/MM/YYYY format
+        const dateRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+        if (!dateRegex.test(value)) {
+            input.setCustomValidity('Please enter date in dd/mm/yyyy format');
+            input.reportValidity();
+            return;
+        }
+        
+        // Check if date is valid
+        const parts = value.split('/');
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        
+        const date = new Date(year, month, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+            input.setCustomValidity('Please enter a valid date');
+            input.reportValidity();
+            return;
+        }
+        
+        input.setCustomValidity('');
+    };
+    
+    // Auto-generate Next Maintenance date and Status based on Service Date
+    const setupServiceDateAutoGeneration = () => {
+        console.log('OCM Add Page: Setting up Service Date auto-generation...');
+        
+        const serviceDateInput = document.getElementById('Service_Date');
+        const nextMaintenanceInput = document.getElementById('Next_Maintenance');
+        const statusSelect = document.getElementById('Status');
+        
+        if (!serviceDateInput || !nextMaintenanceInput || !statusSelect) {
+            console.warn('OCM Add Page: Required inputs not found for auto-generation');
+            return;
+        }
+        
+        const updateNextMaintenanceAndStatus = () => {
+            const serviceDateValue = serviceDateInput.value.trim();
+            
+            if (!serviceDateValue) {
+                // Clear next maintenance and reset status if service date is empty
+                nextMaintenanceInput.value = '';
+                statusSelect.value = '';
+                console.log('OCM Add Page: Service date cleared, reset dependent fields');
+                return;
+            }
+            
+            // Validate service date format
+            const dateRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/;
+            if (!dateRegex.test(serviceDateValue)) {
+                console.log('OCM Add Page: Invalid service date format, skipping auto-generation');
+                return;
+            }
+            
+            try {
+                // Parse service date (DD/MM/YYYY)
+                const parts = serviceDateValue.split('/');
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+                const year = parseInt(parts[2], 10);
+                
+                const serviceDate = new Date(year, month, day);
+                
+                // Generate next maintenance date (one year later)
+                const nextMaintenanceDate = new Date(serviceDate);
+                nextMaintenanceDate.setFullYear(nextMaintenanceDate.getFullYear() + 1);
+                
+                // Format next maintenance date as DD/MM/YYYY
+                const nextDay = String(nextMaintenanceDate.getDate()).padStart(2, '0');
+                const nextMonth = String(nextMaintenanceDate.getMonth() + 1).padStart(2, '0');
+                const nextYear = nextMaintenanceDate.getFullYear();
+                const nextMaintenanceFormatted = `${nextDay}/${nextMonth}/${nextYear}`;
+                
+                // Update Next Maintenance field
+                nextMaintenanceInput.value = nextMaintenanceFormatted;
+                
+                // Determine status based on current date vs next maintenance date
+                const currentDate = new Date();
+                currentDate.setHours(0, 0, 0, 0); // Reset time for accurate comparison
+                nextMaintenanceDate.setHours(0, 0, 0, 0);
+                
+                let status;
+                if (nextMaintenanceDate < currentDate) {
+                    status = 'Overdue';
+                } else {
+                    status = 'Upcoming';
+                }
+                
+                // Update Status field
+                statusSelect.value = status;
+                
+                // Visual feedback
+                nextMaintenanceInput.style.backgroundColor = '#e8f5e8';
+                statusSelect.style.backgroundColor = status === 'Overdue' ? '#ffe8e8' : '#e8f5e8';
+                
+                // Reset background color after 2 seconds
+                setTimeout(() => {
+                    nextMaintenanceInput.style.backgroundColor = '';
+                    statusSelect.style.backgroundColor = '';
+                }, 2000);
+                
+                console.log(`OCM Add Page: Auto-generated - Next Maintenance: ${nextMaintenanceFormatted}, Status: ${status}`);
+                
+                // Trigger change events for any other listeners
+                nextMaintenanceInput.dispatchEvent(new Event('change', { bubbles: true }));
+                statusSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                
+            } catch (error) {
+                console.error('OCM Add Page: Error in auto-generation:', error);
+            }
+        };
+        
+        // Add event listeners for auto-generation
+        serviceDateInput.addEventListener('change', updateNextMaintenanceAndStatus);
+        serviceDateInput.addEventListener('blur', updateNextMaintenanceAndStatus);
+        
+        // Also listen for flatpickr onChange if it gets initialized
+        const checkForFlatpickr = () => {
+            if (serviceDateInput._flatpickr) {
+                serviceDateInput._flatpickr.config.onChange.push(updateNextMaintenanceAndStatus);
+                console.log('OCM Add Page: Added auto-generation to Flatpickr onChange');
+            } else {
+                // Retry after a delay
+                setTimeout(checkForFlatpickr, 1000);
+            }
+        };
+        
+        // Start checking for Flatpickr
+        setTimeout(checkForFlatpickr, 500);
+        
+        console.log('OCM Add Page: Service Date auto-generation setup complete');
+    };
+    
+    // Start initialization
+    console.log('OCM Add Page: Starting initialization process...');
+    initializeWithRetry();
+    
+    console.log('=== OCM ADD PAGE INITIALIZATION COMPLETE ===');
+});
 </script>
 {% endblock %}

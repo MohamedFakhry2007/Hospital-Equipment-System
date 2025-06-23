@@ -9,7 +9,12 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="Department" class="form-label">Department <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="Department" name="Department" value="{{ request.form.Department if request.form else entry.Department }}" required>
+                <select class="form-select" id="Department" name="Department" required>
+                    <option value="">Select Department</option>
+                    {% for dept in departments %}
+                        <option value="{{ dept }}" {% if (request.form.Department if request.form else entry.Department) == dept %}selected{% endif %}>{{ dept }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="Name" class="form-label">Equipment Name <span class="text-danger">*</span></label>
@@ -36,22 +41,66 @@
                 <input type="text" class="form-control" id="Log_Number" name="Log_Number" value="{{ request.form['Log_Number'] if request.form else entry['Log_Number'] }}" required>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="Installation_Date" class="form-label">Installation Date <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Installation_Date" name="Installation_Date" value="{{ request.form['Installation_Date'] if request.form else entry['Installation_Date'] }}" placeholder="MM/DD/YYYY" required>
+                <label for="Installation_Date" class="form-label">
+                    <i class="fas fa-calendar-alt text-primary me-2"></i>Installation Date <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Installation_Date" name="Installation_Date" 
+                           value="{{ request.form['Installation_Date'] if request.form else entry['Installation_Date'] }}"
+                           placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="Warranty_End" class="form-label">Warranty End <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Warranty_End" name="Warranty_End" value="{{ request.form['Warranty_End'] if request.form else entry['Warranty_End'] }}" placeholder="MM/DD/YYYY" required>
+                <label for="Warranty_End" class="form-label">
+                    <i class="fas fa-shield-alt text-warning me-2"></i>Warranty End <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-times"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Warranty_End" name="Warranty_End" 
+                           value="{{ request.form['Warranty_End'] if request.form else entry['Warranty_End'] }}"
+                           placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
         </div>
         <div class="row">
             <div class="col-md-4 mb-3">
-                <label for="Service_Date" class="form-label">Service Date <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Service_Date" name="Service_Date" value="{{ request.form['Service_Date'] if request.form else entry['Service_Date'] }}" placeholder="MM/DD/YYYY" required>
+                <label for="Service_Date" class="form-label">
+                    <i class="fas fa-tools text-success me-2"></i>Service Date <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-check"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Service_Date" name="Service_Date" 
+                           value="{{ request.form['Service_Date'] if request.form else entry['Service_Date'] }}"
+                           placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
-                <label for="Next_Maintenance" class="form-label">Next Maintenance <span class="text-danger">*</span></label>
-                <input type="text" class="form-control datepicker" id="Next_Maintenance" name="Next_Maintenance" value="{{ request.form['Next_Maintenance'] if request.form else entry['Next_Maintenance'] }}" placeholder="MM/DD/YYYY" required>
+                <label for="Next_Maintenance" class="form-label">
+                    <i class="fas fa-calendar-plus text-info me-2"></i>Next Maintenance <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-calendar-week"></i>
+                    </span>
+                    <input type="text" class="form-control modern-date-picker" id="Next_Maintenance" name="Next_Maintenance" 
+                           value="{{ request.form['Next_Maintenance'] if request.form else entry['Next_Maintenance'] }}"
+                           placeholder="dd/mm/yyyy" 
+                           pattern="^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/\d{4}$"
+                           title="Please enter date in dd/mm/yyyy format" required>
+                </div>
             </div>
             <div class="col-md-4 mb-3">
                 <label for="Engineer" class="form-label">Engineer <span class="text-danger">*</span></label>
@@ -64,8 +113,8 @@
                 <select class="form-select" id="Status" name="Status" required>
                     <option value="">Select Status</option>
                     <option value="Upcoming" {% if (request.form.Status if request.form else entry.Status) == 'Upcoming' %}selected{% endif %}>Upcoming</option>
-                    <option value="Scheduled" {% if (request.form.Status if request.form else entry.Status) == 'Scheduled' %}selected{% endif %}>Scheduled</option>
-                    <option value="Completed" {% if (request.form.Status if request.form else entry.Status) == 'Completed' %}selected{% endif %}>Completed</option>
+                    <option value="Overdue" {% if (request.form.Status if request.form else entry.Status) == 'Overdue' %}selected{% endif %}>Overdue</option>
+                    <option value="Maintained" {% if (request.form.Status if request.form else entry.Status) == 'Maintained' %}selected{% endif %}>Maintained</option>
                 </select>
             </div>
         </div>
@@ -75,18 +124,5 @@
     </form>
 </div>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize flatpickr date pickers
-        const dateInputs = document.querySelectorAll('.datepicker');
-        dateInputs.forEach(input => {
-            flatpickr(input, {
-                dateFormat: "m/d/Y",
-                allowInput: true
-            });
-        });
-    });
-</script>
+
 {% endblock %}

@@ -1,7 +1,18 @@
 {
-  "email_notifications_enabled": false,
-  "email_reminder_interval_minutes": 500,
-  "recipient_email": "mohamedfakhrysmile@gmail.com",
+  "email_notifications_enabled": true,
+  "email_reminder_interval_minutes": 1440,
+  "recipient_email": "Alorfbiomed@gmail.com",
   "push_notifications_enabled": true,
-  "push_notification_interval_minutes": 5
+  "push_notification_interval_minutes": 60,
+  "email_send_time_hour": 7,
+  "reminder_timing": {
+    "60_days_before": false,
+    "14_days_before": false,
+    "1_day_before": false
+  },
+  "scheduler_interval_hours": 24,
+  "enable_automatic_reminders": false,
+  "cc_emails": "",
+  "automatic_backup_enabled": false,
+  "automatic_backup_interval_hours": 24
 }

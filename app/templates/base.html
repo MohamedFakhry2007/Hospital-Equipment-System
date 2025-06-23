@@ -3,49 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hospital Equipment Maintenance</title>
+    <title>Alorf Maintenance</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <!-- Font Awesome for icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Flatpickr CSS for modern date picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+    <!-- Modern Date Picker CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern-datepicker.css') }}">
     <!-- Custom CSS -->
     <style>
         body {
-            padding-top: 70px; /* Adjust for fixed navbar height */
+            margin: 0;
+            padding: 0;
+            padding-top: 100px; /* Increased padding for header clearance */
+            min-height: 100vh;
+            overflow-x: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        
+        /* Modern Header Styles */
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 12px 0;
+            height: 80px;
+            border: none;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #ffffff !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .navbar-brand:hover {
+            color: #f8f9fa !important;
+            transform: translateY(-1px);
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-brand i {
+            font-size: 1.3rem;
+        }
+        
+        /* Modern Button-Style Navigation */
+        .navbar-nav {
+            gap: 8px;
+        }
+        
+        .nav-item .nav-link {
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            padding: 8px 16px !important;
+            margin: 0 2px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .nav-item .nav-link:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            color: #ffffff !important;
+        }
+        
+        .nav-item .nav-link.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        .nav-item .nav-link i {
+            font-size: 0.85rem;
+        }
+        
+        /* Mobile responsive adjustments */
+        @media (max-width: 991px) {
+            .navbar-nav {
+                margin-top: 10px;
+                gap: 5px;
+            }
+            
+            .nav-item .nav-link {
+                margin: 2px 0;
+                text-align: center;
+            }
+        }
+        
+        /* Full-screen layout modifications */
+        .container-fluid-custom {
+            padding-left: 15px;
+            padding-right: 15px;
+            max-width: none;
+            width: 100%;
+        }
+        
+        .main-content {
+            min-height: calc(100vh - 100px - 80px); /* Account for navbar height and footer */
+            padding: 40px 0 20px 0; /* Increased top padding to prevent title overlap */
+        }
+        
+        /* Page title styling to ensure visibility */
+        .page-title {
+            margin-top: 20px;
+            margin-bottom: 30px;
+            padding-top: 15px;
+            color: #2c3e50;
+            font-weight: 600;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
         footer {
-            background-color: #f8f9fa;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             padding: 20px 0;
-            margin-top: 40px;
+            margin-top: auto;
+            text-align: center;
+        }
+        
+        /* Make tables more responsive for full-screen */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+        
+        /* Optimize cards for full-screen */
+        .card {
+            height: 100%;
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 12px;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+            font-weight: 600;
+        }
+        
+        /* Navigation adjustments for full width */
+        .navbar .container {
+            max-width: none;
+            width: 100%;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        
+        /* Toast container positioning */
+        .toast-container {
+            z-index: 1060 !important;
+            top: 110px !important; /* Position below the header with more space */
+        }
+        
+        /* Alert positioning */
+        .alert {
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
 
-    <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <!-- Modern Navigation Bar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('views.index') }}">Equipment Maintenance</a>
+            <a class="navbar-brand" href="{{ url_for('views.index') }}">
+                <i class="fas fa-tools"></i>
+                Alorf Maintenance
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.index') }}">Dashboard</a>
+                        <a class="nav-link" href="{{ url_for('views.index') }}">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.list_equipment', data_type='ppm') }}">PPM List</a>
+                        <a class="nav-link" href="{{ url_for('views.list_equipment', data_type='ppm') }}">
+                            <i class="fas fa-calendar-check"></i>
+                            PPM List
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.list_equipment', data_type='ocm') }}">OCM List</a>
+                        <a class="nav-link" href="{{ url_for('views.list_equipment', data_type='ocm') }}">
+                            <i class="fas fa-clipboard-list"></i>
+                            OCM List
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.import_export_page') }}">Import / Export</a>
+                        <a class="nav-link" href="{{ url_for('views.import_export_page') }}">
+                            <i class="fas fa-exchange-alt"></i>
+                            Import / Export
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.training_management_page') }}">Training Management</a>
+                        <a class="nav-link" href="{{ url_for('views.training_management_page') }}">
+                            <i class="fas fa-graduation-cap"></i>
+                            Training
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.settings_page') }}">Settings</a>
+                        <a class="nav-link" href="{{ url_for('views.audit_log_page') }}">
+                            <i class="fas fa-clipboard-list"></i>
+                            Audit Log
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('views.settings_page') }}">
+                            <i class="fas fa-cog"></i>
+                            Settings
+                        </a>
                     </li>
                 </ul>
             </div>
@@ -53,10 +241,10 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="container mt-4">
+    <div class="container-fluid-custom main-content">
         {# Toast Messages Container - Positioned here for global availability #}
         <div aria-live="polite" aria-atomic="true" class="position-relative">
-            <div id="toastPlacement" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055">
+            <div id="toastPlacement" class="toast-container position-fixed top-0 end-0 p-3">
                 <!-- Toasts will be appended here by JavaScript -->
             </div>
         </div>
@@ -75,18 +263,70 @@
     </div>
 
     <!-- Footer -->
-    <footer class="text-center">
-        <p>&copy; 2025 Hospital Equipment Maintenance System</p>
+    <footer>
+        <p>&copy; 2025 Alorf Maintenance System - Professional Equipment Management</p>
     </footer>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <!-- Font Awesome for icons (if not already included) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <!-- Flatpickr JavaScript for modern date picker -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <!-- Modern Date Picker JavaScript -->
+    <script src="{{ url_for('static', filename='js/modern-datepicker.js') }}"></script>
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/notifications.js') }}" defer></script> {# Added notifications.js #}
+    <script src="{{ url_for('static', filename='js/notifications.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/equipment_list.js') }}"></script>
+    
+    <!-- Active navigation highlighting script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get current page URL
+            const currentPath = window.location.pathname;
+            
+            // Get all navigation links
+            const navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+            
+            // Remove active class from all links
+            navLinks.forEach(link => link.classList.remove('active'));
+            
+            // Add active class to current page link
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+            
+            // Force date picker initialization as fallback
+            setTimeout(() => {
+                console.log('Base template: Checking date picker initialization...');
+                const dateInputs = document.querySelectorAll('.modern-date-picker');
+                console.log(`Base template: Found ${dateInputs.length} date inputs`);
+                
+                let uninitializedCount = 0;
+                dateInputs.forEach((input, index) => {
+                    if (!input._flatpickr && !input.dataset.flatpickrInitialized) {
+                        uninitializedCount++;
+                        console.log(`Base template: Input ${index + 1} (${input.id || input.name || 'unnamed'}) is not initialized`);
+                    }
+                });
+                
+                if (uninitializedCount > 0) {
+                    console.log(`Base template: ${uninitializedCount} inputs need initialization, calling ModernDatePicker.initialize()`);
+                    if (window.ModernDatePicker) {
+                        window.ModernDatePicker.initialize();
+                    } else {
+                        console.error('Base template: ModernDatePicker not available!');
+                    }
+                } else {
+                    console.log('Base template: All date inputs are properly initialized');
+                }
+            }, 1500);
+        });
+    </script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>

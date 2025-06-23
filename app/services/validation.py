@@ -20,7 +20,7 @@ class ValidationService:
     
     @staticmethod
     def validate_date_format(date_str: str) -> Tuple[bool, Optional[str]]:
-        """Validate date is in DD/MM/YYYY or YYYY-MM-DD format, returning DD/MM/YYYY.
+        """Validate date is in DD/MM/YYYY format (preferred) or YYYY-MM-DD format (backward compatibility).
         
         Args:
             date_str: Date string to validate
@@ -33,16 +33,42 @@ class ValidationService:
             return False, "Date cannot be empty"
             
         try:
-            # Try parsing as DD/MM/YYYY
+            # Try parsing as DD/MM/YYYY first (preferred format)
             parsed_date = datetime.strptime(date_str, '%d/%m/%Y')
             return True, None
         except ValueError:
             try:
-                # Try parsing as YYYY-MM-DD
+                # Try parsing as YYYY-MM-DD for backward compatibility
                 parsed_date = datetime.strptime(date_str, '%Y-%m-%d')
                 return True, None
             except ValueError:
-                return False, "Invalid date format. Expected format: DD/MM/YYYY or YYYY-MM-DD"
+                return False, "Invalid date format. Expected format: DD/MM/YYYY"
+
+    @staticmethod
+    def convert_date_to_ddmmyyyy(date_str: str) -> str:
+        """Convert date string to DD/MM/YYYY format.
+        
+        Args:
+            date_str: Date string in various formats
+            
+        Returns:
+            Date string in DD/MM/YYYY format
+        """
+        if not date_str or date_str.strip() == '':
+            return date_str
+            
+        try:
+            # Try DD/MM/YYYY first (already in correct format)
+            parsed_date = datetime.strptime(date_str, '%d/%m/%Y')
+            return date_str  # Already in correct format
+        except ValueError:
+            try:
+                # Try YYYY-MM-DD and convert
+                parsed_date = datetime.strptime(date_str, '%Y-%m-%d')
+                return parsed_date.strftime('%d/%m/%Y')
+            except ValueError:
+                # Return original if parsing fails
+                return date_str
 
     @staticmethod
     def validate_ppm_form(form_data: Dict[str, Any]) -> Tuple[bool, Dict[str, List[str]]]:
@@ -83,91 +109,118 @@ class ValidationService:
         if ocm_value not in ('yes', 'no'):
             errors['OCM'] = ["OCM must be 'Yes' or 'No'"]
         
+        # Validate date fields
+        date_fields = ['Installation_Date', 'Warranty_End', 'Service_Date', 'Next_Maintenance']
+        for field in date_fields:
+            date_str = form_data.get(field, '').strip()
+            if date_str:  # Only validate if date is provided
+                date_valid, date_error = ValidationService.validate_date_format(date_str)
+                if not date_valid:
+                    errors[field] = [date_error]
+        
         return len(errors) == 0, errors
 
     @staticmethod
-    def generate_quarter_dates(q1_date: str) -> List[str]:
-        """Generate quarter dates from Q1 date.
+    def validate_quarterly_assignment(quarter_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """Validate quarterly assignment data for PPM.
         
         Args:
-            q1_date: Quarter I date in DD/MM/YYYY or YYYY-MM-DD format
+            quarter_data: Dictionary containing engineer and quarter_date fields
             
         Returns:
-            List of Q2, Q3, Q4 dates in DD/MM/YYYY format
-            
-        Raises:
-            ValueError: If the date format is invalid
+            Tuple of (is_valid, error_message)
         """
-        logger.debug(f"Generating quarter dates from: '{q1_date}'")
+        engineer = quarter_data.get('engineer', '').strip()
+        quarter_date = quarter_data.get('quarter_date', '').strip()
+        
+        if not quarter_date:
+            return False, "Quarter date is required"
+            
+        # Validate date format
         try:
-            try:
-                # Try parsing as DD/MM/YYYY
-                q1 = datetime.strptime(q1_date, '%d/%m/%Y')
-            except ValueError:
-                # Try parsing as YYYY-MM-DD
-                q1 = datetime.strptime(q1_date, '%Y-%m-%d')
-            return [
-                (q1 + relativedelta(months=3*i)).strftime('%d/%m/%Y')
-                for i in range(1, 4)
-            ]
+            # First try DD/MM/YYYY format
+            datetime.strptime(quarter_date, '%d/%m/%Y')
+            return True, ""
         except ValueError:
-            logger.error(f"Invalid date format for Q1 date: '{q1_date}'")
-            raise ValueError("Invalid date format for Quarter I date. Expected DD/MM/YYYY or YYYY-MM-DD")
-
-    @staticmethod
-    def convert_ppm_form_to_model(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        model_data = {
-            'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
-            'MODEL': form_data.get('MODEL', '').strip(),
-            'SERIAL': form_data.get('SERIAL', '').strip(),
-            'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
-            'LOG_NO': form_data.get('LOG_NO', '').strip(),
-            'PPM': form_data.get('PPM', '').strip().title()
-        }
-        
-        # Get Q1 date and generate other quarters
-        q1_date = form_data.get('PPM_Q_I_date', '').strip()
-        try:
             try:
-                # Parse as DD/MM/YYYY
-                q1 = datetime.strptime(q1_date, '%d/%m/%Y')
+                # Fallback to YYYY-MM-DD format for backward compatibility
+                datetime.strptime(quarter_date, '%Y-%m-%d')
+                return True, ""
             except ValueError:
-                # Parse as YYYY-MM-DD
-                q1 = datetime.strptime(q1_date, '%Y-%m-%d')
-            q1_date_formatted = q1.strftime('%d/%m/%Y')  # Standardize to DD/MM/YYYY
-            other_dates = ValidationService.generate_quarter_dates(q1_date_formatted)
-        except ValueError as e:
-            logger.error(f"Failed to process quarter dates: {str(e)}")
-            raise ValueError("Invalid Quarter I date format. Please use DD/MM/YYYY or YYYY-MM-DD")
-        
-        # Set Q1
-        model_data['PPM_Q_I'] = {
-            'date': q1_date_formatted,
-            'engineer': form_data.get('PPM_Q_I_engineer', '').strip()
-        }
-        
-        # Set Q2-Q4
-        for i, q in enumerate(['II', 'III', 'IV']):
-            model_data[f'PPM_Q_{q}'] = {
-                'date': other_dates[i],
-                'engineer': form_data.get(f'PPM_Q_{q}_engineer', '').strip()
-            }
-        
-        return model_data
+                return False, "Invalid date format. Expected format: DD/MM/YYYY"
 
     @staticmethod
-    def convert_ocm_form_to_model(form_data: Dict[str, Any]) -> Dict[str, Any]:
-        model_data = {
-            'EQUIPMENT': form_data.get('EQUIPMENT', '').strip(),
-            'MODEL': form_data.get('MODEL', '').strip(),
-            'SERIAL': form_data.get('SERIAL', '').strip(),
-            'MANUFACTURER': form_data.get('MANUFACTURER', '').strip(),
-            'LOG_NO': form_data.get('LOG_NO', '').strip(),
-            'PPM': form_data.get('PPM', '').strip(),
-            'OCM': form_data.get('OCM', '').strip().title(),  # Normalize to 'Yes' or 'No'
-            'OCM_2024': form_data.get('OCM_2024', '').strip(),
-            'ENGINEER': form_data.get('ENGINEER', '').strip(),
-            'OCM_2025': form_data.get('OCM_2025', '').strip()
-        }
+    def calculate_quarter_dates_from_q1(q1_date_str: str) -> List[str]:
+        """Calculate all quarter dates from Q1 date.
         
-        return model_data
+        Args:
+            q1_date_str: Q1 date in DD/MM/YYYY format
+            
+        Returns:
+            List of quarter dates in DD/MM/YYYY format
+        """
+        try:
+            # Parse Q1 date
+            q1_date = datetime.strptime(q1_date_str, '%d/%m/%Y')
+            
+            # Calculate subsequent quarters (3 months apart)
+            quarter_dates = [q1_date_str]  # Q1 date
+            current_date = q1_date
+            
+            for i in range(3):  # Q2, Q3, Q4
+                current_date = current_date + relativedelta(months=3)
+                quarter_dates.append(current_date.strftime('%d/%m/%Y'))
+            
+            return quarter_dates
+            
+        except ValueError:
+            # If parsing fails, try YYYY-MM-DD format for backward compatibility
+            try:
+                q1_date = datetime.strptime(q1_date_str, '%Y-%m-%d')
+                q1_date_formatted = q1_date.strftime('%d/%m/%Y')  # Standardize to DD/MM/YYYY
+                
+                quarter_dates = [q1_date_formatted]  # Q1 date
+                current_date = q1_date
+                
+                for i in range(3):  # Q2, Q3, Q4
+                    current_date = current_date + relativedelta(months=3)
+                    quarter_dates.append(current_date.strftime('%d/%m/%Y'))
+                
+                return quarter_dates
+                
+            except ValueError:
+                raise ValueError("Invalid Quarter I date format. Please use DD/MM/YYYY")
+
+    @staticmethod
+    def normalize_all_dates_in_entry(entry: Dict[str, Any], data_type: str) -> Dict[str, Any]:
+        """Normalize all date fields in an entry to DD/MM/YYYY format.
+        
+        Args:
+            entry: Equipment entry dictionary
+            data_type: 'ppm' or 'ocm'
+            
+        Returns:
+            Entry with all dates normalized to DD/MM/YYYY format
+        """
+        normalized_entry = entry.copy()
+        
+        if data_type == 'ppm':
+            # Normalize main dates
+            for field in ['Installation_Date', 'Warranty_End']:
+                if field in normalized_entry and normalized_entry[field]:
+                    normalized_entry[field] = ValidationService.convert_date_to_ddmmyyyy(normalized_entry[field])
+            
+            # Normalize quarter dates
+            for quarter in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
+                if quarter in normalized_entry and normalized_entry[quarter].get('quarter_date'):
+                    normalized_entry[quarter]['quarter_date'] = ValidationService.convert_date_to_ddmmyyyy(
+                        normalized_entry[quarter]['quarter_date']
+                    )
+                    
+        elif data_type == 'ocm':
+            # Normalize OCM date fields
+            for field in ['Installation_Date', 'Warranty_End', 'Service_Date', 'Next_Maintenance']:
+                if field in normalized_entry and normalized_entry[field]:
+                    normalized_entry[field] = ValidationService.convert_date_to_ddmmyyyy(normalized_entry[field])
+        
+        return normalized_entry

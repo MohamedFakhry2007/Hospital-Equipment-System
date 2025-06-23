@@ -46,24 +46,56 @@
         <h5 class="mt-4 mb-3">Dates (Optional)</h5>
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="Installation_Date" class="form-label">Installation Date (DD/MM/YYYY)</label>
-                <input type="text" class="form-control" id="Installation_Date" name="Installation_Date" value="{{ form_data.Installation_Date or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
+                <label for="Installation_Date" class="form-label">
+                    <i class="fas fa-tools me-2 text-info"></i>Installation Date
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0">
+                        <i class="fas fa-calendar-alt text-info"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0 modern-date-picker" 
+                           id="Installation_Date" name="Installation_Date" 
+                           value="{{ form_data.Installation_Date or '' }}" 
+                           placeholder="dd/mm/yyyy" autocomplete="off"
+                           title="Please enter date in dd/mm/yyyy format">
+                </div>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="Warranty_End" class="form-label">Warranty End Date (DD/MM/YYYY)</label>
-                <input type="text" class="form-control" id="Warranty_End" name="Warranty_End" value="{{ form_data.Warranty_End or '' }}" pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
+                <label for="Warranty_End" class="form-label">
+                    <i class="fas fa-shield-alt me-2 text-warning"></i>Warranty End Date
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0">
+                        <i class="fas fa-calendar-times text-warning"></i>
+                    </span>
+                    <input type="text" class="form-control border-start-0 modern-date-picker" 
+                           id="Warranty_End" name="Warranty_End" 
+                           value="{{ form_data.Warranty_End or '' }}" 
+                           placeholder="dd/mm/yyyy" autocomplete="off"
+                           title="Please enter date in dd/mm/yyyy format">
+                </div>
             </div>
         </div>
         <hr>
         <h5 class="mt-4 mb-3">Quarterly Engineer Assignments</h5>        <div class="row">
             <div class="col-md-6">
-                <h6>Quarter I</h6>
+                <div class="quarter-section quarter-1">
+                    <h6><i class="fas fa-calendar-day me-2"></i>Quarter I</h6>
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label for="PPM_Q_I_date" class="form-label">Q1 Date (DD/MM/YYYY)</label>
-                        <input type="text" class="form-control" id="PPM_Q_I_date" name="PPM_Q_I_date" 
-                               value="{{ form_data.PPM_Q_I.quarter_date if form_data.get('PPM_Q_I') else '' }}" 
-                               pattern="\d{2}/\d{2}/\d{4}" placeholder="DD/MM/YYYY">
+                        <label for="PPM_Q_I_date" class="form-label">
+                            <i class="fas fa-calendar-day me-2 text-primary"></i>Q1 Date
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0">
+                                <i class="fas fa-calendar text-primary"></i>
+                            </span>
+                            <input type="text" class="form-control border-start-0 modern-date-picker" 
+                                   id="PPM_Q_I_date" name="PPM_Q_I_date" 
+                                   value="{{ form_data.PPM_Q_I.quarter_date if form_data.get('PPM_Q_I') else '' }}"
+                                   placeholder="dd/mm/yyyy" autocomplete="off"
+                                   title="Please enter date in dd/mm/yyyy format">
+                        </div>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_I_engineer" class="form-label">Q1 Engineer</label>
@@ -71,23 +103,26 @@
                                value="{{ form_data.PPM_Q_I.engineer if form_data.get('PPM_Q_I') else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label for="PPM_Q_I_status" class="form-label">Q1 Status</label>
-                        <select class="form-select" id="PPM_Q_I_status" name="PPM_Q_I_status">
+                        <label for="PPM_Q_I_status" class="form-label">Q1 Status (Auto-calculated)</label>
+                        <select class="form-select" id="PPM_Q_I_status" name="PPM_Q_I_status" readonly>
                             <option value="">Select Status</option>
-                            {% for status in quarter_status_options %}
-                                <option value="{{ status }}" {% if form_data.get('PPM_Q_I', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
-                            {% endfor %}
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Maintained">Maintained</option>
+                            <option value="Overdue">Overdue</option>
                         </select>
                     </div>
                 </div>
-            </div>            <div class="col-md-6">
-                <h6>Quarter II</h6>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="quarter-section quarter-2">
+                    <h6><i class="fas fa-calendar-day me-2"></i>Quarter II</h6>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_II_date" class="form-label">Q2 Date (Auto-calculated)</label>
-                        <input type="text" class="form-control" id="PPM_Q_II_date" 
+                        <input type="text" class="form-control" id="PPM_Q_II_date" name="PPM_Q_II_date"
                                value="{{ form_data.PPM_Q_II.quarter_date if form_data.get('PPM_Q_II') else '' }}" 
-                               readonly disabled>
+                               placeholder="dd/mm/yyyy" readonly>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_II_engineer" class="form-label">Q2 Engineer</label>
@@ -95,26 +130,28 @@
                                value="{{ form_data.PPM_Q_II.engineer if form_data.get('PPM_Q_II') else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label for="PPM_Q_II_status" class="form-label">Q2 Status</label>
-                        <select class="form-select" id="PPM_Q_II_status" name="PPM_Q_II_status">
+                        <label for="PPM_Q_II_status" class="form-label">Q2 Status (Auto-calculated)</label>
+                        <select class="form-select" id="PPM_Q_II_status" name="PPM_Q_II_status" readonly>
                             <option value="">Select Status</option>
-                            {% for status in quarter_status_options %}
-                                <option value="{{ status }}" {% if form_data.get('PPM_Q_II', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
-                            {% endfor %}
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Maintained">Maintained</option>
+                            <option value="Overdue">Overdue</option>
                         </select>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6">
-                <h6>Quarter III</h6>
+                <div class="quarter-section quarter-3">
+                    <h6><i class="fas fa-calendar-day me-2"></i>Quarter III</h6>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_III_date" class="form-label">Q3 Date (Auto-calculated)</label>
-                        <input type="text" class="form-control" id="PPM_Q_III_date"
+                        <input type="text" class="form-control" id="PPM_Q_III_date" name="PPM_Q_III_date"
                                value="{{ form_data.PPM_Q_III.quarter_date if form_data.get('PPM_Q_III') else '' }}" 
-                               readonly disabled>
+                               placeholder="dd/mm/yyyy" readonly>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_III_engineer" class="form-label">Q3 Engineer</label>
@@ -122,24 +159,26 @@
                                value="{{ form_data.PPM_Q_III.engineer if form_data.get('PPM_Q_III') else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label for="PPM_Q_III_status" class="form-label">Q3 Status</label>
-                        <select class="form-select" id="PPM_Q_III_status" name="PPM_Q_III_status">
+                        <label for="PPM_Q_III_status" class="form-label">Q3 Status (Auto-calculated)</label>
+                        <select class="form-select" id="PPM_Q_III_status" name="PPM_Q_III_status" readonly>
                             <option value="">Select Status</option>
-                            {% for status in quarter_status_options %}
-                                <option value="{{ status }}" {% if form_data.get('PPM_Q_III', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
-                            {% endfor %}
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Maintained">Maintained</option>
+                            <option value="Overdue">Overdue</option>
                         </select>
                     </div>
                 </div>
+                </div>
             </div>
             <div class="col-md-6">
-                <h6>Quarter IV</h6>
+                <div class="quarter-section quarter-4">
+                    <h6><i class="fas fa-calendar-day me-2"></i>Quarter IV</h6>
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_IV_date" class="form-label">Q4 Date (Auto-calculated)</label>
-                        <input type="text" class="form-control" id="PPM_Q_IV_date"
+                        <input type="text" class="form-control" id="PPM_Q_IV_date" name="PPM_Q_IV_date"
                                value="{{ form_data.PPM_Q_IV.quarter_date if form_data.get('PPM_Q_IV') else '' }}" 
-                               readonly disabled>
+                               placeholder="dd/mm/yyyy" readonly>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label for="PPM_Q_IV_engineer" class="form-label">Q4 Engineer</label>
@@ -147,26 +186,16 @@
                                value="{{ form_data.PPM_Q_IV.engineer if form_data.get('PPM_Q_IV') else '' }}">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label for="PPM_Q_IV_status" class="form-label">Q4 Status</label>
-                        <select class="form-select" id="PPM_Q_IV_status" name="PPM_Q_IV_status">
+                        <label for="PPM_Q_IV_status" class="form-label">Q4 Status (Auto-calculated)</label>
+                        <select class="form-select" id="PPM_Q_IV_status" name="PPM_Q_IV_status" readonly>
                             <option value="">Select Status</option>
-                            {% for status in quarter_status_options %}
-                                <option value="{{ status }}" {% if form_data.get('PPM_Q_IV', {}).get('status') == status %}selected{% endif %}>{{ status }}</option>
-                            {% endfor %}
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Maintained">Maintained</option>
+                            <option value="Overdue">Overdue</option>
                         </select>
                     </div>
                 </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label for="Status" class="form-label">Overall Status</label>
-                <select class="form-select" id="Status" name="Status">
-                    <option value="">Select Status</option>
-                    {% for status in general_status_options %}
-                        <option value="{{ status }}" {% if form_data.Status == status or (not form_data.Status and status == 'Upcoming') %}selected{% endif %}>{{ status }}</option>
-                    {% endfor %}
-                </select>
+                </div>
             </div>
         </div>
 
@@ -188,36 +217,111 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+/* Additional styling for PPM form date pickers */
+.quarter-section {
+    background: #f8f9fa;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.quarter-section:hover {
+    background: #f1f3f4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.quarter-section h6 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Color coding for quarters */
+.quarter-1 { border-left: 4px solid #0d6efd; }
+.quarter-2 { border-left: 4px solid #198754; }
+.quarter-3 { border-left: 4px solid #fd7e14; }
+.quarter-4 { border-left: 4px solid #dc3545; }
+
+.quarter-1 h6 { color: #0d6efd; }
+.quarter-2 h6 { color: #198754; }
+.quarter-3 h6 { color: #fd7e14; }
+.quarter-4 h6 { color: #dc3545; }
+</style>
+{% endblock %}
+
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const q1DateInput = document.getElementById('PPM_Q_I_date');
-    const q1DateInput = document.getElementById('PPM_Q_I_date');
     const q2DateInput = document.getElementById('PPM_Q_II_date');
     const q3DateInput = document.getElementById('PPM_Q_III_date');
     const q4DateInput = document.getElementById('PPM_Q_IV_date');
+
+    const q1StatusSelect = document.getElementById('PPM_Q_I_status');
+    const q2StatusSelect = document.getElementById('PPM_Q_II_status');
+    const q3StatusSelect = document.getElementById('PPM_Q_III_status');
+    const q4StatusSelect = document.getElementById('PPM_Q_IV_status');
 
     const q1EngineerInput = document.getElementById('PPM_Q_I_engineer');
     const q2EngineerInput = document.getElementById('PPM_Q_II_engineer');
     const q3EngineerInput = document.getElementById('PPM_Q_III_engineer');
     const q4EngineerInput = document.getElementById('PPM_Q_IV_engineer');
 
-    const overallStatusSelect = document.getElementById('Status');
-
-    function parseDate(dateStr) { // DD/MM/YYYY
+    function parseDate(dateStr) { // DD/MM/YYYY format
         if (!dateStr || typeof dateStr !== 'string') return null;
         const parts = dateStr.split('/');
         if (parts.length !== 3) return null;
+        
         const day = parseInt(parts[0], 10);
         const month = parseInt(parts[1], 10) - 1; // JS months are 0-indexed
         const year = parseInt(parts[2], 10);
+        
         if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        if (day < 1 || day > 31 || month < 0 || month > 11 || year < 1900) return null;
+        
         const date = new Date(year, month, day);
-        // Check if date is valid (e.g. not 31/02/2023)
-        if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
-            return null;
-        }
+        if (isNaN(date.getTime())) return null;
         return date;
+    }
+
+    function formatDate(date) { // Convert Date object to DD/MM/YYYY string
+        if (!date || isNaN(date.getTime())) return '';
+        
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // JS months are 0-indexed
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
+
+    // Function to determine status based on date
+    function getQuarterStatus(dateStr, engineer) {
+        const date = parseDate(dateStr);
+        if (!date) return '';
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize to midnight for accurate comparison
+        date.setHours(0, 0, 0, 0);
+        
+        if (date < today) {
+            return engineer && engineer.trim() ? 'Maintained' : 'Overdue';
+        } else if (date.getTime() === today.getTime()) {
+            return 'Maintained';
+        } else {
+            return 'Upcoming';
+        }
+    }
+
+    function setQuarterStatus(selectElement, dateStr) {
+        const status = getQuarterStatus(dateStr, '');
+        selectElement.value = status;
     }
 
     function calculateOverallStatus(q1DateStr, q1Eng, q2DateStr, q2Eng, q3DateStr, q3Eng, q4DateStr, q4Eng) {
@@ -226,9 +330,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let isOverdue = false;
         let numPastDueQuartersTotal = 0;
-        // let numPastDueQuartersMaintained = 0; // Not directly needed for this simplified logic flow
         let numFutureQuarters = 0;
-        // let hasAnyValidQuarterDate = false; // Not strictly needed for this logic flow
 
         const quarters = [
             { dateStr: q1DateStr, eng: q1Eng },
@@ -240,14 +342,12 @@ document.addEventListener('DOMContentLoaded', function() {
         for (const quarter of quarters) {
             const currentDate = parseDate(quarter.dateStr);
             if (!currentDate) continue; // Skip if date is invalid or not specified
-            // hasAnyValidQuarterDate = true;
 
             if (currentDate < today) {
                 numPastDueQuartersTotal++;
                 if (!quarter.eng || quarter.eng.trim() === '') {
                     isOverdue = true;
                 }
-                // else { numPastDueQuartersMaintained++; }
             } else { // currentDate >= today
                 numFutureQuarters++;
             }
@@ -264,12 +364,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const date = parseDate(dateStr);
         if (!date) return '';
         
-        date.setMonth(date.getMonth() + 3); // Add 3 months
+        // Add 3 months
+        const nextDate = new Date(date);
+        nextDate.setMonth(nextDate.getMonth() + 3);
         
-        const dd = String(date.getDate()).padStart(2, '0');
-        const mm = String(date.getMonth() + 1).padStart(2, '0'); // JS months are 0-indexed
-        const yyyy = date.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
+        return formatDate(nextDate);
     }
 
     function updatePPMForm() {
@@ -277,47 +376,85 @@ document.addEventListener('DOMContentLoaded', function() {
         let q2Date = '', q3Date = '', q4Date = '';
 
         if (q1Date && parseDate(q1Date)) {
+            // Set Q1 status
+            setQuarterStatus(q1StatusSelect, q1Date);
+            
+            // Calculate Q2 (Q1 + 3 months)
             q2Date = calculateNextQuarterDate(q1Date);
             q2DateInput.value = q2Date;
+            setQuarterStatus(q2StatusSelect, q2Date);
+            
             if (q2Date) {
+                // Calculate Q3 (Q2 + 3 months)
                 q3Date = calculateNextQuarterDate(q2Date);
                 q3DateInput.value = q3Date;
+                setQuarterStatus(q3StatusSelect, q3Date);
+                
                 if (q3Date) {
+                    // Calculate Q4 (Q3 + 3 months)
                     q4Date = calculateNextQuarterDate(q3Date);
                     q4DateInput.value = q4Date;
+                    setQuarterStatus(q4StatusSelect, q4Date);
                 } else {
                     q4DateInput.value = '';
+                    q4StatusSelect.selectedIndex = 0;
                 }
             } else {
                 q3DateInput.value = '';
                 q4DateInput.value = '';
+                q3StatusSelect.selectedIndex = 0;
+                q4StatusSelect.selectedIndex = 0;
             }
         } else { // Q1 date is empty or invalid
             q2DateInput.value = '';
             q3DateInput.value = '';
             q4DateInput.value = '';
+            
+            // Clear all statuses
+            q1StatusSelect.selectedIndex = 0;
+            q2StatusSelect.selectedIndex = 0;
+            q3StatusSelect.selectedIndex = 0;
+            q4StatusSelect.selectedIndex = 0;
         }
-
-        const status = calculateOverallStatus(
-            q1Date, q1EngineerInput.value,
-            q2DateInput.value, q2EngineerInput.value,
-            q3DateInput.value, q3EngineerInput.value,
-            q4DateInput.value, q4EngineerInput.value
-        );
-
-        overallStatusSelect.value = status;
-        overallStatusSelect.disabled = true; // Make read-only
     }
 
     // Initial calculation on page load in case of pre-filled form (e.g. validation error reload)
     updatePPMForm();
 
     // Add event listeners
+    q1DateInput.addEventListener('input', updatePPMForm);
     q1DateInput.addEventListener('change', updatePPMForm);
-    q1EngineerInput.addEventListener('input', updatePPMForm); // Recalculate if engineer changes
-    q2EngineerInput.addEventListener('input', updatePPMForm);
-    q3EngineerInput.addEventListener('input', updatePPMForm);
-    q4EngineerInput.addEventListener('input', updatePPMForm);
+
+    // Update statuses when engineers change
+    function updateStatusOnEngineerChange() {
+        if (q1DateInput.value) setQuarterStatus(q1StatusSelect, q1DateInput.value);
+        if (q2DateInput.value) setQuarterStatus(q2StatusSelect, q2DateInput.value);
+        if (q3DateInput.value) setQuarterStatus(q3StatusSelect, q3DateInput.value);
+        if (q4DateInput.value) setQuarterStatus(q4StatusSelect, q4DateInput.value);
+    }
+
+    q1EngineerInput.addEventListener('change', updateStatusOnEngineerChange);
+    q2EngineerInput.addEventListener('change', updateStatusOnEngineerChange);
+    q3EngineerInput.addEventListener('change', updateStatusOnEngineerChange);
+    q4EngineerInput.addEventListener('change', updateStatusOnEngineerChange);
+
+    // Add input validation for date fields
+    function validateDateInput(input) {
+        input.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value && !parseDate(value)) {
+                this.setCustomValidity('Please enter a valid date in dd/mm/yyyy format');
+                this.reportValidity();
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+    }
+
+    // Apply validation to all date inputs
+    validateDateInput(document.getElementById('Installation_Date'));
+    validateDateInput(document.getElementById('Warranty_End'));
+    validateDateInput(q1DateInput);
 });
 </script>
 {% endblock %}

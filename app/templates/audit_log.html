@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log - Hospital Equipment System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-0">
+                        <i class="fas fa-clipboard-list text-primary me-2"></i>
+                        Audit Log
+                    </h1>
+                    <p class="text-muted mb-0">System activity and change tracking</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-success" id="exportBtn">
+                        <i class="fas fa-download me-2"></i>
+                        Export CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
+                        <i class="fas fa-sync-alt me-2"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light border-0">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter text-secondary me-2"></i>
+                        Filters & Search
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" id="filterForm">
+                        <div class="row g-3">
+                            <!-- Event Type Filter -->
+                            <div class="col-md-3">
+                                <label for="eventTypeFilter" class="form-label fw-medium">
+                                    <i class="fas fa-tag text-info me-1"></i>
+                                    Event Type
+                                </label>
+                                <select class="form-select" id="eventTypeFilter" name="event_type">
+                                    <option value="">All Event Types</option>
+                                    {% for event_type in event_types %}
+                                    <option value="{{ event_type }}" 
+                                            {% if current_filters.event_type == event_type %}selected{% endif %}>
+                                        {{ event_type }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- User Filter -->
+                            <div class="col-md-3">
+                                <label for="userFilter" class="form-label fw-medium">
+                                    <i class="fas fa-user text-warning me-1"></i>
+                                    User
+                                </label>
+                                <select class="form-select" id="userFilter" name="user">
+                                    <option value="">All Users</option>
+                                    {% for user in users %}
+                                    <option value="{{ user }}" 
+                                            {% if current_filters.user == user %}selected{% endif %}>
+                                        {{ user }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Date Range -->
+                            <div class="col-md-2">
+                                <label for="startDate" class="form-label fw-medium">
+                                    <i class="fas fa-calendar-alt text-success me-1"></i>
+                                    Start Date
+                                </label>
+                                <input type="date" class="form-control" id="startDate" name="start_date" 
+                                       value="{{ current_filters.start_date }}">
+                            </div>
+
+                            <div class="col-md-2">
+                                <label for="endDate" class="form-label fw-medium">
+                                    <i class="fas fa-calendar-alt text-success me-1"></i>
+                                    End Date
+                                </label>
+                                <input type="date" class="form-control" id="endDate" name="end_date" 
+                                       value="{{ current_filters.end_date }}">
+                            </div>
+
+                            <!-- Search -->
+                            <div class="col-md-2">
+                                <label for="searchQuery" class="form-label fw-medium">
+                                    <i class="fas fa-search text-primary me-1"></i>
+                                    Search
+                                </label>
+                                <input type="text" class="form-control" id="searchQuery" name="search" 
+                                       placeholder="Search logs..." value="{{ current_filters.search }}">
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-2"></i>
+                                        Apply Filters
+                                    </button>
+                                    <a href="{{ url_for('views.audit_log_page') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-2"></i>
+                                        Clear Filters
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Summary -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info border-0 d-flex align-items-center">
+                <i class="fas fa-info-circle me-2"></i>
+                <span>
+                    Showing <strong>{{ logs|length }}</strong> audit log entries
+                    {% if current_filters.event_type or current_filters.user or current_filters.start_date or current_filters.search %}
+                    (filtered)
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="auditLogTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th scope="col" class="text-center" style="width: 80px;">
+                                        <i class="fas fa-hashtag me-1"></i>ID
+                                    </th>
+                                    <th scope="col" style="width: 180px;">
+                                        <i class="fas fa-clock me-1"></i>Timestamp
+                                    </th>
+                                    <th scope="col" style="width: 150px;">
+                                        <i class="fas fa-tag me-1"></i>Event Type
+                                    </th>
+                                    <th scope="col" style="width: 120px;">
+                                        <i class="fas fa-user me-1"></i>User
+                                    </th>
+                                    <th scope="col">
+                                        <i class="fas fa-info-circle me-1"></i>Description
+                                    </th>
+                                    <th scope="col" class="text-center" style="width: 100px;">
+                                        <i class="fas fa-check-circle me-1"></i>Status
+                                    </th>
+                                    <th scope="col" class="text-center" style="width: 80px;">
+                                        <i class="fas fa-eye me-1"></i>Details
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if logs %}
+                                    {% for log in logs %}
+                                    <tr>
+                                        <td class="text-center fw-medium">{{ log.id }}</td>
+                                        <td>
+                                            <small class="text-muted d-block">{{ log.timestamp.split(' ')[0] }}</small>
+                                            <small class="fw-medium">{{ log.timestamp.split(' ')[1] }}</small>
+                                        </td>
+                                        <td>
+                                            {% set event_type = log.event_type %}
+                                            {% if event_type == 'System Startup' %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-power-off me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Equipment Added' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-plus me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Equipment Updated' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-edit me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Equipment Deleted' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-trash me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Reminder Sent' %}
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-bell me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Setting Changed' %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-cog me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Bulk Import' %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-upload me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Data Export' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-download me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Push Notification' %}
+                                                <span class="badge bg-purple">
+                                                    <i class="fas fa-mobile-alt me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'Email Notification' %}
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-envelope me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% elif event_type == 'System Error' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-circle me-1"></i>{{ event_type }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if log.performed_by == 'System' %}
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="fas fa-robot me-1"></i>System
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-user me-1"></i>{{ log.performed_by }}
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="text-truncate" style="max-width: 300px;" 
+                                                 title="{{ log.description }}">
+                                                {{ log.description }}
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            {% if log.status == 'Success' %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check me-1"></i>Success
+                                                </span>
+                                            {% elif log.status == 'Failed' %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-times me-1"></i>Failed
+                                                </span>
+                                            {% elif log.status == 'Warning' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>Warning
+                                                </span>
+                                            {% elif log.status == 'Info' %}
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-info-circle me-1"></i>Info
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ log.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if log.details %}
+                                                <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#detailsModal" 
+                                                        data-log-id="{{ log.id }}"
+                                                        data-log-details='{{ log.details | tojson }}'
+                                                        title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-5">
+                                            <div class="text-muted">
+                                                <i class="fas fa-search fa-3x mb-3"></i>
+                                                <h5>No audit logs found</h5>
+                                                <p class="mb-0">Try adjusting your filters or search criteria</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailsModalLabel">
+                    <i class="fas fa-info-circle text-primary me-2"></i>
+                    Audit Log Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="detailsContent">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom CSS -->
+<style>
+.bg-purple {
+    background-color: #6f42c1 !important;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.text-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .badge {
+        font-size: 0.7em;
+    }
+}
+</style>
+
+<!-- JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Export button functionality
+    const exportBtn = document.getElementById('exportBtn');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const detailsModal = document.getElementById('detailsModal');
+    
+    // Export functionality
+    exportBtn.addEventListener('click', function() {
+        const currentUrl = new URL(window.location);
+        currentUrl.pathname = '{{ url_for("views.export_audit_log") }}';
+        
+        // Show loading state
+        const originalText = exportBtn.innerHTML;
+        exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Exporting...';
+        exportBtn.disabled = true;
+        
+        // Create hidden link and trigger download
+        const link = document.createElement('a');
+        link.href = currentUrl.toString();
+        link.download = 'audit_log.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Reset button after delay
+        setTimeout(() => {
+            exportBtn.innerHTML = originalText;
+            exportBtn.disabled = false;
+        }, 2000);
+    });
+    
+    // Refresh button functionality
+    refreshBtn.addEventListener('click', function() {
+        const originalText = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+        refreshBtn.disabled = true;
+        
+        // Reload the page
+        window.location.reload();
+    });
+    
+    // Details modal functionality
+    detailsModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const logId = button.getAttribute('data-log-id');
+        const logDetails = button.getAttribute('data-log-details');
+        const detailsContent = document.getElementById('detailsContent');
+        
+        console.log('Modal opening for log ID:', logId);
+        console.log('Raw details data:', logDetails);
+        
+        try {
+            let details;
+            
+            // Handle different possible formats
+            if (!logDetails || logDetails === 'null' || logDetails === 'undefined') {
+                details = {};
+            } else if (typeof logDetails === 'string') {
+                // Try to parse as JSON
+                details = JSON.parse(logDetails);
+            } else {
+                details = logDetails;
+            }
+            
+            console.log('Parsed details:', details);
+            
+            let html = '<div class="row">';
+            
+            if (!details || Object.keys(details).length === 0) {
+                html += `
+                    <div class="col-12">
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle text-muted fa-2x mb-3"></i>
+                            <p class="text-muted mb-0">No additional details available for this audit log entry</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                for (const [key, value] of Object.entries(details)) {
+                    let displayValue;
+                    
+                    if (value === null || value === undefined) {
+                        displayValue = '<span class="text-muted">-</span>';
+                    } else if (typeof value === 'object') {
+                        displayValue = `<pre class="mb-0">${JSON.stringify(value, null, 2)}</pre>`;
+                    } else if (typeof value === 'boolean') {
+                        displayValue = value ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+                    } else {
+                        displayValue = String(value);
+                    }
+                    
+                    html += `
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-capitalize">${key.replace(/_/g, ' ')}</label>
+                            <div class="form-control-plaintext bg-light rounded p-3 border">
+                                ${displayValue}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            html += '</div>';
+            detailsContent.innerHTML = html;
+            
+        } catch (error) {
+            console.error('Error parsing details:', error);
+            console.error('Raw details data:', logDetails);
+            
+            detailsContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Error loading details</strong>
+                    <br>
+                    <small>Raw data: ${logDetails ? logDetails.substring(0, 100) + '...' : 'No data'}</small>
+                </div>
+            `;
+        }
+    });
+    
+    // Date range validation
+    const startDate = document.getElementById('startDate');
+    const endDate = document.getElementById('endDate');
+    
+    startDate.addEventListener('change', function() {
+        if (endDate.value && startDate.value > endDate.value) {
+            endDate.value = startDate.value;
+        }
+        endDate.min = startDate.value;
+    });
+    
+    endDate.addEventListener('change', function() {
+        if (startDate.value && endDate.value < startDate.value) {
+            startDate.value = endDate.value;
+        }
+        startDate.max = endDate.value;
+    });
+});
+</script>
+{% endblock %} 

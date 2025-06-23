@@ -4,24 +4,36 @@
 Constants and static data for the Hospital Equipment System.
 """
 
-# Department list for dropdowns
-DEPARTMENTS = [
-    "Cardiology",
-    "Radiology", 
-    "Emergency Department",
-    "Intensive Care Unit (ICU)",
-    "Operating Theater",
-    "Laboratory",
-    "Pharmacy",
-    "Physiotherapy",
-    "Dialysis Unit",
-    "Oncology",
-    "Pediatrics",
-    "Maternity Ward",
-    "Orthopedics",
-    "Neurology",
-    "General Surgery"
-]
+import json
+import os
+from pathlib import Path
+from typing import Dict, List
+
+# Get the base directory (one level up from app/)
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+def load_departments_and_machines() -> Dict[str, List[str]]:
+    """Load departments and machines from JSON file."""
+    json_file_path = os.path.join(BASE_DIR, "data", "departments_and_machines.json")
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: departments_and_machines.json not found at {json_file_path}")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Warning: Error parsing departments_and_machines.json: {e}")
+        return {}
+
+# Load departments and machines data
+DEPARTMENTS_AND_MACHINES = load_departments_and_machines()
+
+# Create clean department names (strip trailing spaces) and mapping
+DEPARTMENTS_RAW = list(DEPARTMENTS_AND_MACHINES.keys())
+DEPARTMENTS = [dept.strip() for dept in DEPARTMENTS_RAW]  # Clean department names for dropdowns
+
+# Create mapping from clean department names to original keys (with spaces)
+DEPARTMENT_KEY_MAPPING = {dept.strip(): dept for dept in DEPARTMENTS_RAW}
 
 # Training modules list
 TRAINING_MODULES = [
@@ -37,129 +49,25 @@ TRAINING_MODULES = [
     "Advanced Equipment Features"
 ]
 
-# Devices/Equipment list by department
-DEVICES_BY_DEPARTMENT = {
-    "Cardiology": [
-        "ECG Machine",
-        "Echocardiogram",
-        "Cardiac Monitor",
-        "Defibrillator",
-        "Holter Monitor",
-        "Stress Test Machine"
-    ],
-    "Radiology": [
-        "X-Ray Machine",
-        "CT Scanner",
-        "MRI Scanner",
-        "Ultrasound Machine",
-        "Mammography Unit",
-        "Fluoroscopy Machine"
-    ],
-    "Emergency Department": [
-        "Defibrillator",
-        "Ventilator",
-        "Patient Monitor",
-        "Crash Cart",
-        "Suction Unit",
-        "Infusion Pump"
-    ],
-    "Intensive Care Unit (ICU)": [
-        "Ventilator",
-        "Patient Monitor",
-        "Infusion Pump",
-        "Dialysis Machine",
-        "ECMO Machine",
-        "Defibrillator"
-    ],
-    "Operating Theater": [
-        "Anesthesia Machine",
-        "Surgical Monitor",
-        "Electrosurgical Unit",
-        "Operating Table",
-        "Surgical Lights",
-        "Suction Unit"
-    ],
-    "Laboratory": [
-        "Centrifuge",
-        "Microscope",
-        "Analyzer",
-        "Incubator",
-        "Autoclave",
-        "Spectrophotometer"
-    ],
-    "Pharmacy": [
-        "Medication Dispenser",
-        "Compounding Equipment",
-        "Refrigeration Unit",
-        "Scale",
-        "Pill Counter",
-        "Laminar Flow Hood"
-    ],
-    "Physiotherapy": [
-        "Ultrasound Therapy Unit",
-        "TENS Unit",
-        "Exercise Equipment",
-        "Heat Therapy Unit",
-        "Electrical Stimulator",
-        "Traction Unit"
-    ],
-    "Dialysis Unit": [
-        "Dialysis Machine",
-        "Water Treatment System",
-        "Patient Monitor",
-        "Blood Pressure Monitor",
-        "Scale",
-        "Infusion Pump"
-    ],
-    "Oncology": [
-        "Linear Accelerator",
-        "Chemotherapy Pump",
-        "Patient Monitor",
-        "Infusion Pump",
-        "Radiation Monitor",
-        "Treatment Planning System"
-    ],
-    "Pediatrics": [
-        "Pediatric Monitor",
-        "Infant Incubator",
-        "Pediatric Ventilator",
-        "Warming Unit",
-        "Phototherapy Unit",
-        "Pediatric Scale"
-    ],
-    "Maternity Ward": [
-        "Fetal Monitor",
-        "Delivery Bed",
-        "Infant Warmer",
-        "Ultrasound Machine",
-        "Infusion Pump",
-        "Patient Monitor"
-    ],
-    "Orthopedics": [
-        "X-Ray Machine",
-        "Bone Drill",
-        "Surgical Table",
-        "Traction Unit",
-        "Bone Saw",
-        "Arthroscopy Equipment"
-    ],
-    "Neurology": [
-        "EEG Machine",
-        "EMG Machine",
-        "Nerve Conduction Unit",
-        "Brain Monitor",
-        "Neurostimulator",
-        "Cranial Doppler"
-    ],
-    "General Surgery": [
-        "Surgical Monitor",
-        "Electrosurgical Unit",
-        "Laparoscopy Equipment",
-        "Surgical Table",
-        "Anesthesia Machine",
-        "Suction Unit"
-    ]
-}
+# Trainer names for machine assignment
+TRAINERS = [
+    "Marlene",
+    "Aundre", 
+    "Marivic",
+    "Fevie",
+    "Marily",
+    "Ailene",
+    "Mary joy",
+    "Celina",
+    "Jijimol",
+    "Atma"
+]
+
+# Create clean devices by department mapping (using clean department names as keys)
+DEVICES_BY_DEPARTMENT = {}
+for clean_dept in DEPARTMENTS:
+    original_key = DEPARTMENT_KEY_MAPPING[clean_dept]
+    DEVICES_BY_DEPARTMENT[clean_dept] = DEPARTMENTS_AND_MACHINES[original_key]
 
 # All devices (flattened list)
 ALL_DEVICES = []

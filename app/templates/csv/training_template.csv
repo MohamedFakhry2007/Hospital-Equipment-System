@@ -1,0 +1,7 @@
+id,employee_id,name,department,machine_trainer_assignments,last_trained_date,next_due_date
+1,EMP001,John Smith,ICU,"[{""machine"": ""Ventilator"", ""trainer"": ""Dr. Ahmed""}, {""machine"": ""Defibrillator"", ""trainer"": ""Dr. Sarah""}]",15/01/2024,15/01/2025
+2,EMP002,Jane Doe,DERMA,"[{""machine"": ""Laser Machine"", ""trainer"": ""Dr. Omar""}, {""machine"": ""Cryotherapy Unit"", ""trainer"": ""Dr. Fatima""}]",10/02/2024,10/02/2025
+3,EMP003,Mike Johnson,CARDIO,"[{""machine"": ""ECG Machine"", ""trainer"": ""Dr. Hassan""}, {""machine"": ""Stress Test Machine"", ""trainer"": ""Dr. Layla""}]",05/03/2024,05/03/2025
+4,EMP004,Sarah Wilson,RADIOLOGY,"[{""machine"": ""X-Ray Machine"", ""trainer"": ""Dr. Khalid""}, {""machine"": ""CT Scanner"", ""trainer"": ""Dr. Nour""}]",20/04/2024,20/04/2025
+5,EMP005,David Brown,LAB,"[{""machine"": ""Blood Analyzer"", ""trainer"": ""Dr. Amina""}, {""machine"": ""Microscope"", ""trainer"": ""Dr. Youssef""}]",12/05/2024,12/05/2025
+6,EMP006,New Employee,N/A,N/A,N/A,N/A 
