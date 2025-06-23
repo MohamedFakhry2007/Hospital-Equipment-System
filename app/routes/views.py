@@ -9,6 +9,7 @@ import io
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask import send_file
+from flask_login import login_required
 import tempfile
 from app.services.data_service import DataService
 from app.services import training_service # Added for training page
@@ -49,182 +50,99 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @views_bp.route('/')
+@login_required
 def index():
     """Display the dashboard with maintenance statistics."""
-    
-    # Fetch PPM entries
-    ppm_data = DataService.get_all_entries(data_type='ppm')
-    if isinstance(ppm_data, dict):  # If it's a single dict, wrap in list
-        ppm_data = [ppm_data]
-    # Add data_type to each PPM entry
-    for item in ppm_data:
-        item['data_type'] = 'ppm'
-
-    # Fetch OCM entries
-    ocm_data = DataService.get_all_entries(data_type='ocm')
-    if isinstance(ocm_data, dict):  # If it's a single dict, wrap in list
-        ocm_data = [ocm_data]
-    # Add data_type to each OCM entry
-    for item in ocm_data:
-        item['data_type'] = 'ocm'
-    
-
-    # Combine both
-    all_equipment = ppm_data + ocm_data
-
-    current_date_str = datetime.now().strftime("%A, %d %B %Y - %I:%M:%S %p")
-    today = datetime.now().date()
-    
-    total_machines = len(all_equipment)
-    overdue_count = 0
-    upcoming_count = 0 # Simplified from upcoming_counts dictionary
-    maintained_count = 0
-    
-    # Calculate upcoming maintenance by time periods
-    upcoming_7_days = 0
-    upcoming_14_days = 0
-    upcoming_21_days = 0
-    upcoming_30_days = 0
-    upcoming_60_days = 0
-    upcoming_90_days = 0
-    
-    # The old quarterly_count/yearly_count based on PPM='Yes'/'No' is obsolete.
-    # We can count PPM vs OCM types if needed.
-    ppm_machine_count = len(ppm_data)
-    ocm_machine_count = len(ocm_data)
-
-    for item in all_equipment:
-        # Pre-process PPM equipment to integrate Q2 status BEFORE counting
-        if item['data_type'] == 'ppm':
-            # Get Q2 information
-            q2_info = item.get('PPM_Q_II', {})
-            if isinstance(q2_info, dict):
-                q2_date = q2_info.get('quarter_date')
-                q2_engineer = q2_info.get('engineer', '')
-                
-                # Set display_next_maintenance to Q2 date
-                item['display_next_maintenance'] = q2_date if q2_date else 'N/A'
-                
-                # Calculate Q2 status and override general status for dashboard display
-                if q2_date:
-                    try:
-                        from app.services.email_service import EmailService
-                        q2_date_obj = EmailService.parse_date_flexible(q2_date).date()
-                        
-                        # Calculate Q2 status
-                        if q2_date_obj < today:
-                            if q2_engineer and q2_engineer.strip():
-                                q2_status = 'maintained'
-                            else:
-                                q2_status = 'overdue'
-                        elif q2_date_obj == today:
-                            q2_status = 'maintained'
-                        else:
-                            q2_status = 'upcoming'
-                        
-                        # Override the general status with Q2 status for dashboard display
-                        item['Status'] = q2_status.capitalize()
-                        
-                    except (ValueError, ImportError):
-                        # Invalid date format, keep original status
-                        pass
-            else:
-                item['display_next_maintenance'] = 'N/A'
-        else:
-            # For OCM equipment, set display_next_maintenance
-            item['display_next_maintenance'] = item.get('Next_Maintenance', 'N/A')
+    """Display the dashboard with maintenance statistics."""
+    try:
+        ppm_data = DataService.get_all_entries(data_type='ppm')
+        ocm_data = DataService.get_all_entries(data_type='ocm')
         
-        # Status is now directly available in item['Status'] (potentially updated by Q2 logic above)
-        status = item.get('Status')
-        if status is None:
-            status = 'N/A'
-        else:
-            status = status.lower()
-            
-        if status == 'overdue':
-            overdue_count += 1
-            item['status_class'] = 'danger'
-        elif status == 'upcoming':
-            upcoming_count += 1
-            item['status_class'] = 'warning'
-            
-            # Calculate upcoming periods for OCM equipment
-            if item['data_type'] == 'ocm':
-                next_maintenance = item.get('Next_Maintenance')
-                if next_maintenance and next_maintenance != 'N/A':
-                    try:
-                        from app.services.email_service import EmailService
-                        next_date = EmailService.parse_date_flexible(next_maintenance).date()
-                        days_until = (next_date - today).days
-                        
-                        if days_until <= 7:
-                            upcoming_7_days += 1
-                        if days_until <= 14:
-                            upcoming_14_days += 1
-                        if days_until <= 21:
-                            upcoming_21_days += 1
-                        if days_until <= 30:
-                            upcoming_30_days += 1
-                        if days_until <= 60:
-                            upcoming_60_days += 1
-                        if days_until <= 90:
-                            upcoming_90_days += 1
-                    except (ValueError, ImportError):
-                        pass
-            
-            # Calculate upcoming periods for PPM equipment quarters
-            elif item['data_type'] == 'ppm':
-                quarter_keys = ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']
-                for q_key in quarter_keys:
-                    quarter_info = item.get(q_key, {})
-                    if isinstance(quarter_info, dict):
-                        quarter_date_str = quarter_info.get('quarter_date')
-                        if quarter_date_str:
-                            try:
-                                from app.services.email_service import EmailService
-                                quarter_date = EmailService.parse_date_flexible(quarter_date_str).date()
-                                if quarter_date >= today:  # Only count upcoming quarters
-                                    days_until = (quarter_date - today).days
-                                    
-                                    if days_until <= 7:
-                                        upcoming_7_days += 1
-                                    if days_until <= 14:
-                                        upcoming_14_days += 1
-                                    if days_until <= 21:
-                                        upcoming_21_days += 1
-                                    if days_until <= 30:
-                                        upcoming_30_days += 1
-                                    if days_until <= 60:
-                                        upcoming_60_days += 1
-                                    if days_until <= 90:
-                                        upcoming_90_days += 1
-                            except (ValueError, ImportError):
-                                pass
-                        
-        elif status == 'maintained':
-            maintained_count += 1
-            item['status_class'] = 'success'
-        else:
-            item['status_class'] = 'secondary' # For 'N/A' or other statuses
+        # Ensure data is a list, even if only one item is returned
+        if isinstance(ppm_data, dict):
+            ppm_data = [ppm_data]
+        if isinstance(ocm_data, dict):
+            ocm_data = [ocm_data]
 
+        all_equipment = ppm_data + ocm_data
 
+        total_machines = len(all_equipment)
+        ppm_machine_count = len(ppm_data)
+        ocm_machine_count = len(ocm_data)
 
+        # Calculate status counts
+        overdue_count = 0
+        upcoming_count = 0
+        maintained_count = 0
 
-    return render_template('index.html',
-                           current_date=current_date_str,
-                           total_machines=total_machines,
-                           overdue_count=overdue_count,
-                           upcoming_count=upcoming_count, # Pass simplified upcoming_count
-                           maintained_count=maintained_count,
-                           ppm_machine_count=ppm_machine_count,
-                           ocm_machine_count=ocm_machine_count,
-                           upcoming_7_days=upcoming_7_days,
-                           upcoming_14_days=upcoming_14_days,
-                           upcoming_21_days=upcoming_21_days,
-                           upcoming_30_days=upcoming_30_days,
-                           upcoming_60_days=upcoming_60_days,
-                           upcoming_90_days=upcoming_90_days,
-                           equipment=all_equipment) # Pass combined list
+        # Calculate upcoming maintenance for OCM (for simplicity, direct check on Next_Maintenance)
+        today = datetime.now().date()
+        upcoming_7_days = 0
+        upcoming_14_days = 0
+        upcoming_21_days = 0
+        upcoming_30_days = 0
+        upcoming_60_days = 0
+        upcoming_90_days = 0
+
+        for item in all_equipment:
+            status = item.get('Status', 'N/A').lower() # Ensure status is lowercase for comparison
+
+            if status == 'overdue':
+                overdue_count += 1
+            elif status == 'upcoming':
+                upcoming_count += 1
+                # For OCM, check Next_Maintenance date
+                if item.get('data_type') == 'ocm': # Assuming 'data_type' is added or can be inferred
+                    next_maintenance = item.get('Next_Maintenance')
+                    if next_maintenance and next_maintenance != 'N/A':
+                        try:
+                            # Use the flexible date parsing from email service
+                            from app.services.email_service import EmailService
+                            next_date = EmailService.parse_date_flexible(next_maintenance).date()
+                            days_until = (next_date - today).days
+
+                            if days_until <= 7: upcoming_7_days += 1
+                            if days_until <= 14: upcoming_14_days += 1
+                            if days_until <= 21: upcoming_21_days += 1
+                            if days_until <= 30: upcoming_30_days += 1
+                            if days_until <= 60: upcoming_60_days += 1
+                            if days_until <= 90: upcoming_90_days += 1
+                        except (ValueError, ImportError): # Catch specific errors for date parsing
+                            logger.warning(f"Could not parse date for OCM item {item.get('Serial')}: {next_maintenance}")
+                            pass # Skip if date is invalid
+
+            elif status == 'maintained':
+                maintained_count += 1
+
+        stats = {
+            'total_machines': total_machines,
+            'ppm_machine_count': ppm_machine_count,
+            'ocm_machine_count': ocm_machine_count,
+            'overdue_count': overdue_count,
+            'upcoming_count': upcoming_count,
+            'maintained_count': maintained_count,
+            'upcoming_7_days': upcoming_7_days,
+            'upcoming_14_days': upcoming_14_days,
+            'upcoming_21_days': upcoming_21_days,
+            'upcoming_30_days': upcoming_30_days,
+            'upcoming_60_days': upcoming_60_days,
+            'upcoming_90_days': upcoming_90_days,
+            'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
+        }
+
+        return render_template('dashboard/index.html', title="Dashboard", stats=stats)
+    except Exception as e:
+        logger.error(f"Error loading dashboard: {str(e)}")
+        flash("Error loading dashboard data.", "danger")
+        # Provide default stats if loading fails
+        default_stats = {
+            'total_machines': 0, 'ppm_machine_count': 0, 'ocm_machine_count': 0,
+            'overdue_count': 0, 'upcoming_count': 0, 'maintained_count': 0,
+            'upcoming_7_days': 0, 'upcoming_14_days': 0, 'upcoming_21_days': 0,
+            'upcoming_30_days': 0, 'upcoming_60_days': 0, 'upcoming_90_days': 0,
+            'current_time': datetime.now().strftime("%A, %d %B %Y — %H:%M:%S")
+        }
+        return render_template('dashboard/index.html', title="Dashboard", stats=default_stats)
 
 
 @views_bp.route('/healthz')
@@ -235,6 +153,7 @@ def health_check():
 
 
 @views_bp.route('/equipment/<data_type>/list')
+@login_required
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
     if data_type not in ('ppm', 'ocm'):
@@ -313,6 +232,7 @@ def list_equipment(data_type):
 
 
 @views_bp.route('/equipment/ppm/add', methods=['GET', 'POST'])
+@login_required
 def add_ppm_equipment():
     """Handle adding new PPM equipment."""
     if request.method == 'POST':
@@ -379,6 +299,7 @@ def add_ppm_equipment():
                          departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
+@login_required
 def add_ocm_equipment():
     """Handle adding new OCM equipment."""
     if request.method == 'POST':
@@ -414,6 +335,7 @@ def add_ocm_equipment():
 
 
 @views_bp.route('/equipment/ppm/edit/<SERIAL>', methods=['GET', 'POST'])
+@login_required
 def edit_ppm_equipment(SERIAL):
     """Handle editing existing PPM equipment."""
     entry = DataService.get_entry('ppm', SERIAL)
@@ -482,6 +404,7 @@ def edit_ppm_equipment(SERIAL):
 
 
 @views_bp.route('/equipment/ocm/edit/<Serial>', methods=['GET', 'POST'])
+@login_required
 def edit_ocm_equipment(Serial):
     """Handle editing OCM equipment."""
     logger.info(f"Received {request.method} request to edit OCM equipment with Serial: {Serial}")
@@ -544,6 +467,7 @@ def edit_ocm_equipment(Serial):
 
 
 @views_bp.route('/equipment/<data_type>/delete/<path:SERIAL>', methods=['POST'])
+@login_required
 def delete_equipment(data_type, SERIAL):
     """Handle deleting existing equipment."""
     logger.info(f"Received request to delete {data_type} equipment with serial: {SERIAL}")
@@ -584,11 +508,13 @@ def delete_equipment(data_type, SERIAL):
 # --- Import/Export Routes ---
 
 @views_bp.route('/import-export')
+@login_required
 def import_export_page():
     """Display the import/export page."""
     return render_template('import_export/main.html')
 
 @views_bp.route('/import_equipment', methods=['POST'])
+@login_required
 def import_equipment():
     """Import equipment data from CSV file."""
     if 'file' not in request.files:
@@ -667,6 +593,7 @@ def import_equipment():
 
 
 @views_bp.route('/export/ppm')
+@login_required
 def export_equipment_ppm():
     """Export PPM equipment data to CSV."""
     try:
@@ -696,6 +623,7 @@ def export_equipment_ppm():
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/export/ocm')
+@login_required
 def export_equipment_ocm():
     """Export OCM equipment data to CSV."""
     try:
@@ -715,6 +643,7 @@ def export_equipment_ocm():
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/export/training')
+@login_required
 def export_equipment_training():
     """Export Training data to CSV."""
     try:
@@ -744,6 +673,7 @@ def export_equipment_training():
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/download/template/<template_type>')
+@login_required
 def download_template(template_type):
     """Download template files for data import."""
     try:
@@ -784,6 +714,7 @@ def download_template(template_type):
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/settings')
+@login_required
 def settings_page():
     """Display the settings page."""
     settings = DataService.load_settings()
@@ -806,6 +737,7 @@ def settings_page():
 
 
 @settings_bp.route('/settings', methods=['POST'])
+@login_required
 def update_settings():
     data = request.get_json()
     try:
@@ -939,6 +871,7 @@ def save_settings_page():
 
 
 @views_bp.route('/settings/reminder', methods=['POST'])
+@login_required
 def save_reminder_settings():
     """Handle saving reminder-specific settings."""
     logger.info("Received request to save reminder settings.")
@@ -978,6 +911,7 @@ def save_reminder_settings():
 
 
 @views_bp.route('/settings/email', methods=['POST'])
+@login_required
 def save_email_settings():
     """Handle saving email-specific settings."""
     logger.info("Received request to save email settings.")
@@ -1007,6 +941,7 @@ def save_email_settings():
 
 
 @views_bp.route('/settings/test-email', methods=['POST'])
+@login_required
 def send_test_email():
     """Send a test email to verify email configuration."""
     logger.info("Received request to send test email.")
@@ -1061,6 +996,7 @@ def send_test_email():
 
 # Training Management Page
 @views_bp.route('/training')
+@login_required
 def training_management_page():
     """Display the training management page."""
     logger.info("Training management page accessed")
@@ -1089,6 +1025,7 @@ def training_management_page():
 
 # Barcode Generation Routes
 @views_bp.route('/equipment/<data_type>/<serial>/barcode')
+@login_required
 def generate_barcode(data_type, serial):
     """Generate and display barcode for a specific equipment."""
     from app.services.barcode_service import BarcodeService
@@ -1114,6 +1051,7 @@ def generate_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode/download')
+@login_required
 def download_barcode(data_type, serial):
     """Download barcode image for a specific equipment."""
     from app.services.barcode_service import BarcodeService
@@ -1149,6 +1087,7 @@ def download_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk')
+@login_required
 def bulk_barcodes(data_type):
     """Generate bulk barcodes for all equipment of a specific type."""
     from app.services.barcode_service import BarcodeService
@@ -1180,6 +1119,7 @@ def bulk_barcodes(data_type):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk/download')
+@login_required
 def download_bulk_barcodes(data_type):
     """Download all barcodes as a ZIP file."""
     from app.services.barcode_service import BarcodeService
@@ -1225,6 +1165,7 @@ def download_bulk_barcodes(data_type):
 
 # Machine Assignment Route
 @views_bp.route('/equipment/machine-assignment')
+@login_required
 def machine_assignment():
     """Display the machine assignment page."""
     return render_template('equipment/machine_assignment.html',
@@ -1234,6 +1175,7 @@ def machine_assignment():
                          trainers=TRAINERS)
 
 @views_bp.route('/equipment/machine-assignment', methods=['POST'])
+@login_required
 def save_machine_assignment():
     """Save machine assignments."""
     try:
@@ -1256,6 +1198,7 @@ def save_machine_assignment():
         }), 500
 
 @views_bp.route('/refresh-dashboard')
+@login_required
 def refresh_dashboard():
     """AJAX endpoint to refresh dashboard data."""
     try:
@@ -1340,6 +1283,7 @@ def refresh_dashboard():
 # ============================================================================
 
 @views_bp.route('/audit-log')
+@login_required
 def audit_log_page():
     """Display the audit log page with filtering options."""
     try:
@@ -1395,6 +1339,7 @@ def audit_log_page():
         return redirect(url_for('views.index'))
 
 @views_bp.route('/audit-log/export')
+@login_required
 def export_audit_log():
     """Export audit logs to CSV."""
     try:
@@ -1464,6 +1409,7 @@ def export_audit_log():
 # ============================================================================
 
 @views_bp.route('/backup/create-full', methods=['POST'])
+@login_required
 def create_full_backup():
     """Create a full application backup."""
     try:
@@ -1483,6 +1429,7 @@ def create_full_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/create-settings', methods=['POST'])
+@login_required
 def create_settings_backup():
     """Create a settings-only backup."""
     try:
@@ -1502,6 +1449,7 @@ def create_settings_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/list')
+@login_required
 def list_backups():
     """List all available backups as JSON."""
     try:
@@ -1514,6 +1462,7 @@ def list_backups():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @views_bp.route('/backup/delete/<filename>', methods=['POST'])
+@login_required
 def delete_backup(filename):
     """Delete a backup file."""
     try:
@@ -1533,6 +1482,7 @@ def delete_backup(filename):
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/download/<backup_type>/<filename>')
+@login_required
 def download_backup(backup_type, filename):
     """Download a backup file."""
     try:

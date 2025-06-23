@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response, current_app # send_file might not be needed now
+from flask_login import login_required
 from datetime import datetime
 
 from app.services.data_service import DataService
@@ -25,6 +26,7 @@ if not logger.hasHandlers():
         logger.addHandler(handler)
 
 @api_bp.route('/equipment/<data_type>', methods=['GET'])
+@login_required
 def get_equipment(data_type):
     """Get all equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -38,6 +40,7 @@ def get_equipment(data_type):
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['GET'])
+@login_required
 def get_equipment_by_serial(data_type, SERIAL):
     """Get a specific equipment entry by SERIAL."""
     if data_type not in ('ppm', 'ocm'):
@@ -54,6 +57,7 @@ def get_equipment_by_serial(data_type, SERIAL):
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
 @api_bp.route('/equipment/<data_type>', methods=['POST'])
+@login_required
 def add_equipment(data_type):
     """Add a new equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -81,6 +85,7 @@ def add_equipment(data_type):
 
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['PUT'])
+@login_required
 def update_equipment(data_type, SERIAL):
     """Update an existing equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -110,6 +115,7 @@ def update_equipment(data_type, SERIAL):
 
 
 @api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['DELETE'])
+@login_required
 def delete_equipment(data_type, SERIAL):
     """Delete an equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -127,6 +133,7 @@ def delete_equipment(data_type, SERIAL):
 
 
 @api_bp.route('/export/<data_type>', methods=['GET'])
+@login_required
 def export_data(data_type):
     """Export data to CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -153,6 +160,7 @@ def export_data(data_type):
 
 
 @api_bp.route('/import/<data_type>', methods=['POST'])
+@login_required
 def import_data(data_type):
     """Import data from CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -194,6 +202,7 @@ def import_data(data_type):
         return jsonify({"error": "Invalid file type, only CSV allowed"}), 400
 
 @api_bp.route('/bulk_delete/<data_type>', methods=['POST'])
+@login_required
 def bulk_delete(data_type):
     """Handle bulk deletion of equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -223,6 +232,7 @@ def bulk_delete(data_type):
 # Training Records API Routes
 
 @api_bp.route('/trainings', methods=['POST'])
+@login_required
 def add_training_route():
     if not request.is_json:
         logger.warning("Add training request is not JSON")
@@ -241,6 +251,7 @@ def add_training_route():
         return jsonify({"error": "Failed to add training record"}), 500
 
 @api_bp.route('/trainings', methods=['GET'])
+@login_required
 def get_all_trainings_route():
     try:
         records = training_service.get_all_trainings()
@@ -250,6 +261,7 @@ def get_all_trainings_route():
         return jsonify({"error": "Failed to retrieve training records"}), 500
 
 @api_bp.route('/trainings/<training_id>', methods=['GET'])
+@login_required
 def get_training_by_id_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings
@@ -264,6 +276,7 @@ def get_training_by_id_route(training_id):
         return jsonify({"error": "Failed to retrieve training record"}), 500
 
 @api_bp.route('/trainings/<training_id>', methods=['PUT'])
+@login_required
 def update_training_route(training_id):
     if not request.is_json:
         logger.warning(f"Update training request for ID {training_id} is not JSON")
@@ -287,6 +300,7 @@ def update_training_route(training_id):
         return jsonify({"error": "Failed to update training record"}), 500
 
 @api_bp.route('/trainings/<training_id>', methods=['DELETE'])
+@login_required
 def delete_training_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings
@@ -304,6 +318,7 @@ def delete_training_route(training_id):
 # --- Application Settings API Routes ---
 
 @api_bp.route('/settings', methods=['GET'])
+@login_required
 def get_settings():
     """Get current application settings."""
     try:
@@ -314,6 +329,7 @@ def get_settings():
         return jsonify({"error": "Failed to load settings"}), 500
 
 @api_bp.route('/settings', methods=['POST'])
+@login_required
 def save_settings():
     """Save application settings."""
     # Added detailed logging for headers and raw body
@@ -389,8 +405,12 @@ def health_check():
     return 'OK', 200
 
 # --- Push Notification API Routes ---
+# These are typically public or use a different auth mechanism (e.g., service worker context)
+# For simplicity, and to lock down the *entire* app as requested, we'll protect them for now.
+# If push notifications stop working, this might be a place to revisit.
 
 @api_bp.route('/vapid_public_key', methods=['GET'])
+@login_required
 def vapid_public_key():
     """Provide the VAPID public key to the client."""
     if not Config.VAPID_PUBLIC_KEY:
@@ -399,6 +419,7 @@ def vapid_public_key():
     return jsonify({"publicKey": Config.VAPID_PUBLIC_KEY}), 200
 
 @api_bp.route('/push_subscribe', methods=['POST'])
+@login_required
 def push_subscribe():
     """
     Subscribes a client for push notifications.
@@ -427,6 +448,7 @@ def push_subscribe():
         return jsonify({"error": "Failed to subscribe for push notifications"}), 500
 
 @api_bp.route('/push_unsubscribe', methods=['POST'])
+@login_required
 def push_unsubscribe():
     """
     Unsubscribes a client from push notifications.
@@ -451,6 +473,7 @@ def push_unsubscribe():
         return jsonify({"error": "Failed to unsubscribe from push notifications"}), 500
 
 @api_bp.route('/test-push', methods=['POST'])
+@login_required
 def send_test_push():
     """Send a test push notification to verify push notification configuration."""
     logger.info("Received request to send test push notification via API.")
@@ -508,6 +531,7 @@ def send_test_push():
         return jsonify({'error': f'Error sending test push notification: {str(e)}'}), 500
 
 @api_bp.route('/training/import', methods=['POST'])
+@login_required
 def import_training_data():
     """API endpoint for training data import that returns JSON response."""
     try:
@@ -568,6 +592,7 @@ def import_training_data():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @api_bp.route('/import/auto', methods=['POST'])
+@login_required
 def import_auto():
     """Auto-detect CSV type and import data."""
     if 'file' not in request.files:
@@ -635,6 +660,7 @@ def import_auto():
         return jsonify({"error": "Invalid file type, only CSV allowed"}), 400
 
 @api_bp.route('/test-email', methods=['POST'])
+@login_required
 def send_test_email():
     """Send a test email to verify email configuration."""
     logger.info("Received request to send test email via API.")

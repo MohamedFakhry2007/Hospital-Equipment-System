@@ -12,9 +12,14 @@ from pathlib import Path
 import threading # Added import
 
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
 from app.utils.logger_setup import setup_logger
 from app.config import Config
 
+db = SQLAlchemy()
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login' # The route name for the login page
 
 # This function remains here as it's called by the thread started in create_app
 def start_email_scheduler():
@@ -86,16 +91,23 @@ def create_app():
     
     # Load configuration
     app.config.from_object(Config)
-    
+
+    # Initialize extensions
+    db.init_app(app)
+    login_manager.init_app(app)
+
     # Ensure data directory exists
     os.makedirs(Config.DATA_DIR, exist_ok=True)
     
     # Register blueprints
     from app.routes.views import views_bp
     from app.routes.api import api_bp
+    # Import auth blueprint
+    from app.routes.auth import auth_bp as auth_blueprint # Renamed to avoid conflict
     
     app.register_blueprint(views_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(auth_blueprint, url_prefix='/auth') # Register auth blueprint
 
     # Start the scheduler in a background thread if enabled
     # This will be called when Gunicorn workers are initialized.
@@ -129,5 +141,12 @@ def create_app():
         logger.info("PPM statuses update process completed.")
     except Exception as e:
         logger.error(f"Error during initial PPM status update: {str(e)}", exc_info=True)
+
+    # User loader for Flask-Login
+    @login_manager.user_loader
+    def load_user(user_id):
+        # Import User model here to avoid circular imports
+        from app.models.user import User
+        return User.query.get(int(user_id))
 
     return app
