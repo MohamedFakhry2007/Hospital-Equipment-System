@@ -1,6 +1,9 @@
 from functools import wraps
-from flask import jsonify, flash, redirect, request, url_for
+from flask import jsonify, flash, redirect, request, url_for, abort
 from flask_login import current_user
+import logging
+
+logger = logging.getLogger('app')
 
 def admin_required(f):
     @wraps(f)
@@ -15,11 +18,11 @@ def admin_required(f):
 
         # Assuming user model has a 'role' attribute and role has a 'name' attribute
         if not hasattr(current_user, 'role') or current_user.role.name != 'Admin':
+            logger.warning(f"Admin access denied for user {getattr(current_user, 'username', 'anonymous')}")
             if request.accept_mimetypes.accept_json and \
                not request.accept_mimetypes.accept_html:
                 return jsonify(message="Admin access required."), 403 # Corrected: jsonify takes message kwarg
-            flash("Admin access required. You do not have permission to view this page.", "danger")
-            return redirect(request.referrer or url_for('views.dashboard'))
+            abort(403)
         return f(*args, **kwargs)
     return decorated_function
 
@@ -37,23 +40,21 @@ def permission_required(permission_name):
 
             if not hasattr(current_user, 'role') or not current_user.role:
                 # This case should ideally not happen for an authenticated user
+                logger.warning(f"User {getattr(current_user, 'username', 'anonymous')} has no role assigned.")
                 if request.accept_mimetypes.accept_json and \
                    not request.accept_mimetypes.accept_html:
                     return jsonify(message="User role not found."), 403
-                flash("Your user profile is incomplete (no role assigned). Please contact an administrator.", "danger")
-                return redirect(url_for('views.dashboard')) # Or a more appropriate error page
+                abort(403)
 
             # Check if the user's role has the required permission
             has_permission = any(p.name == permission_name for p in current_user.role.permissions)
 
             if not has_permission:
+                logger.warning(f"Permission denied for user {getattr(current_user, 'username', 'anonymous')} on {permission_name}")
                 if request.accept_mimetypes.accept_json and \
                    not request.accept_mimetypes.accept_html:
                     return jsonify(message=f"Access Denied: You do not have the required permission '{permission_name}'."), 403
-
-                flash(f"Access Denied: You do not have the required permission ('{permission_name}') to access this page.", "danger")
-                # Try to redirect to referrer, otherwise to dashboard
-                return redirect(request.referrer or url_for('views.dashboard'))
+                abort(403)
 
             return f(*args, **kwargs)
         return decorated_function

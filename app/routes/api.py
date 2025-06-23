@@ -333,6 +333,7 @@ def delete_training_route(training_id):
 
 @api_bp.route('/settings', methods=['GET'])
 @login_required
+@permission_required('manage_settings')
 def get_settings():
     """Get current application settings."""
     try:
@@ -344,6 +345,7 @@ def get_settings():
 
 @api_bp.route('/settings', methods=['POST'])
 @login_required
+@permission_required('manage_settings')
 def save_settings():
     """Save application settings."""
     # Added detailed logging for headers and raw body

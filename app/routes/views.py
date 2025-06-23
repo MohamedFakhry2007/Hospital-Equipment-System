@@ -1,4 +1,3 @@
-```python
 # app/routes/views.py
 
 """
@@ -761,22 +760,12 @@ def download_template(template_type):
 
 @views_bp.route('/settings')
 @login_required
-# This page has multiple aspects. A user might have permission for one part but not another.
-# 'View/Edit Settings(Email , Notifications )' for general view.
-# 'User Management (Create/Edit/Delete users, add permissions )' for user list.
-# 'Theme (light/dark mood )' for theme settings.
-# Applying the most general one. The template should handle conditional display of sections.
-@permission_required('View/Edit Settings(Email , Notifications )')
 def settings_page():
     """Display the settings page."""
     settings_data = DataService.load_settings() # Renamed to avoid conflict with flask.settings
     users = []
     # Check for specific permission to load user data for User Management section
-    # This logic should ideally use the permission system, not just role name.
-    # For example: if current_user.has_permission('User Management (Create/Edit/Delete users, add permissions )'):
-    if current_user.is_authenticated and hasattr(current_user, 'role') and current_user.role and current_user.role.name == 'Admin':
-        # A better check:
-        # if any(p.name == 'User Management (Create/Edit/Delete users, add permissions )' for p in current_user.role.permissions):
+    if current_user.is_authenticated and hasattr(current_user, 'has_permission') and current_user.has_permission('manage_users'):
         users = User.query.all()
     return render_template('settings.html', settings=settings_data, users=users)
 
@@ -1300,7 +1289,7 @@ def refresh_dashboard():
 
 @views_bp.route('/audit-log')
 @login_required
-@permission_required('Audit Logs (View system activity logs)')
+@permission_required('view_audit_log')
 def audit_log_page():
     """Display the audit log page with filtering options."""
     try:
@@ -1367,7 +1356,7 @@ def audit_log_page():
 
 @views_bp.route('/audit-log/export')
 @login_required
-@permission_required('Audit Logs (View system activity logs)')
+@permission_required('view_audit_log')
 def export_audit_log():
     """Export audit logs to CSV."""
     try:
@@ -1553,4 +1542,3 @@ def download_backup(backup_type, filename):
         flash(f"Error downloading backup: {str(e)}", 'danger')
         return redirect(url_for('views.settings_page'))
 
-```

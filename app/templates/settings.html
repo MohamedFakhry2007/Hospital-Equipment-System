@@ -104,6 +104,7 @@
         </div>
 
         <!-- Email Settings Card -->
+        {% if current_user.has_permission('manage_settings') %}
         <div class="col-xl-6 col-lg-12">
             <div class="modern-card email-card h-100">
                 <div class="modern-card-header email-header">
@@ -161,8 +162,10 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- System Settings Card -->
+        {% if current_user.has_permission('manage_settings') %}
         <div class="col-12">
             <div class="modern-card system-card">
                 <div class="modern-card-header system-header">
@@ -303,8 +306,10 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- Backup & Restore Section -->
+        {% if current_user.has_permission('manage_settings') %}
         <div class="col-12">
             <div class="modern-card backup-card">
                 <div class="modern-card-header backup-header">
@@ -430,9 +435,10 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- User Management Section (Admin Only) -->
-        {% if current_user.is_authenticated and current_user.role.name == 'Admin' %}
+        {% if current_user.has_permission('manage_users') %}
         <div class="col-12">
             <div class="modern-card user-management-card">
                 <div class="modern-card-header user-management-header">
