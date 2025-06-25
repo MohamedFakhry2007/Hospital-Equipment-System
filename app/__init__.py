@@ -11,7 +11,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import threading # Added import
 
-from flask import Flask
+from flask import Flask, render_template, request, current_app
+from flask_session import Session # Import Flask-Session
 from app.utils.logger_setup import setup_logger
 from app.config import Config
 
@@ -86,6 +87,9 @@ def create_app():
     
     # Load configuration
     app.config.from_object(Config)
+
+    # Initialize Flask-Session
+    Session(app)
     
     # Ensure data directory exists
     os.makedirs(Config.DATA_DIR, exist_ok=True)
@@ -130,4 +134,17 @@ def create_app():
     except Exception as e:
         logger.error(f"Error during initial PPM status update: {str(e)}", exc_info=True)
 
+    # Register error handlers
+    app.register_error_handler(404, page_not_found)
+    app.register_error_handler(500, internal_server_error)
+
     return app
+
+
+def page_not_found(e):
+    current_app.logger.warning(f"404 Not Found: {request.path}")
+    return render_template("404.html"), 404
+
+def internal_server_error(e):
+    current_app.logger.error(f"500 Internal Server Error: {e}", exc_info=True)
+    return render_template("500.html"), 500

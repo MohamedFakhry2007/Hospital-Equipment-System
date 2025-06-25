@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Alorf Maintenance</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/normalize.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.18), 0 2px 8px rgba(118, 75, 162, 0.10);
+            padding: 2.5rem 2rem 2rem 2rem;
+            max-width: 370px;
+            width: 100%;
+            margin: 40px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .login-card .login-icon {
+            font-size: 2.7rem;
+            color: #667eea;
+            margin-bottom: 0.7rem;
+        }
+        .login-card h2 {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+        .login-card .subtitle {
+            color: #718096;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .login-card form {
+            width: 100%;
+        }
+        .login-card label {
+            font-weight: 500;
+            color: #495057;
+            margin-bottom: 6px;
+        }
+        .login-card input[type="text"],
+        .login-card input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            background: #f8f9fa;
+        }
+        .login-card input[type="text"]:focus,
+        .login-card input[type="password"]:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.10);
+            outline: none;
+        }
+        .login-card button[type="submit"] {
+            width: 100%;
+            padding: 12px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.13);
+            transition: background 0.3s, transform 0.2s;
+            margin-top: 8px;
+        }
+        .login-card button[type="submit"]:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-2px);
+        }
+        .flash-messages {
+            list-style-type: none;
+            padding: 0;
+            margin-bottom: 18px;
+            width: 100%;
+        }
+        .flash-messages li {
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.98rem;
+        }
+        .flash-messages .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .flash-messages .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 1.2rem 0.5rem 1.5rem 0.5rem;
+                max-width: 98vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-icon">
+            <i class="fas fa-lock"></i>
+        </div>
+        <h2>Sign In</h2>
+        <div class="subtitle">Welcome to Alorf Maintenance System<br>Sign in to continue</div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-messages">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        <form method="POST" action="{{ url_for('views.login') }}">
+            <div>
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            <div>
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+            <div>
+                <button type="submit">Login</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

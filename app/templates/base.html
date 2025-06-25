@@ -211,15 +211,13 @@
                             OCM List
                         </a>
                     </li>
-                    {% if session.get('is_admin') %}
+                    {% if session.get('user_role') in ['admin', 'editor'] %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.import_export_page') }}">
                             <i class="fas fa-exchange-alt"></i>
                             Import / Export
                         </a>
                     </li>
-                    {% endif %}
-                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.training_management_page') }}">
                             <i class="fas fa-graduation-cap"></i>
@@ -227,23 +225,19 @@
                         </a>
                     </li>
                     {% endif %}
-                     {% if session.get('is_admin') %}
+                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.audit_log_page') }}">
                             <i class="fas fa-clipboard-list"></i>
                             Audit Log
                         </a>
                     </li>
-                    {% endif %}
-                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.settings_page') }}">
                             <i class="fas fa-cog"></i>
                             Settings
                         </a>
                     </li>
-                    {% endif %}
-                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.create_user') }}">
                             <i class="fas fa-user-plus"></i>
@@ -252,7 +246,7 @@
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                         {% if session.get('is_admin') %}
+                         {% if session.get('user_id') %}
                             <a class="nav-link" href="{{ url_for('views.logout') }}">
                                 <i class="fas fa-sign-out-alt"></i>
                                 Logout

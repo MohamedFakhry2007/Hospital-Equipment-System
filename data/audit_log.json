@@ -670,5 +670,14 @@
     "description": "Accessed audit log page",
     "status": "Info",
     "details": {}
+  },
+  {
+    "id": 59,
+    "timestamp": "2025-06-25 20:36:05",
+    "event_type": "User Action",
+    "performed_by": "User",
+    "description": "Accessed audit log page",
+    "status": "Info",
+    "details": {}
   }
 ]

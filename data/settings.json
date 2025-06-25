@@ -18,74 +18,65 @@
   "users": [
     {
       "username": "editor1",
-      "password": "hashed_password_here",
+      "password": "editor",
       "role": "Editor"
     },
     {
+      "username": "admin",
+      "password": "password",
+      "role": "Admin"
+    },
+    {
       "username": "viewer1",
-      "password": "hashed_password_here",
+      "password": "viewer",
       "role": "Viewer"
+    },
+    {
+      "username": "editor2",
+      "password": "scrypt:32768:8:1$Hwf4db4X4tage9XT$ddacdd3484463d3b32f1b9eda19ce46a322c86056c53b23279dd8fd787c276aad26e8143f547206195c771ce708429bac3bb64b5ae272720d86b49afcf247ff7",
+      "role": "Editor"
     }
   ],
   "roles": {
     "Admin": {
       "permissions": [
-        "/",
-        "/equipment/ppm/list",
-        "/equipment/ocm/list",
-        "/equipment/ppm/add",
-        "/equipment/ppm/edit/<SERIAL>",
-        "/equipment/ppm/delete/<SERIAL>",
-        "/download/template/ppm",
-        "/import_equipment",
-        "/export/ppm",
-        "/equipment/<data_type>/<serial>/barcode",
-        "/equipment/<data_type>/barcodes/bulk/download",
-        "/equipment/ocm/edit/<Serial>",
-        "/equipment/ocm/delete/<Serial>",
-        "/import_equipment (with data_type set to ocm in the form data)",
-        "/export/ocm",
-        "/equipment/ocm/<serial>/barcode",
-        "/equipment/ocm/barcodes/bulk/download",
-        "/training",
-        "/audit-log",
-        "/create_user",
-        "/users",
-        "/users/edit/<username>",
-        "/users/delete/<username>",
-        "/settings",
-        "/settings/reminder",
-        "/settings/email",
-        "/settings/test-email"
+        "dashboard_view",
+        "equipment_ppm_read",
+        "equipment_ppm_write",
+        "equipment_ppm_delete",
+        "equipment_ppm_import_export",
+        "equipment_ocm_read",
+        "equipment_ocm_write",
+        "equipment_ocm_delete",
+        "equipment_ocm_import_export",
+        "training_manage",
+        "audit_log_view",
+        "audit_log_export",
+        "user_manage",
+        "settings_manage",
+        "settings_email_test",
+        "backup_manage"
       ]
     },
     "Editor": {
       "permissions": [
-        "/",
-        "/equipment/ppm/list",
-        "/equipment/ocm/list",
-        "/equipment/ppm/add",
-        "/equipment/ppm/edit/<SERIAL>",
-        "/equipment/ppm/delete/<SERIAL>",
-        "/download/template/ppm",
-        "/import_equipment",
-        "/export/ppm",
-        "/equipment/<data_type>/<serial>/barcode",
-        "/equipment/<data_type>/barcodes/bulk/download",
-        "/equipment/ocm/edit/<Serial>",
-        "/equipment/ocm/delete/<Serial>",
-        "/import_equipment",
-        "/export/ocm",
-        "/equipment/ocm/<serial>/barcode",
-        "/equipment/ocm/barcodes/bulk/download",
-        "/training"
+        "dashboard_view",
+        "equipment_ppm_read",
+        "equipment_ppm_write",
+        "equipment_ppm_delete",
+        "equipment_ppm_import_export",
+        "equipment_ocm_read",
+        "equipment_ocm_write",
+        "equipment_ocm_delete",
+        "equipment_ocm_import_export",
+        "training_manage"
       ]
     },
     "Viewer": {
       "permissions": [
-        "/",
-        "/equipment/ppm/list",
-        "/equipment/ocm/list"
+        "dashboard_view",
+        "equipment_ppm_read",
+        "equipment_ocm_read"
       ]
     }
   }

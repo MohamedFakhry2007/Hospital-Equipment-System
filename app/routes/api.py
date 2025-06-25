@@ -6,7 +6,8 @@ import io # Added for TextIOWrapper
 import logging
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, Response, current_app # send_file might not be needed now
+from flask import Blueprint, jsonify, request, Response, current_app, session # Added session
+from app.decorators import permission_required # Updated import location
 from datetime import datetime
 
 from app.services.data_service import DataService
@@ -24,7 +25,8 @@ if not logger.hasHandlers():
     for handler in root_logger.handlers:
         logger.addHandler(handler)
 
-@api_bp.route('/equipment/<data_type>', methods=['GET'])
+@api_bp.route("/equipment/<data_type>", methods=["GET"])
+@permission_required(["equipment_ppm_read", "equipment_ocm_read"])
 def get_equipment(data_type):
     """Get all equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -37,7 +39,8 @@ def get_equipment(data_type):
         logger.error(f"Error getting {data_type} entries: {str(e)}")
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
-@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['GET'])
+@api_bp.route("/equipment/<data_type>/<SERIAL>", methods=["GET"])
+@permission_required(["equipment_ppm_read", "equipment_ocm_read"])
 def get_equipment_by_serial(data_type, SERIAL):
     """Get a specific equipment entry by SERIAL."""
     if data_type not in ('ppm', 'ocm'):
@@ -53,7 +56,8 @@ def get_equipment_by_serial(data_type, SERIAL):
         logger.error(f"Error getting {data_type} entry {SERIAL}: {str(e)}")
         return jsonify({"error": "Failed to retrieve equipment data"}), 500
 
-@api_bp.route('/equipment/<data_type>', methods=['POST'])
+@api_bp.route("/equipment/<data_type>", methods=["POST"])
+@permission_required(["equipment_ppm_write", "equipment_ocm_write"])
 def add_equipment(data_type):
     """Add a new equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -80,7 +84,8 @@ def add_equipment(data_type):
         return jsonify({"error": "Failed to add equipment"}), 500
 
 
-@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['PUT'])
+@api_bp.route("/equipment/<data_type>/<SERIAL>", methods=["PUT"])
+@permission_required(["equipment_ppm_write", "equipment_ocm_write"])
 def update_equipment(data_type, SERIAL):
     """Update an existing equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -109,7 +114,8 @@ def update_equipment(data_type, SERIAL):
         return jsonify({"error": "Failed to update equipment"}), 500
 
 
-@api_bp.route('/equipment/<data_type>/<SERIAL>', methods=['DELETE'])
+@api_bp.route("/equipment/<data_type>/<SERIAL>", methods=["DELETE"])
+@permission_required(["equipment_ppm_delete", "equipment_ocm_delete"])
 def delete_equipment(data_type, SERIAL):
     """Delete an equipment entry."""
     if data_type not in ('ppm', 'ocm'):
@@ -126,7 +132,8 @@ def delete_equipment(data_type, SERIAL):
         return jsonify({"error": "Failed to delete equipment"}), 500
 
 
-@api_bp.route('/export/<data_type>', methods=['GET'])
+@api_bp.route("/export/<data_type>", methods=["GET"])
+@permission_required(["export_data"])
 def export_data(data_type):
     """Export data to CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -152,7 +159,8 @@ def export_data(data_type):
         return jsonify({"error": f"Failed to export {data_type} data"}), 500
 
 
-@api_bp.route('/import/<data_type>', methods=['POST'])
+@api_bp.route("/import/<data_type>", methods=["POST"])
+@permission_required(["import_data"])
 def import_data(data_type):
     """Import data from CSV."""
     if data_type not in ('ppm', 'ocm'):
@@ -193,7 +201,8 @@ def import_data(data_type):
     else:
         return jsonify({"error": "Invalid file type, only CSV allowed"}), 400
 
-@api_bp.route('/bulk_delete/<data_type>', methods=['POST'])
+@api_bp.route("/bulk_delete/<data_type>", methods=["POST"])
+@permission_required(["equipment_ppm_delete", "equipment_ocm_delete"])
 def bulk_delete(data_type):
     """Handle bulk deletion of equipment entries."""
     if data_type not in ('ppm', 'ocm'):
@@ -222,7 +231,8 @@ def bulk_delete(data_type):
 
 # Training Records API Routes
 
-@api_bp.route('/trainings', methods=['POST'])
+@api_bp.route("/trainings", methods=["POST"])
+@permission_required(["training_write"])
 def add_training_route():
     if not request.is_json:
         logger.warning("Add training request is not JSON")
@@ -240,7 +250,8 @@ def add_training_route():
         logger.error(f"Error adding training record: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to add training record"}), 500
 
-@api_bp.route('/trainings', methods=['GET'])
+@api_bp.route("/trainings", methods=["GET"])
+@permission_required(["training_read"])
 def get_all_trainings_route():
     try:
         records = training_service.get_all_trainings()
@@ -249,7 +260,8 @@ def get_all_trainings_route():
         logger.error(f"Error getting all training records: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to retrieve training records"}), 500
 
-@api_bp.route('/trainings/<training_id>', methods=['GET'])
+@api_bp.route("/trainings/<training_id>", methods=["GET"])
+@permission_required(["training_read"])
 def get_training_by_id_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings
@@ -263,7 +275,8 @@ def get_training_by_id_route(training_id):
         logger.error(f"Error getting training record {training_id}: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to retrieve training record"}), 500
 
-@api_bp.route('/trainings/<training_id>', methods=['PUT'])
+@api_bp.route("/trainings/<training_id>", methods=["PUT"])
+@permission_required(["training_write"])
 def update_training_route(training_id):
     if not request.is_json:
         logger.warning(f"Update training request for ID {training_id} is not JSON")
@@ -286,7 +299,8 @@ def update_training_route(training_id):
         logger.error(f"Error updating training record {training_id}: {str(e)}", exc_info=True)
         return jsonify({"error": "Failed to update training record"}), 500
 
-@api_bp.route('/trainings/<training_id>', methods=['DELETE'])
+@api_bp.route("/trainings/<training_id>", methods=["DELETE"])
+@permission_required(["training_delete"])
 def delete_training_route(training_id):
     try:
         # Use training_id as string since the data stores IDs as strings
@@ -303,7 +317,8 @@ def delete_training_route(training_id):
 
 # --- Application Settings API Routes ---
 
-@api_bp.route('/settings', methods=['GET'])
+@api_bp.route("/settings", methods=["GET"])
+@permission_required(["settings_read"])
 def get_settings():
     """Get current application settings."""
     try:
@@ -313,7 +328,8 @@ def get_settings():
         logger.error(f"Error loading settings: {str(e)}")
         return jsonify({"error": "Failed to load settings"}), 500
 
-@api_bp.route('/settings', methods=['POST'])
+@api_bp.route("/settings", methods=["POST"])
+@permission_required(["settings_write"])
 def save_settings():
     """Save application settings."""
     # Added detailed logging for headers and raw body

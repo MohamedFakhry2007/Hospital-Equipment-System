@@ -33,10 +33,12 @@ logger = logging.getLogger('app')
 ALLOWED_EXTENSIONS = {'csv'}
 SETTINGS_FILE = Path("data/settings.json")
 
-def permission_required(allowed_roles):
+from app.services.permission_manager import PermissionManager # Add this import
+
+def permission_required(required_permissions):
     """
-    Decorator to check if a user has the required role to access a view.
-    `allowed_roles` is a list of role names (strings).
+    Decorator to check if a user has the required permissions to access a view.
+    `required_permissions` is a list of permission names (strings).
     """
     def decorator(f):
         @functools.wraps(f)
@@ -46,18 +48,26 @@ def permission_required(allowed_roles):
                 return redirect(url_for('views.login'))
 
             user_role = session.get('user_role')
-            # Ensure roles are compared in a consistent case (e.g., lowercase)
-            normalized_allowed_roles = [role.lower() for role in allowed_roles]
 
-            if user_role not in normalized_allowed_roles:
-                flash(f'You do not have permission to access this page. Required roles: {", ".join(allowed_roles)}.', 'danger')
-                # Redirect to a general page like index, or a specific 'unauthorized' page
+            # If 'admin' is in required_permissions and user is admin, allow
+            if 'admin' in required_permissions and user_role == 'admin':
+                return f(*args, **kwargs)
+
+            # Allow if user has ANY of the required permissions
+            has_any_permission = False
+            for perm in required_permissions:
+                if PermissionManager.has_permission(user_role, perm):
+                    has_any_permission = True
+                    break
+
+            if not has_any_permission:
+                flash(f'You do not have permission to access this page. Required: {", ".join(required_permissions)}.', 'danger')
                 return redirect(url_for('views.index'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
-# def check_admin(): # Removed as it's replaced by permission_required
+# def check_admin(): # Removed as it's replaced by permission_required decorator
 #     # This function will be replaced by the permission_required decorator.
 #     # Keeping it for now to avoid breaking existing code until all routes are updated.
 #     if not session.get('is_admin') and session.get('user_role') != 'admin':
@@ -77,49 +87,40 @@ def login():
 
         settings = DataService.load_settings()
         users = settings.get('users', [])
-        
         # First, check the admin credentials from environment variables as a fallback or primary admin
-        admin_username_env = current_app.config.get('ADMIN_USERNAME')
-        admin_password_env = current_app.config.get('ADMIN_PASSWORD')
+        # admin_username_env = current_app.config.get("ADMIN_USERNAME")
+        # admin_password_env = current_app.config.get("ADMIN_PASSWORD")
 
-        if username == admin_username_env and password == admin_password_env:
-            session['user_id'] = admin_username_env
-            session['user_role'] = 'admin' # Assuming env admin is always 'admin' role
-            logger.info(f"Admin user '{username}' logged in successfully via environment credentials.")
-            flash('Logged in successfully.', 'success')
-            return redirect(url_for('views.index'))
+        # if username == admin_username_env and password == admin_password_env:
+        #     session["user_id"] = admin_username_env
+        #     session["user_role"] = "admin" # Assuming env admin is always "admin" role
+        #     logger.info(f"Admin user '{username}' logged in successfully via environment credentials.")
+        #     flash("Logged in successfully.", "success")
+        #     return redirect(url_for("views.index"))
 
         # Then, check users from settings.json
         for user in users:
-            if user['username'] == username and check_password_hash(user['password'], password):
+            if user['username'] == username and (user['password'] == password or check_password_hash(user['password'], password)):
                 session['user_id'] = user['username']
                 session['user_role'] = user['role'].lower() # Ensure role is lowercase for consistency
+                if user['role'].lower() == 'admin':
+                    session['is_admin'] = True
+                else:
+                    session.pop('is_admin', None)
                 logger.info(f"User '{username}' (Role: {user['role']}) logged in successfully.")
                 flash('Logged in successfully.', 'success')
                 return redirect(url_for('views.index'))
 
         logger.warning(f"Failed login attempt for username: {username}")
         flash('Invalid username or password.', 'danger')
-        return render_template('login.html')
+        return render_template('auth/login.html')
             
-    return render_template('login.html')
-
-@views_bp.route('/logout')
-def logout():
-    """Handle user logout."""
-    session.pop('user_id', None)
-    session.pop('user_role', None)
-    session.pop('is_admin', None) # Also remove old session key if present
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('views.login'))
+    return render_template('auth/login.html')
 
 @views_bp.route('/')
-@permission_required(['admin', 'editor', 'viewer'])
+@permission_required(["dashboard_view"])
 def index():
     """Display the dashboard with maintenance statistics."""
-    # if not session.get('is_admin'):  # Replaced by decorator
-    #     return redirect(url_for('views.login'))
-    
     ppm_data = DataService.get_all_entries(data_type='ppm')
     if isinstance(ppm_data, dict):
         ppm_data = [ppm_data]
@@ -232,14 +233,23 @@ def index():
                            upcoming_90_days=upcoming_90_days,
                            equipment=all_equipment)
 
+@views_bp.route('/logout')
+def logout():
+    """Handle user logout."""
+    session.pop('user_id', None)
+    session.pop('user_role', None)
+    session.pop('is_admin', None) # Also remove old session key if present
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('views.login'))
+
 @views_bp.route('/healthz')
 def health_check():
     """Simple health check endpoint."""
     logger.info("Health check endpoint /healthz was accessed.")
     return "OK", 200
 
-@views_bp.route('/equipment/<data_type>/list')
-@permission_required(['admin', 'editor', 'viewer'])
+@views_bp.route('/equipment/<data_type>')
+@permission_required(["equipment_ppm_read", "equipment_ocm_read"])
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -544,15 +554,13 @@ def delete_equipment(data_type, SERIAL):
     return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/import-export')
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
 def import_export_page():
     """Display the import/export page."""
-    # if not session.get('is_admin'): # Replaced by decorator
-    #     return redirect(url_for('views.login'))
     return render_template('import_export/main.html')
 
 @views_bp.route('/import_equipment', methods=['POST'])
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
 def import_equipment():
     """Import equipment data from CSV file."""
     # Note: This route is called by a form POST, permission check is good.
@@ -604,7 +612,7 @@ def import_equipment():
     return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/export/<data_type>')
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
 def export_equipment(data_type):
     """Export equipment data to CSV."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -633,7 +641,7 @@ def export_equipment(data_type):
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/download/template/<template_type>')
-@permission_required(['admin', 'editor']) # Viewers might not need to download templates
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
 def download_template(template_type):
     """Download template files for data import."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -825,7 +833,7 @@ def send_test_email():
         return jsonify({'error': f'Error sending test email: {str(e)}'}), 500
 
 @views_bp.route('/training')
-@permission_required(['admin', 'editor']) # Viewers might not need to manage training
+@permission_required(['training_manage'])
 def training_management_page():
     """Display the training management page."""
     # if not session.get('is_admin'): # Replaced by decorator
