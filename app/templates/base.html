@@ -75,7 +75,7 @@
             gap: 6px;
         }
         
-        .nav-item .nav-link:hover {
+        .nav-item .nav-link:hover, .nav-item .nav-link.active:hover {
             background: rgba(255, 255, 255, 0.25);
             border-color: rgba(255, 255, 255, 0.4);
             transform: translateY(-2px);
@@ -211,29 +211,58 @@
                             OCM List
                         </a>
                     </li>
+                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.import_export_page') }}">
                             <i class="fas fa-exchange-alt"></i>
                             Import / Export
                         </a>
                     </li>
+                    {% endif %}
+                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.training_management_page') }}">
                             <i class="fas fa-graduation-cap"></i>
                             Training
                         </a>
                     </li>
+                    {% endif %}
+                     {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.audit_log_page') }}">
                             <i class="fas fa-clipboard-list"></i>
                             Audit Log
                         </a>
                     </li>
+                    {% endif %}
+                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('views.settings_page') }}">
                             <i class="fas fa-cog"></i>
                             Settings
                         </a>
+                    </li>
+                    {% endif %}
+                    {% if session.get('is_admin') %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('views.create_user') }}">
+                            <i class="fas fa-user-plus"></i>
+                            Create User
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                         {% if session.get('is_admin') %}
+                            <a class="nav-link" href="{{ url_for('views.logout') }}">
+                                <i class="fas fa-sign-out-alt"></i>
+                                Logout
+                            </a>
+                         {% else %}
+                            <a class="nav-link" href="{{ url_for('views.login') }}">
+                                <i class="fas fa-sign-in-alt"></i>
+                                Login
+                            </a>
+                         {% endif %}
                     </li>
                 </ul>
             </div>

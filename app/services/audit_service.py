@@ -301,7 +301,8 @@ class AuditService:
         # CSV rows
         for log in logs:
             details_str = json.dumps(log.get('details', {})).replace('"', '""')
-            csv_content += f"{log.get('id', '')},{log.get('timestamp', '')},{log.get('event_type', '')},{log.get('performed_by', '')},\"{log.get('description', '').replace('\"', '\"\"')}\",{log.get('status', '')},\"{details_str}\"\n"
+            description = log.get('description', '').replace('"', '""')
+            csv_content += f"{log.get('id', '')},{log.get('timestamp', '')},{log.get('event_type', '')},{log.get('performed_by', '')},\"{description}\",{log.get('status', '')},\"{details_str}\"\n"
         
         return csv_content
     

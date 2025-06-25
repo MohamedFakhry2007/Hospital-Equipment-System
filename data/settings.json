@@ -1,8 +1,8 @@
 {
-  "email_notifications_enabled": true,
+  "email_notifications_enabled": false,
   "email_reminder_interval_minutes": 1440,
   "recipient_email": "Alorfbiomed@gmail.com",
-  "push_notifications_enabled": true,
+  "push_notifications_enabled": false,
   "push_notification_interval_minutes": 60,
   "email_send_time_hour": 7,
   "reminder_timing": {
@@ -14,5 +14,79 @@
   "enable_automatic_reminders": false,
   "cc_emails": "",
   "automatic_backup_enabled": false,
-  "automatic_backup_interval_hours": 24
+  "automatic_backup_interval_hours": 24,
+  "users": [
+    {
+      "username": "editor1",
+      "password": "hashed_password_here",
+      "role": "Editor"
+    },
+    {
+      "username": "viewer1",
+      "password": "hashed_password_here",
+      "role": "Viewer"
+    }
+  ],
+  "roles": {
+    "Admin": {
+      "permissions": [
+        "/",
+        "/equipment/ppm/list",
+        "/equipment/ocm/list",
+        "/equipment/ppm/add",
+        "/equipment/ppm/edit/<SERIAL>",
+        "/equipment/ppm/delete/<SERIAL>",
+        "/download/template/ppm",
+        "/import_equipment",
+        "/export/ppm",
+        "/equipment/<data_type>/<serial>/barcode",
+        "/equipment/<data_type>/barcodes/bulk/download",
+        "/equipment/ocm/edit/<Serial>",
+        "/equipment/ocm/delete/<Serial>",
+        "/import_equipment (with data_type set to ocm in the form data)",
+        "/export/ocm",
+        "/equipment/ocm/<serial>/barcode",
+        "/equipment/ocm/barcodes/bulk/download",
+        "/training",
+        "/audit-log",
+        "/create_user",
+        "/users",
+        "/users/edit/<username>",
+        "/users/delete/<username>",
+        "/settings",
+        "/settings/reminder",
+        "/settings/email",
+        "/settings/test-email"
+      ]
+    },
+    "Editor": {
+      "permissions": [
+        "/",
+        "/equipment/ppm/list",
+        "/equipment/ocm/list",
+        "/equipment/ppm/add",
+        "/equipment/ppm/edit/<SERIAL>",
+        "/equipment/ppm/delete/<SERIAL>",
+        "/download/template/ppm",
+        "/import_equipment",
+        "/export/ppm",
+        "/equipment/<data_type>/<serial>/barcode",
+        "/equipment/<data_type>/barcodes/bulk/download",
+        "/equipment/ocm/edit/<Serial>",
+        "/equipment/ocm/delete/<Serial>",
+        "/import_equipment",
+        "/export/ocm",
+        "/equipment/ocm/<serial>/barcode",
+        "/equipment/ocm/barcodes/bulk/download",
+        "/training"
+      ]
+    },
+    "Viewer": {
+      "permissions": [
+        "/",
+        "/equipment/ppm/list",
+        "/equipment/ocm/list"
+      ]
+    }
+  }
 }
