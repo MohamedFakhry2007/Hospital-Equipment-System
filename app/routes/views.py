@@ -23,7 +23,8 @@ from app.constants import (
     DEPARTMENTS, TRAINING_MODULES, QUARTER_STATUS_OPTIONS, GENERAL_STATUS_OPTIONS,
     DEVICES_BY_DEPARTMENT, ALL_DEVICES, TRAINERS
 )
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
+import functools # For wraps decorator
 
 views_bp = Blueprint('views', __name__)
 logger = logging.getLogger('app')
@@ -32,10 +33,37 @@ logger = logging.getLogger('app')
 ALLOWED_EXTENSIONS = {'csv'}
 SETTINGS_FILE = Path("data/settings.json")
 
-def check_admin():
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
-    return None
+def permission_required(allowed_roles):
+    """
+    Decorator to check if a user has the required role to access a view.
+    `allowed_roles` is a list of role names (strings).
+    """
+    def decorator(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_role' not in session:
+                flash('You need to be logged in to access this page.', 'warning')
+                return redirect(url_for('views.login'))
+
+            user_role = session.get('user_role')
+            # Ensure roles are compared in a consistent case (e.g., lowercase)
+            normalized_allowed_roles = [role.lower() for role in allowed_roles]
+
+            if user_role not in normalized_allowed_roles:
+                flash(f'You do not have permission to access this page. Required roles: {", ".join(allowed_roles)}.', 'danger')
+                # Redirect to a general page like index, or a specific 'unauthorized' page
+                return redirect(url_for('views.index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# def check_admin(): # Removed as it's replaced by permission_required
+#     # This function will be replaced by the permission_required decorator.
+#     # Keeping it for now to avoid breaking existing code until all routes are updated.
+#     if not session.get('is_admin') and session.get('user_role') != 'admin':
+#          # Check both old and new session vars for admin during transition
+#         return redirect(url_for('views.login'))
+#     return None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -46,34 +74,51 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
+
+        settings = DataService.load_settings()
+        users = settings.get('users', [])
         
-        admin_username = current_app.config.get('ADMIN_USERNAME')
-        admin_password = current_app.config.get('ADMIN_PASSWORD')
-        
-        if username == admin_username and password == admin_password:
-            session['is_admin'] = True
-            logger.info(f"User '{username}' logged in successfully.")
+        # First, check the admin credentials from environment variables as a fallback or primary admin
+        admin_username_env = current_app.config.get('ADMIN_USERNAME')
+        admin_password_env = current_app.config.get('ADMIN_PASSWORD')
+
+        if username == admin_username_env and password == admin_password_env:
+            session['user_id'] = admin_username_env
+            session['user_role'] = 'admin' # Assuming env admin is always 'admin' role
+            logger.info(f"Admin user '{username}' logged in successfully via environment credentials.")
             flash('Logged in successfully.', 'success')
             return redirect(url_for('views.index'))
-        else:
-            logger.warning(f"Failed login attempt for username: {username}")
-            flash('Invalid username or password.', 'danger')
-            return render_template('login.html')
+
+        # Then, check users from settings.json
+        for user in users:
+            if user['username'] == username and check_password_hash(user['password'], password):
+                session['user_id'] = user['username']
+                session['user_role'] = user['role'].lower() # Ensure role is lowercase for consistency
+                logger.info(f"User '{username}' (Role: {user['role']}) logged in successfully.")
+                flash('Logged in successfully.', 'success')
+                return redirect(url_for('views.index'))
+
+        logger.warning(f"Failed login attempt for username: {username}")
+        flash('Invalid username or password.', 'danger')
+        return render_template('login.html')
             
     return render_template('login.html')
 
 @views_bp.route('/logout')
 def logout():
     """Handle user logout."""
-    session.pop('is_admin', None)
+    session.pop('user_id', None)
+    session.pop('user_role', None)
+    session.pop('is_admin', None) # Also remove old session key if present
     flash('You have been logged out.', 'info')
     return redirect(url_for('views.login'))
 
 @views_bp.route('/')
+@permission_required(['admin', 'editor', 'viewer'])
 def index():
     """Display the dashboard with maintenance statistics."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'):  # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     ppm_data = DataService.get_all_entries(data_type='ppm')
     if isinstance(ppm_data, dict):
@@ -194,10 +239,11 @@ def health_check():
     return "OK", 200
 
 @views_bp.route('/equipment/<data_type>/list')
+@permission_required(['admin', 'editor', 'viewer'])
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     if data_type not in ('ppm', 'ocm'):
         flash("Invalid equipment type specified.", "warning")
         return redirect(url_for('views.index'))
@@ -251,10 +297,11 @@ def list_equipment(data_type):
         return render_template('equipment/list.html', equipment=[], data_type=data_type)
 
 @views_bp.route('/equipment/ppm/add', methods=['GET', 'POST'])
+@permission_required(['admin', 'editor'])
 def add_ppm_equipment():
     """Handle adding new PPM equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -307,10 +354,11 @@ def add_ppm_equipment():
                          departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
+@permission_required(['admin', 'editor'])
 def add_ocm_equipment():
     """Handle adding new OCM equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if request.method == 'POST':
         form_data = request.form.to_dict()
@@ -347,10 +395,11 @@ def add_ocm_equipment():
                          departments=DEPARTMENTS, general_status_options=GENERAL_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ppm/edit/<SERIAL>', methods=['GET', 'POST'])
+@permission_required(['admin', 'editor'])
 def edit_ppm_equipment(SERIAL):
     """Handle editing existing PPM equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     entry = DataService.get_entry('ppm', SERIAL)
     if not entry:
@@ -411,10 +460,11 @@ def edit_ppm_equipment(SERIAL):
                          departments=DEPARTMENTS)
 
 @views_bp.route('/equipment/ocm/edit/<Serial>', methods=['GET', 'POST'])
+@permission_required(['admin', 'editor'])
 def edit_ocm_equipment(Serial):
     """Handle editing OCM equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     logger.info(f"Received {request.method} request to edit OCM equipment with Serial: {Serial}")
     try:
@@ -465,10 +515,11 @@ def edit_ocm_equipment(Serial):
         return redirect(url_for('views.list_equipment', data_type='ocm'))
 
 @views_bp.route('/equipment/<data_type>/delete/<path:SERIAL>', methods=['POST'])
+@permission_required(['admin', 'editor']) # Or just ['admin'] depending on desired strictness
 def delete_equipment(data_type, SERIAL):
     """Handle deleting existing equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if data_type not in ('ppm', 'ocm'):
         flash("Invalid equipment type specified.", "warning")
@@ -493,15 +544,19 @@ def delete_equipment(data_type, SERIAL):
     return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/import-export')
+@permission_required(['admin', 'editor'])
 def import_export_page():
     """Display the import/export page."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     return render_template('import_export/main.html')
 
 @views_bp.route('/import_equipment', methods=['POST'])
+@permission_required(['admin', 'editor'])
 def import_equipment():
     """Import equipment data from CSV file."""
+    # Note: This route is called by a form POST, permission check is good.
+    # No explicit session check was here before, but it's good to add.
     if 'file' not in request.files:
         flash('No file part', 'error')
         return redirect(url_for('views.import_export_page'))
@@ -549,10 +604,11 @@ def import_equipment():
     return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/export/<data_type>')
+@permission_required(['admin', 'editor'])
 def export_equipment(data_type):
     """Export equipment data to CSV."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if data_type not in ['ppm', 'ocm', 'training']:
         flash('Invalid data type specified', 'error')
@@ -577,10 +633,11 @@ def export_equipment(data_type):
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/download/template/<template_type>')
+@permission_required(['admin', 'editor']) # Viewers might not need to download templates
 def download_template(template_type):
     """Download template files for data import."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if template_type not in ['ppm', 'ocm', 'training']:
         flash("Invalid template type specified.", "warning")
@@ -604,10 +661,11 @@ def download_template(template_type):
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/settings', methods=['GET', 'POST'])
+@permission_required(['admin'])
 def settings_page():
     """Handle settings page and updates."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     if request.method == 'POST':
         if not request.is_json:
@@ -670,10 +728,11 @@ def settings_page():
     return render_template('settings.html', settings=settings)
 
 @views_bp.route('/settings/reminder', methods=['POST'])
+@permission_required(['admin'])
 def save_reminder_settings():
     """Handle saving reminder-specific settings."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # This was incorrect for a JSON endpoint
     
     if not request.is_json:
         return jsonify({'error': 'Invalid request format. Expected JSON.'}), 400
@@ -702,10 +761,11 @@ def save_reminder_settings():
         return jsonify({'error': 'An error occurred while saving reminder settings.'}), 500
 
 @views_bp.route('/settings/email', methods=['POST'])
+@permission_required(['admin'])
 def save_email_settings():
     """Handle saving email-specific settings."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # Incorrect for JSON endpoint
     
     if not request.is_json:
         return jsonify({'error': 'Invalid request format. Expected JSON.'}), 400
@@ -725,10 +785,11 @@ def save_email_settings():
         return jsonify({'error': 'An error occurred while saving email settings.'}), 500
 
 @views_bp.route('/settings/test-email', methods=['POST'])
+@permission_required(['admin'])
 def send_test_email():
     """Send a test email to verify email configuration."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # Incorrect for JSON endpoint
     
     try:
         settings = DataService.load_settings()
@@ -764,10 +825,11 @@ def send_test_email():
         return jsonify({'error': f'Error sending test email: {str(e)}'}), 500
 
 @views_bp.route('/training')
+@permission_required(['admin', 'editor']) # Viewers might not need to manage training
 def training_management_page():
     """Display the training management page."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         all_trainings = training_service.get_all_trainings()
@@ -790,10 +852,11 @@ def training_management_page():
                              all_devices=ALL_DEVICES)
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode')
+@permission_required(['admin', 'editor']) # Viewers might not need to generate single barcodes
 def generate_barcode(data_type, serial):
     """Generate and display barcode for a specific equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         equipment = DataService.get_entry(data_type, serial)
@@ -813,10 +876,11 @@ def generate_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode/download')
+@permission_required(['admin', 'editor'])
 def download_barcode(data_type, serial):
     """Download barcode image for a specific equipment."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         equipment = DataService.get_entry(data_type, serial)
@@ -843,10 +907,11 @@ def download_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk')
+@permission_required(['admin', 'editor'])
 def bulk_barcodes(data_type):
     """Generate bulk barcodes for all equipment of a specific type."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         equipment_list = DataService.get_all_entries(data_type)
@@ -873,10 +938,11 @@ def bulk_barcodes(data_type):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk/download')
+@permission_required(['admin', 'editor'])
 def download_bulk_barcodes(data_type):
     """Download all barcodes as a ZIP file."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         equipment_list = DataService.get_all_entries(data_type)
@@ -907,10 +973,11 @@ def download_bulk_barcodes(data_type):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/machine-assignment')
+@permission_required(['admin', 'editor']) # Or perhaps just 'admin'
 def machine_assignment():
     """Display the machine assignment page."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     return render_template('equipment/machine_assignment.html',
                          departments=DEPARTMENTS,
@@ -919,10 +986,11 @@ def machine_assignment():
                          trainers=TRAINERS)
 
 @views_bp.route('/equipment/machine-assignment', methods=['POST'])
+@permission_required(['admin', 'editor']) # Or perhaps just 'admin'
 def save_machine_assignment():
     """Save machine assignments."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # Incorrect for JSON endpoint
     
     try:
         data = request.get_json()
@@ -940,10 +1008,11 @@ def save_machine_assignment():
         }), 500
 
 @views_bp.route('/refresh-dashboard')
+@permission_required(['admin', 'editor', 'viewer']) # All roles can see the dashboard
 def refresh_dashboard():
     """AJAX endpoint to refresh dashboard data."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # Incorrect for JSON endpoint
     
     try:
         ppm_data = DataService.get_all_entries(data_type='ppm')
@@ -1008,10 +1077,11 @@ def refresh_dashboard():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @views_bp.route('/audit-log')
+@permission_required(['admin']) # Typically only admins view audit logs
 def audit_log_page():
     """Display the audit log page with filtering options."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         event_type_filter = request.args.get('event_type', '')
@@ -1057,10 +1127,11 @@ def audit_log_page():
         return redirect(url_for('views.index'))
 
 @views_bp.route('/audit-log/export')
+@permission_required(['admin'])
 def export_audit_log():
     """Export audit logs to CSV."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         event_type_filter = request.args.get('event_type', '')
@@ -1108,10 +1179,11 @@ def export_audit_log():
         return redirect(url_for('views.audit_log_page'))
 
 @views_bp.route('/backup/create-full', methods=['POST'])
+@permission_required(['admin'])
 def create_full_backup():
     """Create a full application backup."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         result = BackupService.create_full_backup()
@@ -1123,10 +1195,11 @@ def create_full_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/create-settings', methods=['POST'])
+@permission_required(['admin'])
 def create_settings_backup():
     """Create a settings-only backup."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         result = BackupService.create_settings_backup()
@@ -1138,10 +1211,11 @@ def create_settings_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/list')
+@permission_required(['admin'])
 def list_backups():
     """List all available backups as JSON."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login')) # Incorrect for JSON endpoint
     
     try:
         backups = BackupService.list_backups()
@@ -1151,10 +1225,11 @@ def list_backups():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @views_bp.route('/backup/delete/<filename>', methods=['POST'])
+@permission_required(['admin'])
 def delete_backup(filename):
     """Delete a backup file."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         result = BackupService.delete_backup(filename)
@@ -1166,10 +1241,11 @@ def delete_backup(filename):
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/download/<backup_type>/<filename>')
+@permission_required(['admin'])
 def download_backup(backup_type, filename):
     """Download a backup file."""
-    if not session.get('is_admin'):
-        return redirect(url_for('views.login'))
+    # if not session.get('is_admin'): # Replaced by decorator
+    #     return redirect(url_for('views.login'))
     
     try:
         if backup_type not in ['full', 'settings']:
@@ -1200,12 +1276,13 @@ def download_backup(backup_type, filename):
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/create_user', methods=['GET', 'POST'])
+@permission_required(['admin'])
 def create_user():
     """Handles user creation."""
     logger.critical("Entering create_user route")  # Log entry point
-    if check_admin():
-        logger.critical("Admin check failed, redirecting")
-        return check_admin()
+    # if check_admin(): # Replaced by decorator
+    #     logger.critical("Admin check failed, redirecting")
+    #     return check_admin()
 
     if request.method == 'POST':
         logger.critical("Received POST request")
