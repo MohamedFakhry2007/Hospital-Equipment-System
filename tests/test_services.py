@@ -3,6 +3,7 @@ from datetime import datetime, date, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock, call
 import io
 import logging # Added for logger testing
+import pytest_mock # Added for mocker fixture
 
 import pytest
 from pydantic import ValidationError

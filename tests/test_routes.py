@@ -6,10 +6,10 @@ import shutil
 
 # Attempt to import the Flask app instance
 # Common locations are app/__init__.py or app/main.py
-try:
-    from app import app as flask_app # If app is in app/__init__.py
-except ImportError:
-    from app.main import app as flask_app # If app is in app.main.py
+from app import create_app
+
+flask_app = create_app()
+    
 
 from app.services.data_service import DataService
 from app.config import Config

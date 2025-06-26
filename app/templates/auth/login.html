@@ -134,7 +134,7 @@
                 </ul>
             {% endif %}
         {% endwith %}
-        <form method="POST" action="{{ url_for('views.login') }}">
+        <form method="POST" action="{{ url_for('auth.login') }}">
             <div>
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autocomplete="username">

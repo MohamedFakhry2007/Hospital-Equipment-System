@@ -70,6 +70,18 @@ def start_push_notification_scheduler():
         logger.info("Background thread for Push Notification scheduler has finished.")
 
 
+from flask_login import LoginManager
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user from JSON file by user_id (which is the username in our case)."""
+    from app.models.json_user import JSONUser
+    return JSONUser.get_user(user_id)
+
 def create_app():
     """Create and configure the Flask application.
     
@@ -88,8 +100,11 @@ def create_app():
     # Load configuration
     app.config.from_object(Config)
 
-    # Initialize Flask-Session
+    # Initialize extensions
+    login_manager.init_app(app)
     Session(app)
+
+    # User loader is already defined above
     
     # Ensure data directory exists
     os.makedirs(Config.DATA_DIR, exist_ok=True)
@@ -97,9 +112,13 @@ def create_app():
     # Register blueprints
     from app.routes.views import views_bp
     from app.routes.api import api_bp
+    from app.routes.auth import auth_bp
+    from app.routes.admin import admin_bp
     
     app.register_blueprint(views_bp)
     app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    app.register_blueprint(admin_bp, url_prefix='/admin')
 
     # Start the scheduler in a background thread if enabled
     # This will be called when Gunicorn workers are initialized.

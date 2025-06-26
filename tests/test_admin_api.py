@@ -71,7 +71,7 @@ def editor_user(setup_database): # Depends on setup_database
 # --- Test Cases ---
 
 def test_create_user_as_admin(client, admin_user):
-    with client.application.app_context(): # Ensure app context for login_user
+    with client.application.test_request_context():
         login_user(admin_user)
 
     admin_role = Role.query.filter_by(name='Admin').first()
@@ -92,11 +92,11 @@ def test_create_user_as_admin(client, admin_user):
     assert newly_created_user is not None
     assert newly_created_user.role.name == 'Editor'
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_create_user_missing_fields_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     response = client.post('/admin/users', json={
@@ -107,11 +107,11 @@ def test_create_user_missing_fields_as_admin(client, admin_user):
     data = response.get_json()
     assert "Missing data" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_create_user_duplicate_username_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     editor_role = Role.query.filter_by(name='Editor').first()
@@ -133,11 +133,11 @@ def test_create_user_duplicate_username_as_admin(client, admin_user):
     data = response.get_json()
     assert "Username already exists" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_create_user_invalid_role_id_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     invalid_role_id = 99999 # Assuming this role ID does not exist
@@ -150,11 +150,11 @@ def test_create_user_invalid_role_id_as_admin(client, admin_user):
     data = response.get_json()
     assert "Role not found" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_create_user_as_editor_forbidden(client, editor_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(editor_user)
 
     any_role = Role.query.filter_by(name='Editor').first()
@@ -167,7 +167,7 @@ def test_create_user_as_editor_forbidden(client, editor_user):
     data = response.get_json()
     assert "Admin access required" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_create_user_unauthenticated_forbidden(client):
@@ -194,7 +194,7 @@ def test_create_user_unauthenticated_forbidden(client):
 
 # --- GET /admin/users Tests ---
 def test_get_users_as_admin(client, admin_user, editor_user): # Add editor_user to ensure multiple users exist
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     response = client.get('/admin/users')
@@ -209,11 +209,11 @@ def test_get_users_as_admin(client, admin_user, editor_user): # Add editor_user 
     for user_data in data:
         assert 'password_hash' not in user_data
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_get_users_as_editor_forbidden(client, editor_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(editor_user)
 
     response = client.get('/admin/users')
@@ -221,7 +221,7 @@ def test_get_users_as_editor_forbidden(client, editor_user):
     data = response.get_json()
     assert "Admin access required" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_get_users_unauthenticated_forbidden(client):
@@ -233,7 +233,7 @@ def test_get_users_unauthenticated_forbidden(client):
 
 # --- PUT /admin/users/{id} Tests ---
 def test_update_user_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user) # admin_user is also the one being updated here for simplicity
 
     editor_role = Role.query.filter_by(name='Editor').first()
@@ -253,11 +253,11 @@ def test_update_user_as_admin(client, admin_user):
     assert updated_user.username == new_username
     assert updated_user.role.name == 'Editor'
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_user_change_password_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     old_password_hash = admin_user.password_hash
@@ -271,22 +271,22 @@ def test_update_user_change_password_as_admin(client, admin_user):
     assert updated_user.password_hash != old_password_hash
     assert updated_user.check_password(new_password)
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_non_existent_user_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     non_existent_user_id = 99999
     response = client.put(f'/admin/users/{non_existent_user_id}', json={'username': 'ghost'})
     assert response.status_code == 404 # Not Found
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_user_duplicate_username_as_admin(client, admin_user, editor_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user) # admin_user is performing the update
 
     # Attempt to update editor_user's username to admin_user's username
@@ -297,11 +297,11 @@ def test_update_user_duplicate_username_as_admin(client, admin_user, editor_user
     data = response.get_json()
     assert "Username already exists" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_user_invalid_role_id_as_admin(client, admin_user, editor_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     invalid_role_id = 99999
@@ -312,17 +312,17 @@ def test_update_user_invalid_role_id_as_admin(client, admin_user, editor_user):
     data = response.get_json()
     assert "Role not found" in data['message']
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_user_as_editor_forbidden(client, editor_user, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(editor_user) # editor_user is trying to update admin_user
 
     response = client.put(f'/admin/users/{admin_user.id}', json={'username': 'hacked_admin'})
     assert response.status_code == 403 # Forbidden
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_update_user_unauthenticated_forbidden(client, admin_user):
@@ -331,7 +331,7 @@ def test_update_user_unauthenticated_forbidden(client, admin_user):
 
 # --- DELETE /admin/users/{id} Tests ---
 def test_delete_user_as_admin(client, admin_user, editor_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user) # admin_user performs deletion
 
     user_to_delete_id = editor_user.id
@@ -343,28 +343,28 @@ def test_delete_user_as_admin(client, admin_user, editor_user):
     deleted_user = User.query.get(user_to_delete_id)
     assert deleted_user is None
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_delete_non_existent_user_as_admin(client, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(admin_user)
 
     non_existent_user_id = 99999
     response = client.delete(f'/admin/users/{non_existent_user_id}')
     assert response.status_code == 404 # Not Found
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_delete_user_as_editor_forbidden(client, editor_user, admin_user):
-    with client.application.app_context():
+    with client.application.test_request_context():
         login_user(editor_user) # editor_user trying to delete admin_user
 
     response = client.delete(f'/admin/users/{admin_user.id}')
     assert response.status_code == 403 # Forbidden
 
-    with client.application.app_context():
+    with client.application.test_request_context():
         logout_user()
 
 def test_delete_user_unauthenticated_forbidden(client, admin_user):

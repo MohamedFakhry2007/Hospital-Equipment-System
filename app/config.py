@@ -1,5 +1,12 @@
+import os
+
 class Config:
     SECRET_KEY = 'a_very_secret_key'  # Change this to a random, long string in production
+
+    # Database configuration
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:///E:/reposits/Hospital-Equipment-System/instance/app.db'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     DATA_DIR = 'data'
 
@@ -20,5 +27,6 @@ class Config:
     SESSION_PERMANENT = True # Sessions will be permanent until they expire
     PERMANENT_SESSION_LIFETIME = 86400 # 24 hours in seconds
     SESSION_USE_SIGNER = True # Sign the session cookie for extra security
+
 
 

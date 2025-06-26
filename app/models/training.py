@@ -10,15 +10,27 @@ class Training:
         self.next_due_date = next_due_date
 
     def to_dict(self):
-        return {
-            "id": self.id,
-            "employee_id": self.employee_id,
-            "name": self.name,
-            "department": self.department,
-            "machine_trainer_assignments": self.machine_trainer_assignments, # e.g., [{ "machine": "MachineA", "trainer": "TrainerX" }, ...]
-            "last_trained_date": self.last_trained_date,
-            "next_due_date": self.next_due_date
+        # Ensure all fields are JSON serializable
+        result = {
+            "id": str(self.id) if self.id is not None else None,
+            "employee_id": str(self.employee_id) if self.employee_id is not None else None,
+            "name": str(self.name) if self.name is not None else None,
+            "department": str(self.department) if self.department is not None else None,
+            "machine_trainer_assignments": self.machine_trainer_assignments or [],
         }
+        
+        # Handle date fields
+        if isinstance(self.last_trained_date, str):
+            result["last_trained_date"] = self.last_trained_date
+        elif self.last_trained_date is not None:
+            result["last_trained_date"] = self.last_trained_date.isoformat() if hasattr(self.last_trained_date, 'isoformat') else str(self.last_trained_date)
+            
+        if isinstance(self.next_due_date, str):
+            result["next_due_date"] = self.next_due_date
+        elif self.next_due_date is not None:
+            result["next_due_date"] = self.next_due_date.isoformat() if hasattr(self.next_due_date, 'isoformat') else str(self.next_due_date)
+            
+        return result
 
     @staticmethod
     def from_dict(data):

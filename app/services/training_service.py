@@ -1,167 +1,205 @@
 import json
 import os
+import logging
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from pathlib import Path
+
 from app.models.training import Training
-from flask import current_app
+from app.config import Config
 
-def get_data_file_path():
-    """Get the correct path to the training data file using Flask's root path."""
-    try:
-        # Use Flask's application root path
-        return os.path.join(current_app.root_path, '..', 'data', 'training.json')
-    except RuntimeError:
-        # Fallback for when not in Flask context (e.g., during testing)
-        return os.path.join('data', 'training.json')
+logger = logging.getLogger(__name__)
 
-def load_trainings():
-    """Loads training data from the JSON file."""
-    data_file = get_data_file_path()
-    if not os.path.exists(data_file):
-        print(f"Training data file not found: {data_file}")
+DATA_FILE = Path(Config.DATA_DIR) / 'training.json'
+
+def load_trainings() -> List[Training]:
+    """
+    Load training data from the JSON file.
+    
+    Returns:
+        List[Training]: List of Training objects
+    """
+    if not DATA_FILE.exists():
+        logger.info(f"Training data file not found: {DATA_FILE}")
         return []
+        
     try:
-        with open(data_file, 'r', encoding='utf-8') as f:
-            # Handle empty file case
-            content = f.read()
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
             if not content:
+                logger.info("Training data file is empty")
                 return []
+                
             data = json.loads(content)
-        print(f"Successfully loaded {len(data)} training records from {data_file}")
-        return [Training.from_dict(item) for item in data]
-    except (IOError, json.JSONDecodeError) as e:
-        # Handle file not found, not readable, or invalid JSON
-        print(f"Error loading training data from {data_file}: {e}")
-        return []
+            if not isinstance(data, list):
+                logger.error(f"Invalid training data format in {DATA_FILE}")
+                return []
+                
+            logger.info(f"Successfully loaded {len(data)} training records from {DATA_FILE}")
+            return [Training.from_dict(item) for item in data]
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Error decoding JSON from {DATA_FILE}: {e}")
+    except Exception as e:
+        logger.error(f"Error loading training data from {DATA_FILE}: {e}")
+        
+    return []
 
-def save_trainings(trainings):
-    """Saves training data to the JSON file."""
-    data_file = get_data_file_path()
+def save_trainings(trainings: List[Training]) -> bool:
+    """
+    Save training data to the JSON file.
+    
+    Args:
+        trainings: List of Training objects to save
+        
+    Returns:
+        bool: True if save was successful, False otherwise
+    """
     try:
-        os.makedirs(os.path.dirname(data_file), exist_ok=True) # Ensure directory exists
-        with open(data_file, 'w', encoding='utf-8') as f:
-            json.dump([training.to_dict() for training in trainings], f, indent=4, ensure_ascii=False)
-        print(f"Successfully saved {len(trainings)} training records to {data_file}")
-    except IOError as e:
-        # Handle file not writable
-        print(f"Error: Could not write to {data_file}: {e}") # Or raise an exception
+        DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Convert Training objects to dicts
+        data = [training.to_dict() for training in trainings]
+        
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            
+        logger.info(f"Successfully saved {len(trainings)} training records to {DATA_FILE}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving training data to {DATA_FILE}: {e}")
+        return False
 
-def get_all_trainings():
-    """Returns all training records."""
+def get_all_trainings() -> List[Training]:
+    """
+    Get all training records.
+    
+    Returns:
+        List[Training]: List of all training records
+    """
     return load_trainings()
 
-def add_training(training_data):
-    """Adds a new training record."""
-    trainings = load_trainings()
-
-    # Ensure we get integer IDs for proper comparison
-    existing_ids = []
-    for t in trainings:
-        if t.id is not None:
-            try:
-                existing_ids.append(int(t.id))
-            except (ValueError, TypeError):
-                pass
+def add_training(training_data: Dict[str, Any]) -> Optional[Training]:
+    """
+    Add a new training record.
     
-    new_id = max(existing_ids, default=0) + 1 if existing_ids else 1
-    training_data['id'] = new_id
-
-    # The Training.from_dict method now handles the structure of 'machine_trainer_assignments'
-    # and backward compatibility from 'trained_on_machines' and 'trainer'.
-    # So, direct manipulation of 'trained_on_machines' or 'machine_trainer_assignments'
-    # in training_data before calling from_dict is less critical here, assuming client sends correct new format.
-    # If client sends 'machine_trainer_assignments', it should be a list of dicts.
-    # If client sends old format, from_dict will handle it.
-
-    new_training = Training.from_dict(training_data)
-    trainings.append(new_training)
-    save_trainings(trainings)
-    return new_training
-
-def get_training_by_id(training_id):
-    """Retrieves a specific training record by its ID."""
-    trainings = load_trainings()
-    for training in trainings:
-        # Handle both string and integer IDs for comparison
-        try:
-            if int(training.id) == int(training_id):
-                return training
-        except (ValueError, TypeError):
-            # Fallback to string comparison if conversion fails
-            if str(training.id) == str(training_id):
-                return training
+    Args:
+        training_data: Dictionary containing training data
+        
+    Returns:
+        Training: The created training record, or None if failed
+    """
+    try:
+        trainings = load_trainings()
+        
+        # Generate new ID if not provided
+        if 'id' not in training_data or not training_data['id']:
+            # Find the highest existing ID and increment by 1
+            existing_ids = [t.id for t in trainings if t.id is not None]
+            new_id = max(existing_ids, default=0) + 1
+            training_data['id'] = new_id
+            
+        # Ensure machine_trainer_assignments is a list
+        if 'machine_trainer_assignments' not in training_data:
+            training_data['machine_trainer_assignments'] = []
+            
+        # Create the training record
+        training = Training.from_dict(training_data)
+        trainings.append(training)
+        
+        if save_trainings(trainings):
+            return training
+            
+    except Exception as e:
+        logger.error(f"Error adding training record: {e}")
+        
     return None
 
-def update_training(training_id, training_data):
-    """Updates an existing training record."""
-    trainings = load_trainings()
-    training_to_update_idx = -1
-
-    for i, training in enumerate(trainings):
-        # Handle both string and integer IDs for comparison
-        try:
-            if int(training.id) == int(training_id):
-                training_to_update_idx = i
-                break
-        except (ValueError, TypeError):
-            # Fallback to string comparison if conversion fails
-            if str(training.id) == str(training_id):
-                training_to_update_idx = i
-                break
-
-    if training_to_update_idx != -1:
-        current_training = trainings[training_to_update_idx]
-        # Update attributes from training_data
-        for key, value in training_data.items():
-            # The key 'trained_on_machines' is deprecated in favor of 'machine_trainer_assignments'.
-            # The client should send 'machine_trainer_assignments' as a list of dicts.
-            # No special conversion is needed here for 'machine_trainer_assignments' if client sends correct format.
-            setattr(current_training, key, value)
-
-        # Ensure 'id' is not accidentally overwritten by None from form if not present
-        # Also, ensure the 'id' on the object matches the training_id from the URL parameter.
-        try:
-            current_id = int(getattr(current_training, 'id', None))
-            expected_id = int(training_id)
-            if current_id != expected_id:
-                setattr(current_training, 'id', expected_id)
-        except (ValueError, TypeError):
-            # Fallback for non-numeric IDs
-            if getattr(current_training, 'id', None) != training_id:
-                setattr(current_training, 'id', training_id)
-        
-        if 'id' not in training_data or training_data['id'] is None:
-            try:
-                setattr(current_training, 'id', int(training_id))
-            except (ValueError, TypeError):
-                setattr(current_training, 'id', training_id)
-
-        trainings[training_to_update_idx] = current_training
-        save_trainings(trainings)
-        return current_training
-    return None
-
-def delete_training(training_id):
-    """Deletes a training record by its ID."""
-    trainings = load_trainings()
-    original_length = len(trainings)
+def get_training_by_id(training_id: int) -> Optional[Training]:
+    """
+    Get a training record by ID.
     
-    # Handle both string and integer IDs for comparison
-    filtered_trainings = []
-    for training in trainings:
-        should_keep = True
-        try:
-            if int(training.id) == int(training_id):
-                should_keep = False
-        except (ValueError, TypeError):
-            # Fallback to string comparison if conversion fails
-            if str(training.id) == str(training_id):
-                should_keep = False
+    Args:
+        training_id: ID of the training record to retrieve
         
-        if should_keep:
-            filtered_trainings.append(training)
-    
-    trainings = filtered_trainings
+    Returns:
+        Training: The requested training record, or None if not found
+    """
+    try:
+        trainings = load_trainings()
+        return next((t for t in trainings if t.id == training_id), None)
+    except Exception as e:
+        logger.error(f"Error getting training record {training_id}: {e}")
+        return None
 
-    if len(trainings) < original_length:
-        save_trainings(trainings)
-        return True
-    return False
+def update_training(training_id: int, training_data: Dict[str, Any]) -> Optional[Training]:
+    """
+    Update an existing training record.
+    
+    Args:
+        training_id: ID of the training record to update
+        training_data: Dictionary containing updated training data
+        
+    Returns:
+        Training: The updated training record, or None if update failed
+    """
+    try:
+        trainings = load_trainings()
+        
+        # Find the training record to update
+        for i, training in enumerate(trainings):
+            if training.id == training_id:
+                # Update the training record with new data
+                updated_data = training.to_dict()
+                updated_data.update(training_data)
+                updated_data['id'] = training_id  # Ensure ID doesn't change
+                
+                # Ensure machine_trainer_assignments is a list
+                if 'machine_trainer_assignments' not in updated_data:
+                    updated_data['machine_trainer_assignments'] = []
+                
+                # Update the training record
+                trainings[i] = Training.from_dict(updated_data)
+                
+                if save_trainings(trainings):
+                    return trainings[i]
+                return None
+                
+        logger.warning(f"Training record with ID {training_id} not found")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error updating training record {training_id}: {e}")
+        return None
+
+def delete_training(training_id: int) -> bool:
+    """
+    Delete a training record by ID.
+    
+    Args:
+        training_id: ID of the training record to delete
+        
+    Returns:
+        bool: True if deletion was successful, False otherwise
+    """
+    try:
+        trainings = load_trainings()
+        initial_count = len(trainings)
+        
+        # Filter out the training record with the given ID
+        updated_trainings = [t for t in trainings if t.id != training_id]
+        
+        if len(updated_trainings) < initial_count:
+            # Only save if a record was actually removed
+            if save_trainings(updated_trainings):
+                logger.info(f"Deleted training record with ID {training_id}")
+                return True
+            return False
+            
+        logger.warning(f"Training record with ID {training_id} not found for deletion")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error deleting training record {training_id}: {e}")
+        return False

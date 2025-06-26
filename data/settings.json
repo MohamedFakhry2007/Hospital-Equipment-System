@@ -23,7 +23,7 @@
     },
     {
       "username": "admin",
-      "password": "password",
+      "password": "$2b$12$Lx4X1W4T3X5Z6Y7A8B9C0u1v2w3x4y5z6A7B8C9D0E1F2G3H4I5J6K7L8",
       "role": "Admin"
     },
     {
@@ -50,9 +50,11 @@
         "equipment_ocm_delete",
         "equipment_ocm_import_export",
         "training_manage",
+        "training_read",
         "audit_log_view",
         "audit_log_export",
         "user_manage",
+        "settings_read", 
         "settings_manage",
         "settings_email_test",
         "backup_manage"
@@ -69,7 +71,8 @@
         "equipment_ocm_write",
         "equipment_ocm_delete",
         "equipment_ocm_import_export",
-        "training_manage"
+        "training_manage",
+        "training_read"
       ]
     },
     "Viewer": {

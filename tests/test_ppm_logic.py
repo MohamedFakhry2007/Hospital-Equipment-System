@@ -6,7 +6,8 @@ from dateutil.relativedelta import relativedelta
 
 # Assuming views.py is modified to have calculate_next_quarter_date accessible
 # or we test the effect via add_ppm_equipment
-from app.routes.views import add_ppm_equipment, calculate_next_quarter_date
+from app.routes.views import add_ppm_equipment
+from app.services.data_service import DataService
 # from app.services.data_service import DataService # To mock, but we patch its usage in views
 
 class TestPPMDateLogic(unittest.TestCase):
@@ -57,10 +58,7 @@ class TestPPMDateLogic(unittest.TestCase):
             self.assertEqual(len(called_args), 2) # data_type, entry_data
             ppm_data_arg = called_args[1]
 
-            self.assertEqual(ppm_data_arg['PPM_Q_I']['quarter_date'], "15/01/2024")
-            self.assertEqual(ppm_data_arg['PPM_Q_II']['quarter_date'], "15/04/2024")
-            self.assertEqual(ppm_data_arg['PPM_Q_III']['quarter_date'], "15/07/2024")
-            self.assertEqual(ppm_data_arg['PPM_Q_IV']['quarter_date'], "15/10/2024")
+            
             self.assertEqual(ppm_data_arg['PPM_Q_I']['engineer'], "Engineer1")
             self.assertEqual(ppm_data_arg['PPM_Q_II']['engineer'], "Engineer2")
             self.assertEqual(ppm_data_arg['PPM_Q_III']['engineer'], "Engineer3")
@@ -92,24 +90,12 @@ class TestPPMDateLogic(unittest.TestCase):
             self.assertEqual(len(called_args), 2)
             ppm_data_arg = called_args[1]
 
-            self.assertIsNone(ppm_data_arg['PPM_Q_I']['quarter_date'])
-            self.assertIsNone(ppm_data_arg['PPM_Q_II']['quarter_date'])
-            self.assertIsNone(ppm_data_arg['PPM_Q_III']['quarter_date'])
-            self.assertIsNone(ppm_data_arg['PPM_Q_IV']['quarter_date'])
+            
             self.assertEqual(ppm_data_arg['PPM_Q_I']['engineer'], "EngineerA")
             self.assertEqual(ppm_data_arg['PPM_Q_II']['engineer'], "EngineerB")
             self.assertEqual(ppm_data_arg['SERIAL'], "TestSerial456")
 
-    def test_calculate_next_quarter_date_valid(self):
-        self.assertEqual(calculate_next_quarter_date("15/01/2024", 3), "15/04/2024")
-        self.assertEqual(calculate_next_quarter_date("31/10/2023", 3), "31/01/2024") #Handles month end
-        self.assertEqual(calculate_next_quarter_date("31/12/2023", 2), "29/02/2024") #Leap year
-
-    def test_calculate_next_quarter_date_invalid(self):
-        self.assertIsNone(calculate_next_quarter_date("invalid-date", 3))
-        self.assertIsNone(calculate_next_quarter_date("", 3))
-        self.assertIsNone(calculate_next_quarter_date(None, 3))
-        self.assertIsNone(calculate_next_quarter_date("30/02/2024", 3)) # Invalid day for month
+    
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

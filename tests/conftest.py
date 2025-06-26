@@ -11,8 +11,8 @@ from app.services.data_service import DataService
 def app():
     """Create a Flask app instance for testing."""
     app = create_app()
-    # Set the testing config or modify as needed
     app.config['TESTING'] = True
+    app.config['LOGIN_DISABLED'] = True # Disable login for most tests unless explicitly enabled
     with app.app_context():
         yield app
 
@@ -20,7 +20,9 @@ def app():
 @pytest.fixture
 def client(app):
     """Create a test client using the Flask app fixture."""
-    return app.test_client()
+    with app.test_client() as client:
+        with app.app_context():
+            yield client
 
 
 @pytest.fixture

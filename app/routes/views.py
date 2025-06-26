@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, current_app, send_file
+from flask_login import current_user, login_required
 import tempfile
 import zipfile
 from app.services.data_service import DataService
@@ -33,8 +34,6 @@ logger = logging.getLogger('app')
 ALLOWED_EXTENSIONS = {'csv'}
 SETTINGS_FILE = Path("data/settings.json")
 
-from app.services.permission_manager import PermissionManager # Add this import
-
 def permission_required(required_permissions):
     """
     Decorator to check if a user has the required permissions to access a view.
@@ -43,20 +42,14 @@ def permission_required(required_permissions):
     def decorator(f):
         @functools.wraps(f)
         def decorated_function(*args, **kwargs):
-            if 'user_role' not in session:
+            if not current_user.is_authenticated:
                 flash('You need to be logged in to access this page.', 'warning')
-                return redirect(url_for('views.login'))
-
-            user_role = session.get('user_role')
-
-            # If 'admin' is in required_permissions and user is admin, allow
-            if 'admin' in required_permissions and user_role == 'admin':
-                return f(*args, **kwargs)
+                return redirect(url_for('auth.login'))
 
             # Allow if user has ANY of the required permissions
             has_any_permission = False
             for perm in required_permissions:
-                if PermissionManager.has_permission(user_role, perm):
+                if current_user.has_permission(perm):
                     has_any_permission = True
                     break
 
@@ -67,58 +60,15 @@ def permission_required(required_permissions):
         return decorated_function
     return decorator
 
-# def check_admin(): # Removed as it's replaced by permission_required decorator
-#     # This function will be replaced by the permission_required decorator.
-#     # Keeping it for now to avoid breaking existing code until all routes are updated.
-#     if not session.get('is_admin') and session.get('user_role') != 'admin':
-#          # Check both old and new session vars for admin during transition
-#         return redirect(url_for('views.login'))
-#     return None
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@views_bp.route('/login', methods=['GET', 'POST'])
-def login():
-    """Handle user login."""
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-
-        settings = DataService.load_settings()
-        users = settings.get('users', [])
-        # First, check the admin credentials from environment variables as a fallback or primary admin
-        # admin_username_env = current_app.config.get("ADMIN_USERNAME")
-        # admin_password_env = current_app.config.get("ADMIN_PASSWORD")
-
-        # if username == admin_username_env and password == admin_password_env:
-        #     session["user_id"] = admin_username_env
-        #     session["user_role"] = "admin" # Assuming env admin is always "admin" role
-        #     logger.info(f"Admin user '{username}' logged in successfully via environment credentials.")
-        #     flash("Logged in successfully.", "success")
-        #     return redirect(url_for("views.index"))
-
-        # Then, check users from settings.json
-        for user in users:
-            if user['username'] == username and (user['password'] == password or check_password_hash(user['password'], password)):
-                session['user_id'] = user['username']
-                session['user_role'] = user['role'].lower() # Ensure role is lowercase for consistency
-                if user['role'].lower() == 'admin':
-                    session['is_admin'] = True
-                else:
-                    session.pop('is_admin', None)
-                logger.info(f"User '{username}' (Role: {user['role']}) logged in successfully.")
-                flash('Logged in successfully.', 'success')
-                return redirect(url_for('views.index'))
-
-        logger.warning(f"Failed login attempt for username: {username}")
-        flash('Invalid username or password.', 'danger')
-        return render_template('auth/login.html')
-            
-    return render_template('auth/login.html')
+# Login route has been moved to auth.py to consolidate authentication logic
 
 @views_bp.route('/')
-@permission_required(["dashboard_view"])
+@permission_required(['dashboard_view'])
 def index():
     """Display the dashboard with maintenance statistics."""
     ppm_data = DataService.get_all_entries(data_type='ppm')
@@ -234,13 +184,14 @@ def index():
                            equipment=all_equipment)
 
 @views_bp.route('/logout')
+@login_required
 def logout():
     """Handle user logout."""
-    session.pop('user_id', None)
-    session.pop('user_role', None)
-    session.pop('is_admin', None) # Also remove old session key if present
+    username = current_user.username
+    logout_user()
+    logger.info(f"User '{username}' logged out successfully.")
     flash('You have been logged out.', 'info')
-    return redirect(url_for('views.login'))
+    return redirect(url_for('auth.login'))
 
 @views_bp.route('/healthz')
 def health_check():
@@ -249,7 +200,7 @@ def health_check():
     return "OK", 200
 
 @views_bp.route('/equipment/<data_type>')
-@permission_required(["equipment_ppm_read", "equipment_ocm_read"])
+@permission_required(['equipment_ppm_read', 'equipment_ocm_read'])
 def list_equipment(data_type):
     """Display list of equipment (either PPM or OCM)."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -307,7 +258,7 @@ def list_equipment(data_type):
         return render_template('equipment/list.html', equipment=[], data_type=data_type)
 
 @views_bp.route('/equipment/ppm/add', methods=['GET', 'POST'])
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_write'])
 def add_ppm_equipment():
     """Handle adding new PPM equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -364,7 +315,7 @@ def add_ppm_equipment():
                          departments=DEPARTMENTS, quarter_status_options=QUARTER_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ocm/add', methods=['GET', 'POST'])
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ocm_write'])
 def add_ocm_equipment():
     """Handle adding new OCM equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -405,7 +356,7 @@ def add_ocm_equipment():
                          departments=DEPARTMENTS, general_status_options=GENERAL_STATUS_OPTIONS)
 
 @views_bp.route('/equipment/ppm/edit/<SERIAL>', methods=['GET', 'POST'])
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_write'])
 def edit_ppm_equipment(SERIAL):
     """Handle editing existing PPM equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -470,7 +421,7 @@ def edit_ppm_equipment(SERIAL):
                          departments=DEPARTMENTS)
 
 @views_bp.route('/equipment/ocm/edit/<Serial>', methods=['GET', 'POST'])
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ocm_write'])
 def edit_ocm_equipment(Serial):
     """Handle editing OCM equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -525,7 +476,7 @@ def edit_ocm_equipment(Serial):
         return redirect(url_for('views.list_equipment', data_type='ocm'))
 
 @views_bp.route('/equipment/<data_type>/delete/<path:SERIAL>', methods=['POST'])
-@permission_required(['admin', 'editor']) # Or just ['admin'] depending on desired strictness
+@permission_required(['equipment_ppm_delete', 'equipment_ocm_delete'])
 def delete_equipment(data_type, SERIAL):
     """Handle deleting existing equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -554,13 +505,13 @@ def delete_equipment(data_type, SERIAL):
     return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/import-export')
-@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export'])
 def import_export_page():
     """Display the import/export page."""
     return render_template('import_export/main.html')
 
 @views_bp.route('/import_equipment', methods=['POST'])
-@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export'])
 def import_equipment():
     """Import equipment data from CSV file."""
     # Note: This route is called by a form POST, permission check is good.
@@ -612,7 +563,7 @@ def import_equipment():
     return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/export/<data_type>')
-@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export', 'training_manage'])
+@permission_required(['equipment_ppm_import_export', 'equipment_ocm_import_export'])
 def export_equipment(data_type):
     """Export equipment data to CSV."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -669,7 +620,7 @@ def download_template(template_type):
         return redirect(url_for('views.import_export_page'))
 
 @views_bp.route('/settings', methods=['GET', 'POST'])
-@permission_required(['admin'])
+@permission_required(['settings_manage'])
 def settings_page():
     """Handle settings page and updates."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -736,7 +687,7 @@ def settings_page():
     return render_template('settings.html', settings=settings)
 
 @views_bp.route('/settings/reminder', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['settings_manage'])
 def save_reminder_settings():
     """Handle saving reminder-specific settings."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -769,7 +720,7 @@ def save_reminder_settings():
         return jsonify({'error': 'An error occurred while saving reminder settings.'}), 500
 
 @views_bp.route('/settings/email', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['settings_manage'])
 def save_email_settings():
     """Handle saving email-specific settings."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -793,7 +744,7 @@ def save_email_settings():
         return jsonify({'error': 'An error occurred while saving email settings.'}), 500
 
 @views_bp.route('/settings/test-email', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['settings_email_test'])
 def send_test_email():
     """Send a test email to verify email configuration."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -860,7 +811,7 @@ def training_management_page():
                              all_devices=ALL_DEVICES)
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode')
-@permission_required(['admin', 'editor']) # Viewers might not need to generate single barcodes
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def generate_barcode(data_type, serial):
     """Generate and display barcode for a specific equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -884,7 +835,7 @@ def generate_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/<serial>/barcode/download')
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def download_barcode(data_type, serial):
     """Download barcode image for a specific equipment."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -915,7 +866,7 @@ def download_barcode(data_type, serial):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk')
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def bulk_barcodes(data_type):
     """Generate bulk barcodes for all equipment of a specific type."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -946,7 +897,7 @@ def bulk_barcodes(data_type):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/<data_type>/barcodes/bulk/download')
-@permission_required(['admin', 'editor'])
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def download_bulk_barcodes(data_type):
     """Download all barcodes as a ZIP file."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -981,7 +932,7 @@ def download_bulk_barcodes(data_type):
         return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/equipment/machine-assignment')
-@permission_required(['admin', 'editor']) # Or perhaps just 'admin'
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def machine_assignment():
     """Display the machine assignment page."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -994,7 +945,7 @@ def machine_assignment():
                          trainers=TRAINERS)
 
 @views_bp.route('/equipment/machine-assignment', methods=['POST'])
-@permission_required(['admin', 'editor']) # Or perhaps just 'admin'
+@permission_required(['equipment_ppm_write', 'equipment_ocm_write'])
 def save_machine_assignment():
     """Save machine assignments."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1016,7 +967,7 @@ def save_machine_assignment():
         }), 500
 
 @views_bp.route('/refresh-dashboard')
-@permission_required(['admin', 'editor', 'viewer']) # All roles can see the dashboard
+@permission_required(['dashboard_view'])
 def refresh_dashboard():
     """AJAX endpoint to refresh dashboard data."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1085,7 +1036,7 @@ def refresh_dashboard():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @views_bp.route('/audit-log')
-@permission_required(['admin']) # Typically only admins view audit logs
+@permission_required(['audit_log_view'])
 def audit_log_page():
     """Display the audit log page with filtering options."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1135,7 +1086,7 @@ def audit_log_page():
         return redirect(url_for('views.index'))
 
 @views_bp.route('/audit-log/export')
-@permission_required(['admin'])
+@permission_required(['audit_log_export'])
 def export_audit_log():
     """Export audit logs to CSV."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1187,7 +1138,7 @@ def export_audit_log():
         return redirect(url_for('views.audit_log_page'))
 
 @views_bp.route('/backup/create-full', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['backup_manage'])
 def create_full_backup():
     """Create a full application backup."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1203,7 +1154,7 @@ def create_full_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/create-settings', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['backup_manage'])
 def create_settings_backup():
     """Create a settings-only backup."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1219,7 +1170,7 @@ def create_settings_backup():
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/list')
-@permission_required(['admin'])
+@permission_required(['backup_manage'])
 def list_backups():
     """List all available backups as JSON."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1233,7 +1184,7 @@ def list_backups():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @views_bp.route('/backup/delete/<filename>', methods=['POST'])
-@permission_required(['admin'])
+@permission_required(['backup_manage'])
 def delete_backup(filename):
     """Delete a backup file."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1249,7 +1200,7 @@ def delete_backup(filename):
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/backup/download/<backup_type>/<filename>')
-@permission_required(['admin'])
+@permission_required(['backup_manage'])
 def download_backup(backup_type, filename):
     """Download a backup file."""
     # if not session.get('is_admin'): # Replaced by decorator
@@ -1284,7 +1235,7 @@ def download_backup(backup_type, filename):
         return redirect(url_for('views.settings_page'))
 
 @views_bp.route('/create_user', methods=['GET', 'POST'])
-@permission_required(['admin'])
+@permission_required(['user_manage'])
 def create_user():
     """Handles user creation."""
     logger.critical("Entering create_user route")  # Log entry point
@@ -1336,5 +1287,4 @@ def create_user():
 
     logger.critical("Rendering create_user.html template")
     return render_template('create_user.html')
-
 
