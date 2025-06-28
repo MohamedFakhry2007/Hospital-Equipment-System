@@ -26,6 +26,9 @@ python-barcode = "^0.15.1"
 Pillow = "^10.0.0"
 flask-session = "^0.8.0"
 flask-login = "^0.6.3"
+flask-sqlalchemy = "^3.1.1"
+flask-migrate = "^4.0.5"
+bcrypt = "^4.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"

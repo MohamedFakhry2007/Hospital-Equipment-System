@@ -24,8 +24,8 @@ This project is a web-based system designed to manage hospital equipment mainten
 *   **Data Storage:**
     *   Data is stored in JSON files (`ppm.json`, `ocm.json`, `training.json`).
 * **PPM/OCM data**:
-    * PPM data has information about the equipement and it has 4 quarters, with a date and an engineer.
-    * OCM data has information about the equipement and it has the OCM for this year and next year and the name of the engineer.
+    * PPM data has information about the equipment and it has 4 quarters, with a date and an engineer.
+    * OCM data has information about the equipment and it has the OCM for this year and next year and the name of the engineer.
 *   **Training Management:**
     *   Track employee training records, including employee details, trainer, machines trained on, and training dates.
     *   Add, edit, and delete training records through a dedicated interface.
@@ -33,34 +33,149 @@ This project is a web-based system designed to manage hospital equipment mainten
 
 ## Technical Stack
 
-## Dependencies
+* **Backend:** Python 3.11+ with Flask
+* **Database:** MySQL
+* **ORM:** SQLAlchemy with Flask-Migrate for database migrations
+* **Frontend:** HTML, CSS, JavaScript
+* **Package Management:** Poetry
+* **Task Scheduling:** APScheduler
+* **Data Validation:** Pydantic
+* **Data Manipulation:** Pandas
 
-*   Python 3.11+
-*   Flask: Web framework
-*   Pydantic: Data validation and settings management
-*   Pandas: Data manipulation (for CSV handling)
-*   Schedule: Task scheduling
-*   Python-dotenv: Environment variable management
-*   APScheduler: Advanced task scheduling
-* email-validator
-* Flask-wtf
+## Prerequisites
+
+1. **Python 3.11+**
+   - Download from: https://www.python.org/downloads/
+   - During installation, make sure to check "Add Python to PATH"
+
+2. **MySQL Server**
+   - Download from: https://dev.mysql.com/downloads/installer/
+   - Choose "Developer Default" setup type
+   - Remember the root password you set during installation
+
+3. **Git**
+   - Download from: https://git-scm.com/downloads
+
+4. **Poetry** (Python package manager)
+   - Install using: 
+     ```bash
+     (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+     ```
+   - Restart your terminal after installation
 
 ## Setup Instructions
 
-1.  **Clone the Repository:** First, you need to clone the project repository to your local machine. Open your terminal or command prompt and use the following command, replacing `<repository_url>` with the actual URL of your repository: `git clone <repository_url>`. After cloning, navigate to the project directory using `cd hospital-equipment-maintenance`.
-2.  **Install Poetry:** Make sure you have Poetry installed. Poetry is a tool for dependency management and packaging in Python. If you do not have it, run the following command: `curl -sSL https://install.python-poetry.org | python3 -`.
-3.  **Install Dependencies:** Once you are in the project directory, install the required dependencies using Poetry. Run the command `poetry install`. This will install all the necessary Python libraries specified in the `pyproject.toml` file. This will create a virtual environment.
-4.  **Activate the Virtual Environment:** After the dependencies are installed, you need to activate the virtual environment. Run the command `poetry shell`. This will activate the virtual environment created by poetry.
-5. **Run the App**: With the virtual environment activated, you can now start the Flask development server. To do so, run the command `flask --app app run --debug`.
-6.  **Access the Application:** Once the server is running, open your web browser and go to `http://127.0.0.1:5000/` or the address provided by the server.
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd Hospital-Equipment-System
+```
 
-**Explanation of the steps:**
+### 2. Set Up MySQL Database
 
-1.  **Clone the Repository:** This step gets a copy of the project's code onto your computer. The `git clone` command downloads the code, and `cd` changes your current directory to the project's folder.
-2.  **Install Poetry:** This step is important to manage the dependencies. It ensures that the correct tools are installed.
-3.  **Install Dependencies:** This step uses Poetry to read the `pyproject.toml` file and install all the necessary libraries that the project needs to run. It also creates a virtual environment.
-4.  **Activate the Virtual Environment:** This step activates the virtual environment created by Poetry, so the dependencies installed are available for the project.
-5. **Run the App:** This step starts the Flask application using the `flask` command, making the app accessible in a web browser. the `--debug` is optional.
-6. **Access the application:** This step tells how to access the application once it is running.
+1. Open MySQL Command Line Client
+2. Log in as root: 
+   ```bash
+   mysql -u root -p
+   ```
+3. Create a new database and user:
+   ```sql
+   CREATE DATABASE hospital_equipment;
+   CREATE USER 'appuser'@'localhost' IDENTIFIED BY 'your_secure_password';
+   GRANT ALL PRIVILEGES ON hospital_equipment.* TO 'appuser'@'localhost';
+   FLUSH PRIVILEGES;
+   EXIT;
+   ```
 
+### 3. Configure Environment Variables
+Create a `.env` file in the project root with:
+```
+FLASK_APP=app.main:create_app
+FLASK_ENV=development
+SECRET_KEY=your-secret-key-here
+DATABASE_URL=mysql+mysqlconnector://appuser:your_secure_password@localhost/hospital_equipment
+```
 
+### 4. Install Dependencies
+```bash
+poetry install
+```
+
+### 5. Set Up Database Tables
+```bash
+poetry run flask db init
+poetry run flask db migrate -m "Initial tables"
+poetry run flask db upgrade
+```
+
+### 6. Import Initial Data
+If you have SQL dump files:
+```bash
+mysql -u appuser -p hospital_equipment < database_dump.sql
+```
+
+Or if you have JSON data files, use the provided import scripts.
+
+### 7. Start the Development Server
+```bash
+./devserver.sh
+```
+The application will be available at: http://localhost:5001
+
+## Development Workflow
+
+### Running Tests
+```bash
+poetry run pytest
+```
+
+### Database Migrations
+After making changes to your models:
+```bash
+poetry run flask db migrate -m "Description of changes"
+poetry run flask db upgrade
+```
+
+### Adding New Dependencies
+```bash
+poetry add package-name
+```
+
+## Database Management
+
+### Backup Database
+```bash
+mysqldump -u appuser -p hospital_equipment > backup_$(date +%Y%m%d).sql
+```
+
+### Restore Database
+```bash
+mysql -u appuser -p hospital_equipment < backup_file.sql
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **MySQL Connection Issues**
+   - Verify MySQL service is running
+   - Check credentials in `.env` file
+   - Ensure the database and user exist
+
+2. **Python Package Issues**
+   ```bash
+   poetry install --sync
+   ```
+
+3. **Database Migration Problems**
+   ```bash
+   # Show current migration status
+   poetry run flask db current
+   
+   # If needed, rollback and reapply
+   poetry run flask db downgrade
+   poetry run flask db upgrade
+   ```
+
+## License
+[Specify your project's license here]

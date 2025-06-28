@@ -4,9 +4,11 @@ class Config:
     SECRET_KEY = 'a_very_secret_key'  # Change this to a random, long string in production
 
     # Database configuration
+    basedir = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///E:/reposits/Hospital-Equipment-System/instance/app.db'
+        f'sqlite:///{os.path.join(basedir, "..", "instance", "app.db")}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ECHO = False  # Set to True for SQL query logging
 
     DATA_DIR = 'data'
 

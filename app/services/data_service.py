@@ -16,6 +16,8 @@ from pydantic import ValidationError
 from app.config import Config
 from app.models.ppm import PPMEntry
 from app.models.ocm import OCMEntry
+from app.services.ppm_service import PPMService
+from app.services.ocm_service import OCMService
 
 
 logger = logging.getLogger(__name__)
@@ -139,88 +141,130 @@ class DataService:
             raise ValueError("Failed to save settings due to an unexpected error.") from e
 
     @staticmethod
-    def load_data(data_type: Literal['ppm', 'ocm', 'training']) -> List[Dict[str, Any]]:
-        """Load data from JSON file.
-
+    def _load_ocm_data(page: int = 1, per_page: int = 20) -> Dict[str, Any]:
+        """Load OCM data from the database with pagination.
+        
         Args:
-            data_type: Type of data to load ('ppm', 'ocm', or 'training')
-
+            page: Page number (1-based)
+            per_page: Number of items per page
+            
         Returns:
-            List of data entries
+            Dict containing items and pagination info
         """
-        logger.debug("Starting load_data method with data_type='%s'", data_type)
-
         try:
-            logger.debug("Calling DataService.ensure_data_files_exist()")
-            DataService.ensure_data_files_exist()
+            # Use OCMService to get paginated equipment from the database
+            return OCMService.get_all_equipment(page=page, per_page=per_page)
+        except Exception as e:
+            logger.error(f"Error loading OCM data from database: {str(e)}", exc_info=True)
+            return {'items': [], 'total': 0, 'pages': 0, 'current_page': page, 'per_page': per_page}
 
-            logger.debug("Determining file path based on data_type")
-            if data_type == 'ppm':
-                file_path = Config.PPM_JSON_PATH
-                logger.debug("Selected PPM file path: %s", file_path)
-            elif data_type == 'ocm':
-                file_path = Config.OCM_JSON_PATH
-                logger.debug("Selected OCM file path: %s", file_path)
-            else:  # training
-                file_path = Path(Config.DATA_DIR) / "training.json"
-                logger.debug("Selected Training file path: %s", file_path)
-
-            logger.debug("Opening file for reading: %s", file_path)
-            with open(file_path, 'r') as f:
-                logger.debug("Reading content from file: %s", file_path)
-                content = f.read()
-
-                logger.debug("Checking if file content is empty")
-                if not content:
-                    logger.debug("File is empty. Returning an empty list.")
+    @staticmethod
+    def _load_training_data() -> List[Dict[str, Any]]:
+        """Load training data from JSON file."""
+        try:
+            with open(Config.TRAINING_JSON_PATH, 'r') as f:
+                data = json.load(f)
+                # Basic validation that data is a list
+                if not isinstance(data, list):
+                    logger.warning("Training data is not a list, initializing with empty list")
                     return []
-
-                logger.debug("Attempting to decode JSON content")
-                try:
-                    data = json.loads(content)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Error decoding JSON from {file_path}: {str(e)}. Returning empty list.")
-                    return []
-
-                logger.debug("Successfully decoded JSON. Data type: %s", type(data))
-                logger.debug("Loaded data sample (first 2 items): %s", data[:2] if isinstance(data, list) else data)
-
-                logger.debug("Returning loaded data with %d entries", len(data) if isinstance(data, list) else 0)
                 return data
-
         except FileNotFoundError:
-            logger.warning(f"Data file {file_path} not found. Returning empty list.")
+            logger.warning(f"Training data file not found at {Config.TRAINING_JSON_PATH}")
+            return []
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding training data: {str(e)}")
             return []
         except Exception as e:
-            logger.error(f"Unexpected error loading {data_type} data from {file_path}: {str(e)}. Returning empty list.")
+            logger.error(f"Unexpected error loading training data: {str(e)}")
             return []
-    
+
+    @staticmethod
+    def load_data(
+        data_type: Literal['ppm', 'ocm', 'training'],
+        page: int = 1,
+        per_page: int = 20,
+        search: str = '',
+        status_filter: str = '',
+        sort_by: str = '',
+        sort_dir: str = 'asc'
+    ) -> Dict[str, Any]:
+        """Load data from the appropriate source with pagination and filtering support.
+        
+        For PPM and OCM data, uses the database via their respective services.
+        For training data, uses JSON files (no pagination).
+        
+        Args:
+            data_type: Type of data to load ('ppm', 'ocm', or 'training')
+            page: Page number (1-based)
+            per_page: Number of items per page
+            search: Search term to filter equipment
+            status_filter: Status to filter by (e.g., 'completed', 'pending', 'overdue')
+            sort_by: Field to sort by
+            sort_dir: Sort direction ('asc' or 'desc')
+            
+        Returns:
+            Dict containing items and pagination info for PPM/OCM, List for training
+        """
+        if data_type == 'ppm':
+            return PPMService.get_all_equipment(
+                page=page,
+                per_page=per_page,
+                search=search,
+                status_filter=status_filter,
+                sort_by=sort_by,
+                sort_dir=sort_dir
+            )
+        elif data_type == 'ocm':
+            return OCMService.get_all_equipment(
+                page=page,
+                per_page=per_page,
+                search=search,
+                status_filter=status_filter,
+                sort_by=sort_by,
+                sort_dir=sort_dir
+            )
+        
+        # For training data, return list as before (no pagination)
+        if data_type == 'training':
+            return {'items': DataService._load_training_data(), 'total': 0, 'pages': 0, 'current_page': 1, 'per_page': 20}
+                
+        logger.warning(f"Unknown data type: {data_type}")
+        return {'items': [], 'total': 0, 'pages': 0, 'current_page': page, 'per_page': per_page}
+
     @staticmethod
     def save_data(data: List[Dict[str, Any]], data_type: Literal['ppm', 'ocm', 'training']):
-        """Save data to JSON file.
+        """Save data to the appropriate storage.
 
         Args:
             data: List of data entries to save
             data_type: Type of data to save ('ppm', 'ocm', or 'training')
         """
         try:
-            DataService.ensure_data_files_exist()
-
             if data_type == 'ppm':
-                file_path = Config.PPM_JSON_PATH
+                # For PPM, we'll use the PPMService for database operations
+                # This is a bulk import, so we'll use the bulk_import_equipment method
+                result = PPMService.bulk_import_equipment(data)
+                if result['errors'] > 0:
+                    logger.warning(f"Encountered {result['errors']} errors during PPM data import")
+                return
             elif data_type == 'ocm':
-                file_path = Config.OCM_JSON_PATH
-            else:  # training
-                file_path = Path(Config.DATA_DIR) / "training.json"
-                
+                # For OCM, use OCMService for database operations
+                result = OCMService.bulk_import_equipment(data)
+                if result['errors'] > 0:
+                    logger.warning(f"Encountered {result['errors']} errors during OCM data import")
+                return
+            
+            # For training data, continue using JSON files
+            DataService.ensure_data_files_exist()
+            file_path = Path(Config.DATA_DIR) / "training.json"
             with open(file_path, 'w') as f:
                 json.dump(data, f, indent=2)
         except IOError as e:
-            logger.error(f"IOError saving {data_type} data to {file_path}: {str(e)}")
-            # Potentially re-raise a custom exception or handle as critical
+            logger.error(f"IOError saving {data_type} data: {str(e)}")
             raise ValueError(f"Failed to save {data_type} data due to IO error.") from e
         except Exception as e:
-            logger.error(f"Unexpected error saving {data_type} data to {file_path}: {str(e)}")
+            logger.error(f"Unexpected error saving {data_type} data: {str(e)}")
             raise ValueError(f"Failed to save {data_type} data due to an unexpected error.") from e
 
     # --- Push Subscription Management ---
@@ -483,81 +527,33 @@ class DataService:
             entry: Entry data to add
             
         Returns:
-            Added entry with assigned NO
+            Added entry with assigned ID
+            
+        Raises:
+            ValueError: If validation fails or entry already exists
         """
         logger.debug("Starting add_entry function.")
         logger.debug(f"Received data_type: {data_type}")
         logger.debug(f"Received entry: {entry}")
 
         try:
-            # Create copy of entry to avoid modifying original
-            entry_copy = entry.copy()
-            logger.debug(f"Created copy of entry: {entry_copy}")
-
-            # Remove NO if present (we'll calculate it)
-            entry_copy.pop('NO', None)
-            logger.debug(f"After removing 'NO': {entry_copy}")
-
-            # Load existing data to calculate new NO
-            all_data = DataService.load_data(data_type)
-            new_no = len(all_data) + 1
-            logger.debug(f"Calculated new NO: {new_no}")
-
-            # Add NO to entry_copy before validation
-            entry_copy['NO'] = new_no
-            logger.debug(f"Added NO to entry: {entry_copy}")
-
-            if 'Status' in entry_copy:
-                logger.debug(f"Using provided Status: {entry_copy['Status']}")
-            else:
-                # Default Status handling if needed
-                pass
-
-            # Process and validate the entry
             if data_type == 'ppm':
-                logger.debug("Processing PPM entry...")
-                # PPM specific processing
-                if isinstance(entry_copy.get('Status'), str) and not entry_copy['Status'].strip():
-                    entry_copy['Status'] = None
-
-                # Process PPM quarter fields
-                for quarter_key in ['PPM_Q_I', 'PPM_Q_II', 'PPM_Q_III', 'PPM_Q_IV']:
-                    if isinstance(entry_copy.get(quarter_key), str):
-                        entry_copy[quarter_key] = {
-                            'engineer': entry_copy[quarter_key]
-                        }
-                    elif isinstance(entry_copy.get(quarter_key), dict):
-                        entry_copy[quarter_key].setdefault('engineer', None)
-                        logger.debug(f"Ensured 'engineer' key in {quarter_key}: {entry_copy[quarter_key]}")
-
-                logger.debug(f"Final entry_copy before PPM validation: {entry_copy}")
-                validated_entry_model = PPMEntry(**entry_copy)
+                # Use PPMService for database operations
+                result = PPMService.add_equipment(entry)
+                if not result:
+                    raise ValueError(f"Failed to add PPM entry with serial {entry.get('SERIAL')}")
+                return result
+            elif data_type == 'ocm':
+                # Use OCMService for database operations
+                result, error = OCMService.add_equipment(entry)
+                if error:
+                    raise ValueError(f"Failed to add OCM entry: {error}")
+                return result
             else:
-                logger.debug("Processing OCM entry...")
-                logger.debug(f"Final entry_copy before OCM validation: {entry_copy}")
-                validated_entry_model = OCMEntry(**entry_copy)
-
-            validated_entry = validated_entry_model.model_dump()
-            logger.debug(f"Validated entry after model dump: {validated_entry}")
-
-            # Ensure serial is unique
-            DataService._ensure_unique_serial(all_data, validated_entry, data_type)
-
-            # Add to data
-            all_data.append(validated_entry)
-            logger.debug(f"Added entry to data. New total: {len(all_data)}")
-
-            # Save updated data
-            DataService.save_data(all_data, data_type)
-            logger.info(f"Successfully added new {data_type} entry with NO: {new_no}")
-
-            return validated_entry
-
-        except ValidationError as e:
-            logger.error(f"Validation error adding {data_type} entry: {str(e)}")
-            raise ValueError(str(e))
+                raise ValueError(f"Unsupported data type: {data_type}")
+            
         except Exception as e:
-            logger.error(f"Error adding {data_type} entry: {str(e)}", exc_info=True)
+            logger.error(f"Error adding {data_type} entry: {str(e)}")
             raise
 
     @staticmethod
@@ -579,119 +575,53 @@ class DataService:
         logger.debug(f"Update data received: {updated_data}")
 
         try:
-            # Load all data
-            logger.debug(f"Loading all {data_type} data to find entry with serial {serial}")
-            data = DataService.load_data(data_type)
-            
-            # Find and update the entry
-            found = False
-            for i, entry in enumerate(data):
-                entry_serial = entry.get('Serial', entry.get('SERIAL'))
-                logger.debug(f"Comparing entry serial '{entry_serial}' with update serial '{serial}'")
-                
-                if entry_serial == serial:
-                    logger.info(f"Found matching {data_type} entry to update")
-                    logger.debug(f"Original entry data: {entry}")
-                    
-                    # Preserve required fields if not in updated_data
-                    if data_type == 'ocm' and 'NO' not in updated_data and 'NO' in entry:
-                        logger.debug(f"Preserving NO field from original entry: {entry['NO']}")
-                        updated_data['NO'] = entry['NO']
-                    
-                    # Validate updated data
-                    logger.debug(f"Validating updated data for {data_type}: {updated_data}")
-                    try:
-                        if data_type == 'ppm':
-                            # If 'Status' is not in updated_data and 'Status' is in the original entry,
-                            # preserve the original 'Status'.
-                            if 'Status' not in updated_data and 'Status' in entry:
-                                updated_data['Status'] = entry['Status']
-                            PPMEntry(**updated_data)
-                        else:
-                            OCMEntry(**updated_data)
-                        logger.debug("Data validation successful")
-                    except ValidationError as e:
-                        logger.error(f"Validation error for {data_type} update: {str(e)}")
-                        raise ValueError(f"Invalid {data_type.upper()} data: {str(e)}")
-                    
-                    # Update the entry
-                    data[i] = updated_data
-                    found = True
-                    logger.debug(f"Updated entry data: {updated_data}")
-                    break
-            
-            if not found:
-                logger.warning(f"No {data_type} entry found with serial {serial} for update")
-                return None
-            
-            # Save the updated data
-            logger.info(f"Saving updated {data_type} data")
-            DataService.save_data(data, data_type)
-            
-            logger.info(f"Successfully updated {data_type} entry with serial {serial}")
-            return updated_data
+            if data_type == 'ppm':
+                # Use PPMService for database operations
+                result = PPMService.update_equipment(serial, updated_data)
+                if not result:
+                    logger.warning(f"No PPM entry found with serial {serial}")
+                    return None
+                return result
+            elif data_type == 'ocm':
+                # Use OCMService for database operations
+                result, error = OCMService.update_equipment(serial, updated_data)
+                if error:
+                    raise ValueError(f"Failed to update OCM entry: {error}")
+                return result
+            else:
+                raise ValueError(f"Unsupported data type: {data_type}")
 
         except Exception as e:
             logger.error(f"Error updating {data_type} entry with serial {serial}: {str(e)}", exc_info=True)
             raise
 
     @staticmethod
-    def delete_entry(data_type: Literal['ppm', 'ocm'], SERIAL: str) -> bool:
+    def delete_entry(data_type: Literal['ppm', 'ocm'], serial: str) -> bool:
         """Delete an entry.
 
         Args:
             data_type: Type of data to delete entry from ('ppm' or 'ocm')
-            SERIAL: SERIAL of entry to delete
+            serial: Serial number of entry to delete
 
         Returns:
             True if entry was deleted, False if not found
         """
-        logger.info(f"Attempting to delete {data_type} entry with serial: {SERIAL}")
-        
         try:
-            data = DataService.load_data(data_type)
-            initial_len = len(data)
-            logger.debug(f"Loaded {initial_len} entries from {data_type} data")
-            
-            # Handle different serial field names for PPM and OCM
-            serial_field = 'SERIAL' if data_type == 'ppm' else 'Serial'
-            logger.debug(f"Using serial field name: {serial_field}")
-            
-            # Find the entry to delete first
-            entry_to_delete = None
-            entry_index = -1
-            
-            for i, entry in enumerate(data):
-                entry_serial = entry.get(serial_field)
-                logger.debug(f"Comparing entry serial '{entry_serial}' with target serial '{SERIAL}'")
-                if entry_serial == SERIAL:
-                    entry_to_delete = entry
-                    entry_index = i
-                    break
-            
-            if entry_to_delete is None:
-                logger.warning(f"No {data_type} entry found with serial {SERIAL}")
-                return False
-                
-            logger.info(f"Found {data_type} entry to delete: {entry_to_delete}")
-            
-            # Remove the entry
-            data.pop(entry_index)
-            logger.debug(f"Removed entry at index {entry_index}")
-            
-            # Reindex the remaining entries
-            reindexed_data = DataService.reindex(data)
-            logger.debug(f"Reindexed remaining {len(reindexed_data)} entries")
-            
-            # Save the updated data
-            DataService.save_data(reindexed_data, data_type)
-            logger.info(f"Successfully deleted {data_type} entry with serial {SERIAL}")
-            
-            return True
+            if data_type == 'ppm':
+                # Use PPMService for database operations
+                return PPMService.delete_equipment(serial)
+            elif data_type == 'ocm':
+                # Use OCMService for database operations
+                success, error = OCMService.delete_equipment(serial)
+                if error:
+                    logger.error(f"Error deleting OCM entry: {error}")
+                return success
+            else:
+                raise ValueError(f"Unsupported data type: {data_type}")
             
         except Exception as e:
-            logger.error(f"Error deleting {data_type} entry with serial {SERIAL}: {str(e)}", exc_info=True)
-            raise
+            logger.error(f"Error deleting {data_type} entry with serial {serial}: {str(e)}")
+            return False
 
     @staticmethod
     def get_entry(data_type: Literal['ppm', 'ocm'], serial: str) -> Optional[Dict[str, Any]]:
@@ -706,29 +636,21 @@ class DataService:
         """
         logger.info(f"Attempting to get {data_type} entry with serial: {serial}")
         try:
-            # Load all data
-            logger.debug(f"Loading all {data_type} data to search for serial {serial}")
-            data = DataService.load_data(data_type)
-            
-            # Find entry with matching serial
-            logger.debug(f"Searching for entry with serial {serial} in {len(data)} {data_type} entries")
-            for entry in data:
-                entry_serial = entry.get('Serial', entry.get('SERIAL'))  # Handle both field names
-                logger.debug(f"Comparing entry serial '{entry_serial}' with search serial '{serial}'")
-                if entry_serial == serial:
-                    logger.info(f"Found matching {data_type} entry for serial {serial}")
-                    logger.debug(f"Entry data: {entry}")
-                    return entry
-            
-            logger.warning(f"No {data_type} entry found with serial {serial}")
-            return None
+            if data_type == 'ppm':
+                # Use PPMService for database lookup
+                return PPMService.get_equipment_by_serial(serial)
+            elif data_type == 'ocm':
+                # Use OCMService for database lookup
+                return OCMService.get_equipment_by_serial(serial)
+            else:
+                raise ValueError(f"Unsupported data type: {data_type}")
 
         except Exception as e:
             logger.error(f"Error retrieving {data_type} entry with serial {serial}: {str(e)}", exc_info=True)
             return None
 
     @staticmethod
-    def get_all_entries(data_type: Literal['ppm', 'ocm']) -> List[Dict[str, Any]]:
+    def get_all_entries(data_type: Literal['ppm', 'ocm'], page: int = 1, per_page: int = 20) -> List[Dict[str, Any]]:
         """Get all entries.
 
         Args:
@@ -737,7 +659,7 @@ class DataService:
         Returns:
             List of all entries
         """
-        return DataService.load_data(data_type)
+        return DataService.load_data(data_type, page=page, per_page=per_page)['items']
 
     @staticmethod
     def import_data(data_type: Literal['ppm', 'ocm'], file_stream: TextIO) -> Dict[str, Any]:
@@ -947,39 +869,60 @@ class DataService:
     @staticmethod
     def update_all_ppm_statuses():
         """
-        Recalculates and updates the status for all PPM entries in ppm.json.
-        Saves the data back to the file if any statuses were changed.
+        Recalculates and updates the status for all PPM entries.
+        Updates the database with new statuses if any were changed.
+        
+        Note: This method should only be called from within an existing application context.
         """
+        from flask import current_app
+        
+        if not current_app:
+            logger.warning("Cannot update PPM statuses: No application context found")
+            return 0
+            
         logger.info("Starting update of all PPM statuses.")
+        return DataService._update_ppm_statuses_in_context()
+    
+    @staticmethod
+    def _update_ppm_statuses_in_context():
+        """
+        Helper method that runs within an application context to update PPM statuses.
+        """
+        from app import db
+        from app.models.ppm_equipment import PPMEquipment
+        
         try:
-            all_ppm_data = DataService.load_data('ppm')
-            if not all_ppm_data:
-                logger.info("No PPM data found to update statuses.")
+            # Get all PPM equipment from database
+            all_ppm_equipment = PPMEquipment.query.all()
+            
+            if not all_ppm_equipment:
+                logger.info("No PPM equipment found to update statuses.")
                 return
 
             statuses_changed_count = 0
-            updated_data = []
 
-            for entry in all_ppm_data:
-                original_status = entry.get('Status')
-                # Ensure entry is mutable for in-place update if needed, or create a copy
-                entry_copy = entry.copy()
-
-                new_status = DataService.calculate_status(entry_copy, 'ppm')
+            for equipment in all_ppm_equipment:
+                original_status = equipment.status
+                
+                # Convert to dict for calculate_status
+                equipment_dict = equipment.to_dict()
+                new_status = DataService.calculate_status(equipment_dict, 'ppm')
 
                 if original_status != new_status:
-                    entry_copy['Status'] = new_status
+                    equipment.status = new_status
                     statuses_changed_count += 1
-                    logger.debug(f"PPM SERIAL {entry_copy.get('SERIAL', 'N/A')}: Status changed from '{original_status}' to '{new_status}'.")
-
-                updated_data.append(entry_copy)
+                    logger.debug(f"PPM ID {equipment.id}: Status changed from '{original_status}' to '{new_status}'.")
 
             if statuses_changed_count > 0:
-                DataService.save_data(updated_data, 'ppm')
+                db.session.commit()
                 logger.info(f"Successfully updated statuses for {statuses_changed_count} PPM entries. Data saved.")
             else:
                 logger.info("No PPM statuses required updating.")
+                
+            return statuses_changed_count
 
         except Exception as e:
             logger.error(f"Error during PPM status update process: {str(e)}", exc_info=True)
-            # Depending on application design, might want to raise this or handle more gracefully.
+            if 'db' in locals():
+                db.session.rollback()
+            raise

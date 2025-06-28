@@ -13,9 +13,15 @@ def setup_logger(app_name: str = 'app') -> logging.Logger:
     - Uses rotating file handler to manage log file size
     - Includes timestamp, log level, and message
     - Creates log directory if it doesn't exist
+    - Prevents duplicate handlers if called multiple times
     """
     logger = logging.getLogger(app_name)
-    logger.setLevel(logging.DEBUG)  # Set root logger to DEBUG
+    
+    # Prevent adding handlers multiple times
+    if logger.handlers:
+        return logger
+        
+    logger.setLevel(logging.DEBUG)
 
     # Create formatters and add it to the handlers
     log_format = logging.Formatter(

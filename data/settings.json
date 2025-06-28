@@ -35,6 +35,16 @@
       "username": "editor2",
       "password": "scrypt:32768:8:1$Hwf4db4X4tage9XT$ddacdd3484463d3b32f1b9eda19ce46a322c86056c53b23279dd8fd787c276aad26e8143f547206195c771ce708429bac3bb64b5ae272720d86b49afcf247ff7",
       "role": "Editor"
+    },
+    {
+      "username": "editor3",
+      "password": "scrypt:32768:8:1$mhlcVZXgrLMPujQT$2e8c008450660ebdfc75cb40a0543d8a7e536e2f1549bfb9a2dddc10a1b11406c4000d72380b4fe277cafc1684a5f798bdd6bcc57b1f9be125de1bd5da2bdb5b",
+      "role": "Editor"
+    },
+    {
+      "username": "viewer2",
+      "password": "scrypt:32768:8:1$EGX73S0d4yiTBaSU$e2205f70a51308be9a893c8a7d6f42a48c30a38c584345c33e5a6d5940062b6c06fcb9d48d9bf175fc8da02c267a36b19f51453ed2214ff809fa87794f2de640",
+      "role": "Viewer"
     }
   ],
   "roles": {
@@ -54,7 +64,7 @@
         "audit_log_view",
         "audit_log_export",
         "user_manage",
-        "settings_read", 
+        "settings_read",
         "settings_manage",
         "settings_email_test",
         "backup_manage"

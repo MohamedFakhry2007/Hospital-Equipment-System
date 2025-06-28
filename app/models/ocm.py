@@ -3,9 +3,13 @@ Pydantic models for OCM (Other Corrective Maintenance) data validation.
 """
 import logging
 from datetime import datetime
-from typing import Optional, Literal
-
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional, Dict, Any, Literal
+from pydantic import BaseModel, field_validator, Field, ConfigDict
+import re
+from datetime import datetime as dt
+import time
+import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +77,7 @@ class OCMEntryCreate(BaseModel):
     EQUIPMENT: str
     MODEL: str
     Name: Optional[str] = None
-    SERIAL: str
+    SERIAL: Optional[str] = "N/A"  # Make serial optional with default value
     MANUFACTURER: str
     Department: str
     LOG_NO: str
@@ -111,10 +115,27 @@ class OCMEntryCreate(BaseModel):
                 logger.error(f"Date validation failed for value '{v}': {str(e)}")
                 raise ValueError(f"Invalid date format: {v}. Expected format: DD/MM/YYYY")
 
-    @field_validator('EQUIPMENT', 'MODEL', 'SERIAL', 'MANUFACTURER', 'Department', 'LOG_NO', 'ENGINEER')
+    @field_validator('EQUIPMENT', 'MODEL', 'MANUFACTURER', 'Department', 'LOG_NO', 'ENGINEER', 'SERIAL')
     @classmethod
-    def validate_not_empty(cls, v: str) -> str:
-        """Validate required fields are not empty."""
-        if not v.strip():
-            raise ValueError("Field cannot be empty")
-        return v.strip()
+    def validate_not_empty(cls, v: Optional[str], info) -> str:
+        """Validate required fields are not empty and provide defaults."""
+        field_name = info.field_name
+        
+        # Handle None or empty string
+        if v is None or not str(v).strip():
+            # Generate a simple unique ID for log and serial numbers
+            unique_id = str(uuid.uuid4())[:8].upper()
+            
+            # Provide default values based on field
+            defaults = {
+                'EQUIPMENT': 'Unknown Equipment',
+                'MODEL': 'Unknown Model',
+                'MANUFACTURER': 'Unknown Manufacturer',
+                'Department': 'General',
+                'LOG_NO': f"LOG-{unique_id}",
+                'ENGINEER': 'Technician',
+                'SERIAL': f"OCM-{unique_id}"
+            }
+            return defaults.get(field_name, 'N/A')
+            
+        return str(v).strip()

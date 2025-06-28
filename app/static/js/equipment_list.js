@@ -1,244 +1,231 @@
-console.log('equipment_list.js loaded');
-
-// Add selected class style only if not already added
-if (!document.getElementById('equipment-table-styles')) {
-    const style = document.createElement('style');
-    style.id = 'equipment-table-styles';
-    style.textContent = `
-        .equipment-table tr.selected {
-            background-color: #e2e6ea !important;
-        }
-        .item-checkbox:checked {
-            background-color: #0d6efd;
-            border-color: #0d6efd;
-        }
-    `;
-    document.head.appendChild(style);
-}
+/**
+ * Equipment List Page Functionality
+ * Handles sorting, filtering, and other interactive elements on the equipment list page
+ */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if we're on a page with equipment table
-    const tableBody = document.querySelector('.equipment-table tbody');
+    console.log('Equipment list page initialized');
     
-    if (!tableBody) {
-        console.log('No equipment table found on this page, skipping equipment_list.js initialization');
-        return;
-    }
+    // Initialize bulk selection
+    initBulkSelection();
     
-    // UI Elements
-    const searchInput = document.getElementById('searchInput');
-    const filterSelect = document.getElementById('filterSelect');
-    const sortSelect = document.getElementById('sortSelect');
+    // Initialize sorting
+    initSorting();
+    
+    // Initialize search form submission
+    initSearchForm();
+    
+    // Initialize status filter
+    initStatusFilter();
+    
+    // Initialize per page selector
+    initPerPageSelector();
+    
+    // Initialize bulk delete button
+    initBulkDeleteButton();
+    
+    // Initialize date pickers
+    initDatePickers();
+});
+
+/**
+ * Initialize bulk selection functionality
+ */
+function initBulkSelection() {
     const selectAllCheckbox = document.getElementById('selectAll');
+    const itemCheckboxes = document.querySelectorAll('.item-checkbox');
     const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
-    const selectedCountSpan = document.getElementById('selectedCount');
+    const selectedCount = document.getElementById('selectedCount');
     
-    let sortDirection = 1;
-    let lastSortColumn = '';
+    if (!selectAllCheckbox || !bulkDeleteBtn || !selectedCount) return;
     
-    // Event listeners for table controls
-    searchInput?.addEventListener('input', updateTable);
-    filterSelect?.addEventListener('change', updateTable);
-    sortSelect?.addEventListener('change', () => {
-        if (sortSelect.value === lastSortColumn) {
-            sortDirection *= -1;
-        } else {
-            sortDirection = 1;
-        }
-        lastSortColumn = sortSelect.value;
-        updateTable();
-    });
-
-    // Determine data type from URL
-    const dataType = window.location.pathname.includes('ppm') ? 'ppm' : 'ocm';
-    
-    // Column map based on data type
-    const columnMap = dataType === 'ppm' ? {
-        'EQUIPMENT': 3,
-        'MODEL': 4,
-        'SERIAL': 5,
-        'MANUFACTURER': 6
-    } : {
-        'Name': 3,
-        'Model': 4,
-        'Serial': 5,
-        'Manufacturer': 6
-    };
-
-    // Table update function
-    function updateTable() {
-        try {
-            console.log('Updating table:', {
-                search: searchInput?.value || '',
-                filter: filterSelect?.value || '',
-                sort: sortSelect?.value || ''
-            });
-
-            const rows = Array.from(tableBody.getElementsByTagName('tr'));
-            const searchTerm = (searchInput?.value || '').toLowerCase();
-            const filterValue = (filterSelect?.value || '').toLowerCase();
-            const sortColumn = sortSelect?.value || '';
-
-            // Reset select all checkbox
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = false;
-            }
-
-            // Filter and search
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                const statusCell = row.querySelector('td span.badge');
-                const statusValue = statusCell ? statusCell.textContent.trim().toLowerCase() : '';
-                const matchesSearch = text.includes(searchTerm);
-                const matchesFilter = !filterValue || statusValue === filterValue;
-                row.style.display = matchesSearch && matchesFilter ? '' : 'none';
-            });
-
-            // Show no results message
-            const visibleRows = rows.filter(row => row.style.display !== 'none');
-            if (visibleRows.length === 0) {
-                const colspan = tableBody.querySelector('tr')?.cells.length || 16;
-                tableBody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">No results found</td></tr>`;
-                updateBulkDeleteButton();
-                return;
-            }
-
-            // Sort
-            if (sortColumn) {
-                const sortedRows = visibleRows.sort((a, b) => {
-                    const columnIndex = getColumnIndex(sortColumn);
-                    const aValue = a.cells[columnIndex]?.textContent.trim() || '';
-                    const bValue = b.cells[columnIndex]?.textContent.trim() || '';
-                    return aValue.localeCompare(bValue) * sortDirection;
-                });
-
-                const fragment = document.createDocumentFragment();
-                sortedRows.forEach(row => fragment.appendChild(row));
-                rows.forEach(row => {
-                    if (row.style.display === 'none') {
-                        fragment.appendChild(row);
-                    }
-                });
-                tableBody.innerHTML = '';
-                tableBody.appendChild(fragment);
-            }
-
-            // Reattach checkbox event listeners
-            attachCheckboxEventListeners();
-            updateBulkDeleteButton();
-
-        } catch (error) {
-            console.error('Error in updateTable:', error);
-        }
-    }
-
-    function getColumnIndex(columnName) {
-        return columnMap[columnName] || 0;
-    }
-
-    // Checkbox functionality
-    function attachCheckboxEventListeners() {
-        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
-
-        selectAllCheckbox?.addEventListener('change', function() {
-            const visibleRows = Array.from(tableBody.querySelectorAll('tr'))
-                .filter(row => row.style.display !== 'none');
-            
-            visibleRows.forEach(row => {
-                const checkbox = row.querySelector('.item-checkbox');
-                if (checkbox) {
-                    checkbox.checked = selectAllCheckbox.checked;
-                    toggleRowSelection(checkbox);
-                }
-            });
-        });
-
+    // Toggle all checkboxes when 'select all' is clicked
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
         itemCheckboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                if (!checkbox.checked && selectAllCheckbox) {
-                    selectAllCheckbox.checked = false;
-                }
-                toggleRowSelection(checkbox);
-            });
+            checkbox.checked = isChecked;
         });
-    }
-
-    function toggleRowSelection(checkbox) {
-        const row = checkbox.closest('tr');
-        if (row) {
-            if (checkbox.checked) {
-                row.classList.add('selected');
-            } else {
-                row.classList.remove('selected');
-            }
-        }
-        updateBulkDeleteButton();
-    }
-
-    function updateBulkDeleteButton() {
-        const checkedCount = document.querySelectorAll('.item-checkbox:checked').length;
-        console.log('updateBulkDeleteButton called, checkedCount:', checkedCount);
-        
-        if (bulkDeleteBtn) {
-            bulkDeleteBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
-        }
-        if (selectedCountSpan) {
-            selectedCountSpan.textContent = checkedCount;
-        }
-    }
-
-    // Initial setup
-    attachCheckboxEventListeners();
+        updateBulkActions();
+    });
     
-    // Bulk delete functionality
-    bulkDeleteBtn?.addEventListener('click', async function() {
-        const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
-        const selectedSerials = Array.from(checkedBoxes).map(checkbox => {
-            return dataType === 'ppm' ? checkbox.dataset.serial : checkbox.closest('tr').querySelector('td:nth-child(6)').textContent.trim();
+    // Update 'select all' when individual checkboxes change
+    itemCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateBulkActions();
+            updateSelectAllCheckbox();
         });
+    });
+    
+    function updateSelectAllCheckbox() {
+        const allChecked = Array.from(itemCheckboxes).every(checkbox => checkbox.checked);
+        const someChecked = Array.from(itemCheckboxes).some(checkbox => checkbox.checked);
         
-        if (!selectedSerials.length) {
+        if (allChecked) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else if (someChecked) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        }
+    }
+    
+    function updateBulkActions() {
+        const selectedItems = document.querySelectorAll('.item-checkbox:checked');
+        
+        if (selectedItems.length > 0) {
+            bulkDeleteBtn.style.display = 'inline-block';
+            selectedCount.textContent = selectedItems.length;
+        } else {
+            bulkDeleteBtn.style.display = 'none';
+        }
+    }
+}
+
+/**
+ * Initialize sorting functionality
+ */
+function initSorting() {
+    const sortableHeaders = document.querySelectorAll('.sortable');
+    
+    sortableHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            const sortBy = this.getAttribute('data-sort');
+            const currentSort = new URLSearchParams(window.location.search).get('sort');
+            const currentSortDir = new URLSearchParams(window.location.search).get('sort_dir') || 'asc';
+            
+            // Toggle sort direction if clicking the same column
+            const newSortDir = (sortBy === currentSort && currentSortDir === 'asc') ? 'desc' : 'asc';
+            
+            // Update URL with new sort parameters
+            const url = new URL(window.location.href);
+            url.searchParams.set('sort', sortBy);
+            url.searchParams.set('sort_dir', newSortDir);
+            
+            // Reset to first page when changing sort
+            url.searchParams.set('page', 1);
+            
+            window.location.href = url.toString();
+        });
+    });
+}
+
+/**
+ * Initialize search form submission
+ */
+function initSearchForm() {
+    const searchForm = document.getElementById('searchForm');
+    if (!searchForm) return;
+    
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const searchInput = document.getElementById('searchInput');
+        const searchValue = searchInput.value.trim();
+        
+        const url = new URL(window.location.href);
+        
+        if (searchValue) {
+            url.searchParams.set('search', searchValue);
+        } else {
+            url.searchParams.delete('search');
+        }
+        
+        // Reset to first page when searching
+        url.searchParams.set('page', 1);
+        
+        window.location.href = url.toString();
+    });
+}
+
+/**
+ * Initialize status filter
+ */
+function initStatusFilter() {
+    const filterSelect = document.getElementById('filterSelect');
+    if (!filterSelect) return;
+    
+    filterSelect.addEventListener('change', function() {
+        const filterValue = this.value;
+        const url = new URL(window.location.href);
+        
+        if (filterValue) {
+            url.searchParams.set('filter', filterValue);
+        } else {
+            url.searchParams.delete('filter');
+        }
+        
+        // Reset to first page when changing filter
+        url.searchParams.set('page', 1);
+        
+        window.location.href = url.toString();
+    });
+}
+
+/**
+ * Initialize per page selector
+ */
+function initPerPageSelector() {
+    const perPageSelect = document.getElementById('perPageSelect');
+    if (!perPageSelect) return;
+    
+    perPageSelect.addEventListener('change', function() {
+        const perPage = this.value;
+        const url = new URL(window.location.href);
+        
+        if (perPage) {
+            url.searchParams.set('per_page', perPage);
+            // Reset to first page when changing items per page
+            url.searchParams.set('page', 1);
+        }
+        
+        window.location.href = url.toString();
+    });
+}
+
+/**
+ * Initialize bulk delete button
+ */
+function initBulkDeleteButton() {
+    const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+    const bulkActionForm = document.getElementById('bulkActionForm');
+    const bulkItemIds = document.getElementById('bulkItemIds');
+    
+    if (!bulkDeleteBtn || !bulkActionForm || !bulkItemIds) return;
+    
+    bulkDeleteBtn.addEventListener('click', function() {
+        const selectedItems = document.querySelectorAll('.item-checkbox:checked');
+        const itemIds = Array.from(selectedItems).map(checkbox => checkbox.dataset.serial);
+        
+        if (itemIds.length === 0) {
             alert('Please select at least one item to delete.');
             return;
         }
-
-        if (!confirm(`Are you sure you want to delete ${selectedSerials.length} selected records?`)) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/bulk_delete/${dataType}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ serials: selectedSerials })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                // Remove deleted rows from the table
-                checkedBoxes.forEach(checkbox => {
-                    const row = checkbox.closest('tr');
-                    if (row) {
-                        row.remove();
-                    }
-                });
-
-                // Update counters
-                updateBulkDeleteButton();
-                
-                // Show success message
-                const message = `Successfully deleted ${result.deleted_count} record(s).` +
-                    (result.not_found > 0 ? ` ${result.not_found} record(s) were not found.` : '');
-                alert(message);
-            } else {
-                alert(`Failed to delete records: ${result.message || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error('Error during bulk delete:', error);
-            alert('Error occurred while deleting records. Please try again.');
+        
+        if (confirm(`Are you sure you want to delete ${itemIds.length} selected item(s)?`)) {
+            bulkItemIds.value = JSON.stringify(itemIds);
+            bulkActionForm.submit();
         }
     });
-});
+}
+
+/**
+ * Initialize date pickers
+ */
+function initDatePickers() {
+    // Check if modern-datepicker is loaded
+    if (typeof ModernDatepicker !== 'undefined') {
+        // ModernDatepicker is already initialized by modern-datepicker.js
+        console.log('Modern date picker is already initialized');
+    } else {
+        console.warn('Modern date picker not found, falling back to native date inputs');
+        // Fallback to native date inputs
+        document.querySelectorAll('input[type="date"]').forEach(input => {
+            if (!input.type) {
+                input.type = 'date';
+            }
+        });
+    }
+}

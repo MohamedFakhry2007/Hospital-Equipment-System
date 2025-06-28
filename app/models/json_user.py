@@ -48,12 +48,29 @@ class JSONUser(UserMixin):
         """Check if the provided password matches the stored hash."""
         logger.debug(f"[check_password] Checking password for {self.username}")
         
-        # For testing purposes, allow login with any non-empty password
-        if password and password.strip():
-            logger.warning(f"[check_password] Allowing login for {self.username} with any non-empty password for testing")
-            return True
+        if not password or not self.password_hash:
+            logger.warning(f"[check_password] Empty password or hash for user {self.username}")
+            return False
             
-        return False
+        try:
+            # Check if the stored hash is in scrypt format
+            if self.password_hash.startswith('scrypt:'):
+                from werkzeug.security import check_password_hash
+                logger.debug(f"[check_password] Using scrypt hash verification for {self.username}")
+                return check_password_hash(self.password_hash, password)
+            # Check if the stored hash is in bcrypt format
+            elif self.password_hash.startswith('$2b$'):
+                import bcrypt
+                logger.debug(f"[check_password] Using bcrypt hash verification for {self.username}")
+                return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+            # Fallback to direct comparison (not recommended for production)
+            else:
+                logger.warning(f"[check_password] Using direct password comparison for {self.username} (INSECURE!)")
+                return self.password_hash == password
+                
+        except Exception as e:
+            logger.error(f"[check_password] Error checking password for {self.username}: {e}")
+            return False
     
     def has_permission(self, permission_name):
         """Check if the user has the specified permission."""

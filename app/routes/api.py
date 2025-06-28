@@ -254,11 +254,35 @@ def add_training_route():
 @permission_required(["training_read"])
 def get_all_trainings_route():
     try:
-        records = training_service.get_all_trainings()
-        return jsonify([record.to_dict() for record in records]), 200
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search = request.args.get('search', '')
+        department = request.args.get('department', '')
+        
+        # Get paginated data
+        data = training_service.load_trainings(
+            page=page,
+            per_page=per_page,
+            search=search,
+            department=department
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': data['items'],
+            'pagination': {
+                'total': data['total'],
+                'pages': data['pages'],
+                'page': page,
+                'per_page': per_page,
+                'has_next': data['has_next'],
+                'has_prev': data['has_prev']
+            }
+        }), 200
     except Exception as e:
         logger.error(f"Error getting all training records: {str(e)}", exc_info=True)
-        return jsonify({"error": "Failed to retrieve training records"}), 500
+        return jsonify({"success": False, "error": "Failed to retrieve training records"}), 500
 
 @api_bp.route("/trainings/<training_id>", methods=["GET"])
 @permission_required(["training_read"])
@@ -267,7 +291,8 @@ def get_training_by_id_route(training_id):
         # Use training_id as string since the data stores IDs as strings
         record = training_service.get_training_by_id(training_id)
         if record:
-            return jsonify(record.to_dict()), 200
+            # get_training_by_id() already returns a dictionary
+            return jsonify(record), 200
         else:
             logger.warning(f"Training record with ID {training_id} not found.")
             return jsonify({"error": "Training record not found"}), 404

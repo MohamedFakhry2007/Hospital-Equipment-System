@@ -1,122 +1,182 @@
-import json
-import os
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+from typing import List, Dict, Any, Optional, Tuple
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import or_
 
-from app.models.training import Training
-from app.config import Config
+from app import db
+from app.models.training_model import TrainingRecord, TrainingAssignment
+from app.constants import DEPARTMENTS, TRAINERS
 
 logger = logging.getLogger(__name__)
 
-DATA_FILE = Path(Config.DATA_DIR) / 'training.json'
-
-def load_trainings() -> List[Training]:
+def get_departments() -> List[str]:
     """
-    Load training data from the JSON file.
+    Get the list of available departments.
     
     Returns:
-        List[Training]: List of Training objects
+        List of department names
     """
-    if not DATA_FILE.exists():
-        logger.info(f"Training data file not found: {DATA_FILE}")
+    return DEPARTMENTS
+
+
+def get_trainers() -> List[Dict[str, str]]:
+    """
+    Get the list of available trainers.
+    
+    Returns:
+        List of trainer dictionaries with id and name
+    """
+    # Convert list of trainer names to list of dicts with id and name
+    return [{'id': str(i+1), 'name': trainer} 
+            for i, trainer in enumerate(TRAINERS)]
+
+def load_trainings(
+    page: int = 1,
+    per_page: int = 20,
+    search: str = '',
+    department: str = ''
+) -> Dict[str, Any]:
+    """
+    Load paginated training data from the database.
+    
+    Args:
+        page: Page number (1-based)
+        per_page: Number of items per page
+        search: Search term to filter by name or employee ID
+        department: Filter by department
+        
+    Returns:
+        Dict containing items, total count, and pagination info
+    """
+    try:
+        query = TrainingRecord.query
+        
+        # Apply search filter
+        if search:
+            search = f'%{search}%'
+            query = query.filter(
+                or_(
+                    TrainingRecord.name.ilike(search),
+                    TrainingRecord.employee_id.ilike(search)
+                )
+            )
+            
+        # Apply department filter
+        if department:
+            query = query.filter(TrainingRecord.department == department)
+        
+        # Get total count before pagination
+        total = query.count()
+        
+        # Apply pagination
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Convert to list of dicts
+        items = [record.to_dict() for record in pagination.items]
+        
+        return {
+            'items': items,
+            'total': total,
+            'pages': pagination.pages,
+            'current_page': page,
+            'per_page': per_page,
+            'has_next': pagination.has_next,
+            'has_prev': pagination.has_prev,
+            'next_page': page + 1 if pagination.has_next else None,
+            'prev_page': page - 1 if pagination.has_prev else None
+        }
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error loading trainings: {str(e)}")
+        return {
+            'items': [],
+            'total': 0,
+            'pages': 0,
+            'current_page': page,
+            'per_page': per_page,
+            'has_next': False,
+            'has_prev': False,
+            'next_page': None,
+            'prev_page': None
+        }
+
+def save_training(record_data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]:
+    """
+    Save a training record to the database.
+    
+    Args:
+        record_data: Dictionary containing training record data
+        
+    Returns:
+        Tuple of (saved_record, error_message)
+    """
+    try:
+        # Handle machine_trainer_assignments
+        assignments_data = record_data.pop('machine_trainer_assignments', [])
+        
+        # Create or update the training record
+        if 'id' in record_data and record_data['id']:
+            # Update existing record
+            record = TrainingRecord.query.get(record_data['id'])
+            if not record:
+                return None, "Training record not found"
+                
+            # Update fields
+            for key, value in record_data.items():
+                if hasattr(record, key):
+                    setattr(record, key, value)
+        else:
+            # Create new record
+            record = TrainingRecord.from_dict(record_data)
+            db.session.add(record)
+        
+        # Update assignments
+        if assignments_data:
+            # Delete existing assignments
+            TrainingAssignment.query.filter_by(training_id=record.id).delete()
+            
+            # Add new assignments
+            for assignment_data in assignments_data:
+                assignment = TrainingAssignment(
+                    training_id=record.id,
+                    machine=assignment_data.get('machine', '').strip(),
+                    trainer=assignment_data.get('trainer', '').strip(),
+                    trained_date=assignment_data.get('trained_date')
+                )
+                db.session.add(assignment)
+        
+        db.session.commit()
+        
+        # Reload the record to get all relationships
+        db.session.refresh(record)
+        
+        return record.to_dict(), ""
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(f"Database error saving training record: {str(e)}")
+        return None, f"Database error: {str(e)}"
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error saving training record: {str(e)}")
+        return None, f"Error: {str(e)}"
+
+def get_all_trainings() -> List[Dict[str, Any]]:
+    """
+    Get all training records (use with caution, prefer load_trainings with pagination).
+    
+    Returns:
+        List of training records as dictionaries
+    """
+    try:
+        records = TrainingRecord.query.all()
+        return [record.to_dict() for record in records]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting all trainings: {str(e)}")
         return []
-        
-    try:
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
-            if not content:
-                logger.info("Training data file is empty")
-                return []
-                
-            data = json.loads(content)
-            if not isinstance(data, list):
-                logger.error(f"Invalid training data format in {DATA_FILE}")
-                return []
-                
-            logger.info(f"Successfully loaded {len(data)} training records from {DATA_FILE}")
-            return [Training.from_dict(item) for item in data]
-            
-    except json.JSONDecodeError as e:
-        logger.error(f"Error decoding JSON from {DATA_FILE}: {e}")
-    except Exception as e:
-        logger.error(f"Error loading training data from {DATA_FILE}: {e}")
-        
-    return []
 
-def save_trainings(trainings: List[Training]) -> bool:
-    """
-    Save training data to the JSON file.
-    
-    Args:
-        trainings: List of Training objects to save
-        
-    Returns:
-        bool: True if save was successful, False otherwise
-    """
-    try:
-        DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Convert Training objects to dicts
-        data = [training.to_dict() for training in trainings]
-        
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            
-        logger.info(f"Successfully saved {len(trainings)} training records to {DATA_FILE}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error saving training data to {DATA_FILE}: {e}")
-        return False
-
-def get_all_trainings() -> List[Training]:
-    """
-    Get all training records.
-    
-    Returns:
-        List[Training]: List of all training records
-    """
-    return load_trainings()
-
-def add_training(training_data: Dict[str, Any]) -> Optional[Training]:
-    """
-    Add a new training record.
-    
-    Args:
-        training_data: Dictionary containing training data
-        
-    Returns:
-        Training: The created training record, or None if failed
-    """
-    try:
-        trainings = load_trainings()
-        
-        # Generate new ID if not provided
-        if 'id' not in training_data or not training_data['id']:
-            # Find the highest existing ID and increment by 1
-            existing_ids = [t.id for t in trainings if t.id is not None]
-            new_id = max(existing_ids, default=0) + 1
-            training_data['id'] = new_id
-            
-        # Ensure machine_trainer_assignments is a list
-        if 'machine_trainer_assignments' not in training_data:
-            training_data['machine_trainer_assignments'] = []
-            
-        # Create the training record
-        training = Training.from_dict(training_data)
-        trainings.append(training)
-        
-        if save_trainings(trainings):
-            return training
-            
-    except Exception as e:
-        logger.error(f"Error adding training record: {e}")
-        
-    return None
-
-def get_training_by_id(training_id: int) -> Optional[Training]:
+def get_training_by_id(training_id: int) -> Optional[Dict[str, Any]]:
     """
     Get a training record by ID.
     
@@ -124,16 +184,39 @@ def get_training_by_id(training_id: int) -> Optional[Training]:
         training_id: ID of the training record to retrieve
         
     Returns:
-        Training: The requested training record, or None if not found
+        Training record as dictionary, or None if not found
     """
     try:
-        trainings = load_trainings()
-        return next((t for t in trainings if t.id == training_id), None)
-    except Exception as e:
-        logger.error(f"Error getting training record {training_id}: {e}")
+        record = TrainingRecord.query.get(training_id)
+        return record.to_dict() if record else None
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting training {training_id}: {str(e)}")
         return None
 
-def update_training(training_id: int, training_data: Dict[str, Any]) -> Optional[Training]:
+def add_training(training_data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]:
+    """
+    Add a new training record.
+    
+    Args:
+        training_data: Dictionary containing training data
+        
+    Returns:
+        Tuple of (created_record, error_message)
+    """
+    try:
+        # Generate a new ID if not provided
+        # Ensure machine_trainer_assignments is a list
+        if 'machine_trainer_assignments' not in training_data:
+            training_data['machine_trainer_assignments'] = []
+            
+        # Save the training record
+        return save_training(training_data)
+        
+    except Exception as e:
+        logger.error(f"Error adding training record: {str(e)}")
+        return None, f"Error: {str(e)}"
+
+def update_training(training_id: int, training_data: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str]:
     """
     Update an existing training record.
     
@@ -142,38 +225,30 @@ def update_training(training_id: int, training_data: Dict[str, Any]) -> Optional
         training_data: Dictionary containing updated training data
         
     Returns:
-        Training: The updated training record, or None if update failed
+        Tuple of (updated_record, error_message)
     """
     try:
-        trainings = load_trainings()
+        # Check if record exists
+        record = TrainingRecord.query.get(training_id)
+        if not record:
+            return None, "Training record not found"
+            
+        # Set the ID in the data
+        training_data['id'] = training_id
         
-        # Find the training record to update
-        for i, training in enumerate(trainings):
-            if training.id == training_id:
-                # Update the training record with new data
-                updated_data = training.to_dict()
-                updated_data.update(training_data)
-                updated_data['id'] = training_id  # Ensure ID doesn't change
-                
-                # Ensure machine_trainer_assignments is a list
-                if 'machine_trainer_assignments' not in updated_data:
-                    updated_data['machine_trainer_assignments'] = []
-                
-                # Update the training record
-                trainings[i] = Training.from_dict(updated_data)
-                
-                if save_trainings(trainings):
-                    return trainings[i]
-                return None
-                
-        logger.warning(f"Training record with ID {training_id} not found")
-        return None
+        # Save the updated record
+        return save_training(training_data)
         
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(f"Database error updating training {training_id}: {str(e)}")
+        return None, f"Database error: {str(e)}"
     except Exception as e:
-        logger.error(f"Error updating training record {training_id}: {e}")
-        return None
+        db.session.rollback()
+        logger.error(f"Error updating training {training_id}: {str(e)}")
+        return None, f"Error: {str(e)}"
 
-def delete_training(training_id: int) -> bool:
+def delete_training(training_id: int) -> Tuple[bool, str]:
     """
     Delete a training record by ID.
     
@@ -181,25 +256,26 @@ def delete_training(training_id: int) -> bool:
         training_id: ID of the training record to delete
         
     Returns:
-        bool: True if deletion was successful, False otherwise
+        Tuple of (success, error_message)
     """
     try:
-        trainings = load_trainings()
-        initial_count = len(trainings)
-        
-        # Filter out the training record with the given ID
-        updated_trainings = [t for t in trainings if t.id != training_id]
-        
-        if len(updated_trainings) < initial_count:
-            # Only save if a record was actually removed
-            if save_trainings(updated_trainings):
-                logger.info(f"Deleted training record with ID {training_id}")
-                return True
-            return False
+        record = TrainingRecord.query.get(training_id)
+        if not record:
+            return False, "Training record not found"
             
-        logger.warning(f"Training record with ID {training_id} not found for deletion")
-        return False
+        # Delete assignments first (due to foreign key constraint)
+        TrainingAssignment.query.filter_by(training_id=training_id).delete()
         
+        # Delete the record
+        db.session.delete(record)
+        db.session.commit()
+        
+        return True, ""
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(f"Database error deleting training {training_id}: {str(e)}")
+        return False, f"Database error: {str(e)}"
     except Exception as e:
         logger.error(f"Error deleting training record {training_id}: {e}")
         return False

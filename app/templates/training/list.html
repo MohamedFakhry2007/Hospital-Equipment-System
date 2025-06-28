@@ -8,150 +8,123 @@
         <h1 class="page-title me-3 mb-0">Training Management</h1>
         <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill shadow-sm">
             <i class="fas fa-users me-1"></i>
-            <span id="totalEmployeeCount">{{ trainings|length if trainings else 0 }}</span> employees
+            <span id="totalEmployeeCount">{{ pagination.total if pagination else 0 }}</span> employees
         </span>
     </div>
     
-    <!-- Controls Row -->
-    <div class="row mb-3">
-        <div class="col-md-auto">
+    <!-- Search and Filter Row -->
+    <!-- Search and Filter Row -->
+    <div class="row mb-3 align-items-center">
+        <div class="col-lg-8 col-md-12">
+            <form method="GET" action="{{ url_for('training.list_trainings') }}" id="trainingListForm" class="row g-2">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" name="search" id="searchInput" class="form-control" placeholder="Search by name or ID..." value="{{ search }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select name="department" id="filterDepartment" class="form-select">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept }}" {% if selected_department == dept %}selected{% endif %}>{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                     <select id="filterEmployeeId" name="employee_id" class="form-select">
+                        <option value="">All Employees</option>
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="sortSelect" name="sort" class="form-select">
+                        <option value="">Sort by...</option>
+                        <option value="name">Name</option>
+                        <option value="employee_id">Employee ID</option>
+                        <option value="department">Department</option>
+                        <option value="last_trained_date">Last Trained</option>
+                        <option value="next_due_date">Next Due</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+        <div class="col-lg-4 col-md-12 text-end mt-2 mt-lg-0">
+            <button id="bulkDeleteBtn" class="btn btn-danger" style="display: none;">
+                <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+            </button>
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addTrainingModal">
                 <i class="fas fa-plus"></i> Add New Training
             </button>
         </div>
-        <div class="col-md-auto">
-            <button id="bulkDeleteBtn" class="btn btn-danger" style="display:none;">
-                <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
-            </button>
-        </div>
-        <div class="col-md-auto">
-            <select id="filterEmployeeId" class="form-select d-inline-block" style="width: auto;" title="Filter by Employee ID">
-                <option value="">All Employees</option>
-            </select>
-        </div>
-        <div class="col-md-auto">
-            <select id="filterDepartment" class="form-select d-inline-block" style="width: auto;" title="Filter by Department">
-                <option value="">All Departments</option>
-                {% for dept in departments %}
-                    <option value="{{ dept }}">{{ dept }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-auto">
-            <select id="sortSelect" class="form-select d-inline-block" style="width: auto;" title="Sort records">
-                <option value="">Sort By...</option>
-                <option value="employee_id">Employee ID</option>
-                <option value="name">Name</option>
-                <option value="department">Department</option>
-                <option value="training_percentage">Training %</option>
-                <option value="last_trained_date">Last Trained Date</option>
-                <option value="next_due_date">Next Due Date</option>
-            </select>
-        </div>
-        <div class="col-md-auto ms-auto">
-            <input type="text" id="searchInput" class="form-control d-inline-block" style="width: auto;" placeholder="Search...">
-        </div>
     </div>
 
+    
+
+    <!-- Training Records Table -->
     <div class="table-responsive">
         <table class="table table-striped table-hover" id="trainingTable">
             <thead class="table-dark">
                 <tr>
-                    <th>
-                        <input type="checkbox" id="selectAll" title="Select all records">
-                    </th>
-                    <th>#</th>
-                    <th class="sortable" data-sort="employee_id">
-                        Employee ID <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="sortable" data-sort="name">
-                        Name <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="sortable" data-sort="department">
-                        Department <i class="fas fa-sort"></i>
-                    </th>
-                    <th>Trained On Machines / Trainers</th>
-                    <th class="sortable" data-sort="training_percentage">
-                        Training % <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="sortable" data-sort="last_trained_date">
-                        Last Trained <i class="fas fa-sort"></i>
-                    </th>
-                    <th class="sortable" data-sort="next_due_date">
-                        Next Due <i class="fas fa-sort"></i>
-                    </th>
+                    <th style="width: 3%;"><input type="checkbox" id="selectAll" title="Select all records"></th>
+                    <th style="width: 5%;">#</th>
+                    <th class="sortable" data-sort="employee_id">Employee ID <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="department">Department <i class="fas fa-sort"></i></th>
+                    <th>Assignments</th>
+                    <th class="sortable" data-sort="training_percentage">Training % <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="last_trained_date">Last Trained <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="next_due_date">Next Due <i class="fas fa-sort"></i></th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                {% if trainings %}
-                    {% for training in trainings %}
+                {% for training in trainings %}
                     <tr id="training-row-{{ training.id }}" data-training-id="{{ training.id }}">
-                        <td>
-                            <input type="checkbox" class="row-select" value="{{ training.id }}" title="Select this record">
-                        </td>
-                        <td>{{ loop.index }}</td>
+                        <td>{{ training.id }}</td>
                         <td>{{ training.employee_id }}</td>
                         <td>{{ training.name }}</td>
                         <td>{{ training.department }}</td>
                         <td>
-                            {% if training.machine_trainer_assignments and training.machine_trainer_assignments|length > 0 %}
-                                <ul class="list-unstyled mb-0">
+                            {% if training.machine_trainer_assignments %}
                                 {% for assignment in training.machine_trainer_assignments %}
-                                    <li>
-                                        <span class="machine-number" style="font-weight: 600; color: #6c757d;">{{ loop.index }}-</span>
-                                        <span class="machine-name" style="font-weight: 500; color: #212529;">{{ assignment.machine }}</span>
-                                        {% if assignment.trainer %}
-                                            <span class="trainer-name" style="font-weight: bold; color: #dc3545;"> ({{ assignment.trainer }})</span>
-                                        {% endif %}
-                                    </li>
+                                    <span class="badge bg-info text-dark mb-1">
+                                        {{ assignment.machine }}
+                                        <small class="text-muted">({{ assignment.trainer }})</small>
+                                    </span>
                                 {% endfor %}
-                                </ul>
                             {% else %}
-                                N/A
+                                <span class="text-muted">No machines assigned</span>
                             {% endif %}
                         </td>
+                        <td>{{ training.last_trained_date or 'N/A' }}</td>
+                        <td>{{ training.next_due_date or 'N/A' }}</td>
                         <td>
-                            {% set trained_machines = training.machine_trainer_assignments|length if training.machine_trainer_assignments else 0 %}
-                            {% set total_machines = devices_by_department[training.department]|length if training.department and devices_by_department[training.department] else 0 %}
-                            {% if total_machines > 0 %}
-                                {% set percentage = ((trained_machines / total_machines) * 100)|round(1) %}
-                                <span class="badge bg-{% if percentage >= 80 %}success{% elif percentage >= 60 %}warning{% elif percentage >= 40 %}info{% else %}danger{% endif %} training-percentage">
-                                    {{ percentage }}%
-                                </span>
-                            {% else %}
-                                <span class="badge bg-secondary training-percentage">N/A</span>
-                            {% endif %}
+                            {% set status = training.status|default('pending', true) %}
+                            <span class="badge bg-{{ 'success' if status == 'completed' else 'warning' if status == 'in_progress' else 'danger' }}">
+                                {{ status|title }}
+                            </span>
                         </td>
-                        <td>{{ training.last_trained_date if training.last_trained_date else 'N/A' }}</td>
-                        <td>{{ training.next_due_date if training.next_due_date else 'N/A' }}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary edit-training-btn"
-                                    data-id="{{ training.id }}"
-                                    data-employee-id="{{ training.employee_id }}"
-                                    data-name="{{ training.name }}"
-                                    data-department="{{ training.department }}"
-                                    data-machine-assignments="{{ training.machine_trainer_assignments|tojson|forceescape }}"
-                                    data-last-trained="{{ training.last_trained_date if training.last_trained_date else '' }}"
-                                    data-next-due="{{ training.next_due_date if training.next_due_date else '' }}"
-                                    data-bs-toggle="modal" data-bs-target="#editTrainingModal">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="btn btn-sm btn-danger delete-training-btn" data-id="{{ training.id }}" data-name="{{ training.name }}">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
+                            <a href="{{ url_for('training.edit_training', training_id=training.id) }}" class="btn btn-sm btn-primary">Edit</a>
+                            <form action="{{ url_for('training.delete_training', training_id=training.id) }}" method="post" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this item?')">Delete</button>
+                            </form>
                         </td>
                     </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="11" class="text-center">No training records found.</td>
-                    </tr>
-                {% endif %}
+                {% endfor %}
             </tbody>
         </table>
+        
+        <!-- Pagination -->
+        <nav aria-label="Training pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <!-- Pagination will be inserted here by JavaScript -->
+            </ul>
+        </nav>
     </div>
 </div>
+
 
 <!-- Add Training Modal -->
 <div class="modal fade" id="addTrainingModal" tabindex="-1" aria-labelledby="addTrainingModalLabel" aria-hidden="true">
@@ -224,7 +197,8 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="submit" class="btn btn-primary" form="addTrainingForm">Save Training</button>
+                    <button type="submit" class="btn btn-primary" form="addTrainingForm">Save Training</button>
+                </div>
             </div>
         </div>
     </div>
@@ -527,14 +501,103 @@
 {% block scripts %}
 {{ super() }}
 <script>
-const devicesByDepartment = {{ devices_by_department|tojson }};
-const trainers = {{ trainers|tojson }}; // Use trainers for machine assignment dropdowns
+// Initialize global variables with default values
+window.devicesByDepartment = {};
+window.trainers = [];
+window.csrfToken = '';
 
-// Working implementation copied from machine_assignment.html
-function generateMachineAssignments(department, containerId, existingAssignments = []) {
-    console.log('=== generateMachineAssignments called ===');
-    console.log('Department:', department, 'Container:', containerId);
-    console.log('Available devicesByDepartment:', devicesByDepartment);
+// Set global variables from template data
+(function() {
+    try {
+        // Get JSON strings from template variables
+        const devicesByDepartmentJson = '{{ devices_by_department|tojson|safe }}';
+        const trainersJson = '{{ trainers|tojson|safe }}';
+        
+        // Parse JSON data if not empty
+        if (devicesByDepartmentJson) {
+            window.devicesByDepartment = JSON.parse(devicesByDepartmentJson);
+        }
+        
+        if (trainersJson) {
+            window.trainers = JSON.parse(trainersJson);
+        }
+        
+        // Set CSRF token
+        const token = '{{ csrf_token() }}';
+        if (token) {
+            window.csrfToken = token;
+        }
+    } catch (error) {
+        console.error('Error initializing template data:', error);
+    }
+})();
+
+// Function to escape HTML strings to prevent XSS
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Initialize the training page when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM Content Loaded - Training Page ===');
+    
+    // Initialize the training page
+    if (typeof initTrainingPage === 'function') {
+        initTrainingPage();
+    } else {
+        console.error('initTrainingPage function not found');
+        // Fallback to direct initialization
+        setupEventListeners();
+        fetchAndRenderTrainings(1);
+    }
+    
+    // Set up delete button handlers
+    const deleteButtons = document.querySelectorAll('.delete-training');
+    const deleteForm = document.getElementById('deleteForm');
+    const deleteModal = bootstrap.Modal.getOrCreateInstance(document.getElementById('deleteModal'));
+    
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const trainingId = this.getAttribute('data-id');
+            deleteForm.action = `/training/${trainingId}/delete`;
+            deleteModal.show();
+        });
+    });
+    
+    // Handle search form submission
+    const searchForm = document.querySelector('form[data-training-list]');
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Remove empty parameters before submission
+            const inputs = this.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (!input.value) {
+                    input.disabled = true;
+                }
+            });
+            // Submit the form
+            this.submit();
+        });
+    }
+});
+
+// Generate machine assignments function
+function generateMachineAssignments(department, containerId, existingAssignments) {
+    // Handle default parameter for existingAssignments
+    if (existingAssignments === undefined) {
+        existingAssignments = [];
+    }
+    
+    console.log('Generating machine assignments for department:', department, 'Container:', containerId);
+    console.log('Available devicesByDepartment:', window.devicesByDepartment);
     
     const container = document.getElementById(containerId);
     if (!container) {
@@ -545,95 +608,133 @@ function generateMachineAssignments(department, containerId, existingAssignments
     // Clear existing content
     container.innerHTML = '';
     
-    if (!department) {
-        container.innerHTML = '<p class="text-muted">Select a department to see available machines.</p>';
+    // Get devices for the selected department
+    const devices = window.devicesByDepartment[department] || [];
+    
+    if (devices.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No devices found for this department.</div>';
         return;
     }
     
-    const machines = devicesByDepartment[department] || [];
-    console.log('Machines for department', department, ':', machines);
-    
-    if (machines.length === 0) {
-        container.innerHTML = '<p class="text-muted">No machines found for this department.</p>';
-        return;
-    }
-    
-    // Create machine assignments using the working approach
-    machines.forEach(machineName => {
-        const existingAssignment = existingAssignments.find(a => a.machine === machineName);
-        const isEdit = containerId.includes('edit');
-        const checkboxId = `${isEdit ? 'edit' : 'add'}_checkbox_${machineName.replace(/\s+/g, '_')}`;
-        
-        // Create the row element
+    // Create a row for each device
+    devices.forEach(function(device, index) {
         const row = document.createElement('div');
-        row.className = 'row mb-2 align-items-center machine-assignment-entry';
-        row.dataset.machineName = machineName;
+        row.className = 'row mb-2';
         
-        // Create checkbox column
-        const checkboxCol = document.createElement('div');
-        checkboxCol.className = 'col-md-1';
-        const checkboxDiv = document.createElement('div');
-        checkboxDiv.className = 'form-check';
+        // Find existing assignment for this device if any
+        const existingAssignment = existingAssignments.find(function(a) { 
+            return a.device_id === device.id; 
+        });
+        
+        // Create elements directly instead of using innerHTML for better security
+        const col1 = document.createElement('div');
+        col1.className = 'col-md-5';
+        
+        const formCheck = document.createElement('div');
+        formCheck.className = 'form-check';
+        
         const checkbox = document.createElement('input');
-        checkbox.className = 'form-check-input machine-select-checkbox';
         checkbox.type = 'checkbox';
-        checkbox.value = machineName;
-        checkbox.id = checkboxId;
-        checkbox.checked = !!existingAssignment;
-        checkboxDiv.appendChild(checkbox);
-        checkboxCol.appendChild(checkboxDiv);
+        checkbox.className = 'form-check-input device-checkbox';
+        checkbox.id = 'device_' + device.id;
+        checkbox.value = device.id;
+        if (existingAssignment) {
+            checkbox.checked = true;
+        }
         
-        // Create label column
-        const labelCol = document.createElement('div');
-        labelCol.className = 'col-md-5';
         const label = document.createElement('label');
         label.className = 'form-check-label';
-        label.setAttribute('for', checkboxId);
-        label.textContent = machineName;
-        labelCol.appendChild(label);
+        label.htmlFor = 'device_' + device.id;
+        label.textContent = device.name + ' (' + (device.model_number || 'N/A') + ')';
         
-        // Create trainer select column
-        const selectCol = document.createElement('div');
-        selectCol.className = 'col-md-6';
-        const trainerSelect = document.createElement('select');
-        trainerSelect.className = 'form-select trainer-assign-select';
-        trainerSelect.disabled = !existingAssignment;
+        const col2 = document.createElement('div');
+        col2.className = 'col-md-7';
         
-        // Add trainer options
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = 'Select Trainer...';
-        trainerSelect.appendChild(defaultOption);
+        const hoursInput = document.createElement('input');
+        hoursInput.type = 'number';
+        hoursInput.className = 'form-control form-control-sm';
+        hoursInput.name = 'hours_' + device.id;
+        hoursInput.placeholder = 'Training hours';
+        if (existingAssignment) {
+            hoursInput.value = existingAssignment.hours_trained || '';
+        } else {
+            hoursInput.disabled = true;
+        }
         
-        trainers.forEach(trainer => {
-            const option = document.createElement('option');
-            option.value = trainer;
-            option.textContent = trainer;
-            if (existingAssignment && existingAssignment.trainer === trainer) {
-                option.selected = true;
-            }
-            trainerSelect.appendChild(option);
-        });
+        // Build the DOM structure
+        formCheck.appendChild(checkbox);
+        formCheck.appendChild(label);
+        col1.appendChild(formCheck);
+        col2.appendChild(hoursInput);
+        row.appendChild(col1);
+        row.appendChild(col2);
         
-        selectCol.appendChild(trainerSelect);
-        
-        // Add event listener for checkbox (same as working implementation)
+        // Add event listener to enable/disable hours input based on checkbox
         checkbox.addEventListener('change', function() {
-            trainerSelect.disabled = !this.checked;
+            hoursInput.disabled = !this.checked;
             if (!this.checked) {
-                trainerSelect.value = '';
+                hoursInput.value = '';
             }
         });
         
-        // Assemble the row
-        row.appendChild(checkboxCol);
-        row.appendChild(labelCol);
-        row.appendChild(selectCol);
-        
-        // Add to container
         container.appendChild(row);
+        
+        // The event listener is already added above, so we don't need this duplicate code
     });
 }
+
+// Function to populate trainer dropdown
+function populateTrainerDropdown(selectId, selectedTrainerId) {
+    selectedTrainerId = selectedTrainerId || '';
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    
+    // Clear existing options
+    select.innerHTML = '';
+    
+    // Add default option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select Trainer...';
+    select.appendChild(defaultOption);
+    
+    // Add trainer options
+    window.trainers.forEach(function(trainer) {
+        const option = document.createElement('option');
+        option.value = trainer.id;
+        option.textContent = trainer.name;
+        option.selected = (trainer.id === selectedTrainerId);
+        select.appendChild(option);
+    });
+}
+
+// Function to handle department change in the form
+function handleDepartmentChange(select, containerId) {
+    const department = select.value;
+    generateMachineAssignments(department, containerId);
+}
+
+// Initialize department change handlers for add form
+const addDepartmentSelect = document.getElementById('addDepartment');
+if (addDepartmentSelect) {
+    addDepartmentSelect.addEventListener('change', function() {
+        handleDepartmentChange(this, 'addMachineAssignmentsContainer');
+    });
+}
+
+// Initialize department change handlers for edit form
+const editDepartmentSelect = document.getElementById('editDepartment');
+if (editDepartmentSelect) {
+    editDepartmentSelect.addEventListener('change', function() {
+        handleDepartmentChange(this, 'editMachineAssignmentsContainer');
+    });
+}
+
+// Initialize trainer dropdowns when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    populateTrainerDropdown('trainer_id');
+    populateTrainerDropdown('edit_trainer_id');
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== DOM Content Loaded - Training Page ===');
@@ -672,5 +773,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Training page: Modern date pickers will be handled by shared module');
 });
 </script>
-<script src="{{ url_for('static', filename='js/training.js') }}"></script>
+<!-- Include training page specific JavaScript -->
+<script src="{{ url_for('static', filename='js/training.js') }}" defer></script>
 {% endblock %}

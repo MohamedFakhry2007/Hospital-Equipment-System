@@ -199,23 +199,113 @@ def health_check():
     logger.info("Health check endpoint /healthz was accessed.")
     return "OK", 200
 
+@views_bp.context_processor
+def utility_processor():
+    """Make utility functions available to all templates."""
+    def update_query_param(param, value):
+        """Update a query parameter in the current URL."""
+        from urllib.parse import urlencode, parse_qsl, urlparse, urlunparse
+        
+        # Get the current query parameters as a list of tuples
+        parsed = urlparse(request.url)
+        query_params = parse_qsl(parsed.query, keep_blank_values=True)
+        
+        # Remove existing parameter if it exists
+        query_params = [(k, v) for k, v in query_params if k != param]
+        
+        # Add the new parameter if value is not None
+        if value is not None:
+            query_params.append((param, str(value)))
+            
+        # Generate URL-encoded query string
+        new_query = urlencode(query_params, doseq=True)
+            
+        # Reconstruct the URL with the updated query
+        new_url = urlunparse(parsed._replace(query=new_query))
+        
+        # Extract just the query string part to return
+        parsed_new_url = urlparse(new_url)
+        return parsed_new_url.query
+    
+    return dict(update_query_param=update_query_param)
+
 @views_bp.route('/equipment/<data_type>')
 @permission_required(['equipment_ppm_read', 'equipment_ocm_read'])
 def list_equipment(data_type):
-    """Display list of equipment (either PPM or OCM)."""
-    # if not session.get('is_admin'): # Replaced by decorator
-    #     return redirect(url_for('views.login'))
+    """Display paginated list of equipment (either PPM or OCM)."""
+    current_app.logger.info(f"list_equipment called with data_type: {data_type}")
+    current_app.logger.info(f"Request args: {request.args}")
+    
     if data_type not in ('ppm', 'ocm'):
         flash("Invalid equipment type specified.", "warning")
         return redirect(url_for('views.index'))
     
     try:
-        equipment_data = DataService.get_all_entries(data_type)
-        if isinstance(equipment_data, dict):
-            equipment_data = [equipment_data]
-            
-        for item in equipment_data:
-            status = item.get('Status', 'N/A').lower()
+        # Get pagination parameters from request
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        status_filter = request.args.get('filter', '')
+        sort_by = request.args.get('sort', '')
+        sort_dir = request.args.get('sort_dir', 'asc')
+        
+        current_app.logger.info(f"Loading {data_type} data - page: {page}, per_page: {per_page}, search: '{search}', status_filter: '{status_filter}', sort_by: '{sort_by}', sort_dir: '{sort_dir}'")
+        
+        # Load paginated data
+        result = DataService.load_data(
+            data_type,
+            page=page,
+            per_page=per_page,
+            search=search,
+            status_filter=status_filter,
+            sort_by=sort_by,
+            sort_dir=sort_dir
+        )
+        
+        current_app.logger.info(f"DataService.load_data returned: {type(result)}")
+        if isinstance(result, dict):
+            current_app.logger.info(f"Result keys: {result.keys()}")
+            current_app.logger.info(f"Total items: {result.get('total', 0)}, Items length: {len(result.get('items', []))}")
+            if result.get('items'):
+                current_app.logger.info(f"First item keys: {result['items'][0].keys() if result['items'] else 'No items'}")
+        else:
+            current_app.logger.info(f"Result is a list with length: {len(result) if result else 0}")
+            if result:
+                current_app.logger.info(f"First item type: {type(result[0])}")
+                if hasattr(result[0], 'keys'):
+                    current_app.logger.info(f"First item keys: {result[0].keys()}")
+        
+        # For backward compatibility, check if we got a list (old format) or dict (new format)
+        if isinstance(result, list):
+            current_app.logger.info("Result is a list (old format)")
+            equipment_data = result
+            pagination = None
+        else:  # New format with pagination
+            current_app.logger.info("Result is a dictionary (new format with pagination)")
+            equipment_data = result.get('items', [])
+            pagination = {
+                'total': result.get('total', 0),
+                'pages': result.get('pages', 1),
+                'current_page': result.get('current_page', page),
+                'per_page': result.get('per_page', per_page),
+                'has_next': result.get('has_next', False),
+                'has_prev': result.get('has_prev', False),
+                'next_page': page + 1 if result.get('has_next', False) else None,
+                'prev_page': page - 1 if result.get('has_prev', False) else None
+            }
+        
+        current_app.logger.info(f"Processed equipment_data length: {len(equipment_data) if equipment_data else 0}")
+        current_app.logger.info(f"Pagination data: {pagination}")
+        
+        # Process status for each equipment item
+        current_app.logger.info(f"Processing status for {len(equipment_data)} items")
+        for idx, item in enumerate(equipment_data):
+            if not isinstance(item, dict):
+                current_app.logger.warning(f"Item at index {idx} is not a dictionary: {item}")
+                continue
+                
+            status = str(item.get('Status', 'N/A')).lower()
+            current_app.logger.debug(f"Item {idx} status: {status}")
             item['status_class'] = {
                 'overdue': 'danger',
                 'upcoming': 'warning',
@@ -251,11 +341,31 @@ def list_equipment(data_type):
                             quarter_info['status'] = 'N/A'
                             quarter_info['status_class'] = 'secondary'
         
-        return render_template('equipment/list.html', equipment=equipment_data, data_type=data_type)
+        # Import CSRF token function for the template
+        from flask_wtf.csrf import generate_csrf
+        
+        return render_template(
+            'equipment/list.html',
+            equipment=equipment_data,
+            data_type=data_type,
+            pagination=pagination,
+            current_page=page,
+            per_page=per_page,
+            search=search,
+            status_filter=status_filter,
+            sort=sort_by,
+            sort_dir=sort_dir,
+            title=f"{data_type.upper()} Equipment"
+        )
     except Exception as e:
-        logger.error(f"Error loading {data_type} list: {str(e)}")
+        logger.error(f"Error loading {data_type} list: {str(e)}", exc_info=True)
         flash(f"Error loading {data_type.upper()} equipment data.", "danger")
-        return render_template('equipment/list.html', equipment=[], data_type=data_type)
+        return render_template(
+            'equipment/list.html',
+            equipment=[],
+            data_type=data_type,
+            pagination=None
+        )
 
 @views_bp.route('/equipment/ppm/add', methods=['GET', 'POST'])
 @permission_required(['equipment_ppm_write'])
@@ -479,29 +589,156 @@ def edit_ocm_equipment(Serial):
 @permission_required(['equipment_ppm_delete', 'equipment_ocm_delete'])
 def delete_equipment(data_type, SERIAL):
     """Handle deleting existing equipment."""
-    # if not session.get('is_admin'): # Replaced by decorator
-    #     return redirect(url_for('views.login'))
+    from flask import jsonify
     
     if data_type not in ('ppm', 'ocm'):
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid equipment type specified.'
+            }), 400
         flash("Invalid equipment type specified.", "warning")
         return redirect(url_for('views.index'))
     
     try:
-        entry = DataService.get_entry(data_type, SERIAL)
-        if not entry:
+        # Check if equipment exists
+        equipment = DataService.get_entry(data_type, SERIAL)
+        if not equipment:
+            if request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': f"{data_type.upper()} equipment '{SERIAL}' not found."
+                }), 404
             flash(f"{data_type.upper()} equipment '{SERIAL}' not found.", 'warning')
             return redirect(url_for('views.list_equipment', data_type=data_type))
-            
+        
+        # Delete the equipment
         deleted = DataService.delete_entry(data_type, SERIAL)
+        
         if deleted:
-            flash(f'{data_type.upper()} equipment \'{SERIAL}\' deleted successfully!', 'success')
+            message = f"{data_type.upper()} equipment '{SERIAL}' deleted successfully!"
+            if request.is_json:
+                return jsonify({
+                    'status': 'success',
+                    'message': message,
+                    'deleted_id': SERIAL
+                })
+            flash(message, 'success')
         else:
-            flash(f'{data_type.upper()} equipment \'{SERIAL}\' not found.', 'warning')
+            message = f"{data_type.upper()} equipment '{SERIAL}' not found or could not be deleted."
+            if request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': message
+                }), 404
+            flash(message, 'warning')
             
     except Exception as e:
-        logger.error(f"Error deleting {data_type} equipment {SERIAL}: {str(e)}")
-        flash('An unexpected error occurred during deletion.', 'danger')
+        error_msg = f'An error occurred while deleting the {data_type.upper()} equipment.'
+        logger.error(f"Error deleting {data_type} equipment {SERIAL}: {str(e)}", exc_info=True)
+        
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'message': error_msg
+            }), 500
+            
+        flash(error_msg, 'danger')
     
+    if request.is_json:
+        return jsonify({
+            'status': 'error',
+            'message': 'Unexpected response format.'
+        }), 500
+        
+    return redirect(url_for('views.list_equipment', data_type=data_type))
+
+@views_bp.route('/equipment/<data_type>/bulk-delete', methods=['POST'])
+@permission_required(['equipment_ppm_delete', 'equipment_ocm_delete'])
+def bulk_delete_equipment(data_type):
+    """Handle bulk deletion of equipment."""
+    from flask import jsonify
+    
+    if data_type not in ('ppm', 'ocm'):
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid equipment type specified.'
+            }), 400
+        flash("Invalid equipment type specified.", "warning")
+        return redirect(url_for('views.index'))
+    
+    try:
+        # Get the list of item IDs from the form
+        if request.is_json:
+            data = request.get_json()
+            item_ids = data.get('item_ids', [])
+            if isinstance(item_ids, str):
+                item_ids = item_ids.split(',')
+        else:
+            item_ids = request.form.get('item_ids', '').split(',')
+        
+        # Validate item IDs
+        item_ids = [item_id.strip() for item_id in item_ids if item_id.strip()]
+        
+        if not item_ids:
+            if request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'No items selected for deletion.'
+                }), 400
+            flash('No items selected for deletion.', 'warning')
+            return redirect(url_for('views.list_equipment', data_type=data_type))
+        
+        # Delete each item
+        success_count = 0
+        failed_items = []
+        
+        for item_id in item_ids:
+            try:
+                deleted = DataService.delete_entry(data_type, item_id)
+                if deleted:
+                    success_count += 1
+                else:
+                    failed_items.append(item_id)
+            except Exception as e:
+                logger.error(f"Error deleting {data_type} item {item_id}: {str(e)}")
+                failed_items.append(item_id)
+        
+        # Prepare response
+        response_data = {
+            'status': 'success',
+            'message': f'Successfully deleted {success_count} item(s).',
+            'deleted_count': success_count,
+            'failed_items': failed_items
+        }
+        
+        if failed_items:
+            response_data['message'] += f" Failed to delete {len(failed_items)} item(s)."
+        
+        if request.is_json:
+            return jsonify(response_data)
+            
+        flash(response_data['message'], 'success' if success_count > 0 else 'warning')
+        
+    except Exception as e:
+        error_msg = 'An error occurred during bulk deletion. Please try again.'
+        logger.error(f"Error during bulk delete: {str(e)}", exc_info=True)
+        
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'message': error_msg
+            }), 500
+            
+        flash(error_msg, 'danger')
+    
+    if request.is_json:
+        return jsonify({
+            'status': 'error',
+            'message': 'Unexpected response format.'
+        }), 500
+        
     return redirect(url_for('views.list_equipment', data_type=data_type))
 
 @views_bp.route('/import-export')
@@ -786,25 +1023,58 @@ def send_test_email():
 @views_bp.route('/training')
 @permission_required(['training_manage'])
 def training_management_page():
-    """Display the training management page."""
-    # if not session.get('is_admin'): # Replaced by decorator
-    #     return redirect(url_for('views.login'))
-    
+    """Display the training management page with pagination."""
     try:
-        all_trainings = training_service.get_all_trainings()
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search = request.args.get('search', '')
+        department = request.args.get('department', '')
+        
+        # Get paginated training data
+        data = training_service.load_trainings(
+            page=page,
+            per_page=per_page,
+            search=search,
+            department=department
+        )
+        
+        # Get departments and trainers for filters and forms
+        from app.services.training_service import get_departments, get_trainers
+        departments = get_departments()
+        trainers = get_trainers()
+        
+        # Prepare pagination object for template
+        pagination = {
+            'page': page,
+            'per_page': per_page,
+            'pages': data['pages'],
+            'total': data['total'],
+            'has_next': data['has_next'],
+            'has_prev': data['has_prev'],
+            'next_page': data['next_page'],
+            'prev_page': data['prev_page']
+        }
+        
         return render_template('training/list.html',
-                             trainings=all_trainings,
-                             departments=DEPARTMENTS,
+                             trainings=data['items'],
+                             pagination=pagination,
+                             search=search,
+                             departments=departments,
+                             selected_department=department,
                              training_modules=TRAINING_MODULES,
-                             trainers=TRAINERS,
+                             trainers=trainers,
                              devices_by_department=DEVICES_BY_DEPARTMENT,
                              all_devices=ALL_DEVICES)
     except Exception as e:
-        logger.error(f"Error loading training management page: {str(e)}")
+        logger.error(f"Error loading training management page: {str(e)}", exc_info=True)
         flash("Error loading training data.", "danger")
         return render_template('training/list.html',
                              trainings=[],
+                             pagination=None,
+                             search='',
                              departments=DEPARTMENTS,
+                             selected_department='',
                              training_modules=TRAINING_MODULES,
                              trainers=TRAINERS,
                              devices_by_department=DEVICES_BY_DEPARTMENT,
